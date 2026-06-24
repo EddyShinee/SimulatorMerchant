@@ -1,0 +1,28 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# CSV data store (contains user accounts)
+server/data/*.csv
+
+# Private keys — never commit to a public repo
+*.pfx
+*.p12
+*.key
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
