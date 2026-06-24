@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import { IconApi } from '../components/icons.jsx'
 
 export default function Login() {
@@ -32,8 +33,9 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-white to-brand-50">
-      <div className="flex justify-end p-4">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-white to-brand-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
+      <div className="flex justify-end gap-2 p-4">
+        <ThemeToggle />
         <LanguageSwitcher />
       </div>
       <div className="flex flex-1 items-center justify-center px-4 pb-16">

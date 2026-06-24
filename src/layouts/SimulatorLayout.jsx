@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import { API_CATALOG } from '../config/apis.js'
 import {
   IconApi,
@@ -158,7 +159,7 @@ export default function SimulatorLayout() {
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-900/90 lg:px-8">
           <button
             onClick={() => setMobileOpen(true)}
             className="rounded-md p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
@@ -169,7 +170,8 @@ export default function SimulatorLayout() {
           <div className="hidden text-sm font-medium text-slate-500 lg:block">
             {t('appName')}
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <LanguageSwitcher />
           </div>
         </header>

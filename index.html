@@ -11,6 +11,15 @@
       rel="stylesheet"
     />
     <title>Simulator Merchant</title>
+    <script>
+      // Apply saved theme before paint to avoid a flash of the wrong theme.
+      try {
+        var t = localStorage.getItem('sim_theme')
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
