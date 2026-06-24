@@ -10,6 +10,10 @@ import PaymentToken from './pages/PaymentToken.jsx'
 import DoPayment from './pages/DoPayment.jsx'
 import PaymentAction from './pages/PaymentAction.jsx'
 import PaymentPos from './pages/PaymentPos.jsx'
+import PaymentInquiry from './pages/PaymentInquiry.jsx'
+import TransactionStatusInquiry from './pages/TransactionStatusInquiry.jsx'
+import PaymentOptions from './pages/PaymentOptions.jsx'
+import PaymentOptionDetails from './pages/PaymentOptionDetails.jsx'
 import RequestInbox from './pages/RequestInbox.jsx'
 
 // Redirect authenticated users away from auth pages.
@@ -50,9 +54,13 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="api/payment-token" element={<PaymentToken />} />
+        <Route path="api/payment-options" element={<PaymentOptions />} />
+        <Route path="api/payment-option-details" element={<PaymentOptionDetails />} />
         <Route path="api/do-payment" element={<DoPayment />} />
         <Route path="api/payment-action" element={<PaymentAction />} />
         <Route path="api/payment-pos" element={<PaymentPos />} />
+        <Route path="api/payment-inquiry" element={<PaymentInquiry />} />
+        <Route path="api/transaction-status-inquiry" element={<TransactionStatusInquiry />} />
         <Route path="api/:apiId" element={<ApiConsole />} />
         <Route path="inbox" element={<RequestInbox />} />
       </Route>

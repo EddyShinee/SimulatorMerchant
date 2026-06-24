@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import api, { getApiOrigin } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import InvoiceCopyBar from '../components/InvoiceCopyBar.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import { signJwtHS256, decodeJwtPayload } from '../utils/jwt.js'
 import {
@@ -387,6 +388,7 @@ export default function PaymentToken() {
 
       setResult({
         payload,
+        invoiceNo: finalInvoice,
         jwtToken,
         status: data?.status,
         statusText: data?.statusText,
@@ -400,6 +402,7 @@ export default function PaymentToken() {
       const data = err.response?.data
       setResult({
         payload,
+        invoiceNo: finalInvoice,
         jwtToken: null,
         error: data?.message || err.message || t('errors.network'),
       })
@@ -410,6 +413,7 @@ export default function PaymentToken() {
 
   const webPaymentUrl = result?.decodedResponse?.webPaymentUrl
   const paymentTokenValue = result?.decodedResponse?.paymentToken
+  const resultInvoiceNo = result?.invoiceNo || result?.payload?.invoiceNo
 
   const activeCategory = useMemo(
     () => PARAM_CATEGORIES.find((c) => c.id === activeTab) || PARAM_CATEGORIES[0],
@@ -666,6 +670,8 @@ export default function PaymentToken() {
             </div>
           ) : (
             <div className="space-y-4">
+              <InvoiceCopyBar invoiceNo={resultInvoiceNo} />
+
               {(result.status != null || result.error) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {result.status != null && (
@@ -693,15 +699,25 @@ export default function PaymentToken() {
               )}
 
               <div className="card p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-700">
                     📨 {t('paymentToken.requestPayload')}
                   </p>
-                  <CopyButton text={JSON.stringify(result.payload, null, 2)} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {resultInvoiceNo && (
+                      <CopyButton text={resultInvoiceNo} label={t('paymentToken.copyInvoice')} />
+                    )}
+                    <CopyButton text={JSON.stringify(result.payload, null, 2)} />
+                  </div>
                 </div>
                 <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
                   {JSON.stringify(result.payload, null, 2)}
                 </pre>
+                {resultInvoiceNo && (
+                  <p className="mt-2 text-xs text-slate-400">
+                    Invoice: <span className="font-mono text-slate-500 dark:text-slate-300">{resultInvoiceNo}</span>
+                  </p>
+                )}
               </div>
 
               {result.jwtToken && (

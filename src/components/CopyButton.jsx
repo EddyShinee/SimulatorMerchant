@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { IconCopy } from './icons.jsx'
 
-export default function CopyButton({ text, className = '' }) {
+export default function CopyButton({ text, className = '', label }) {
   const { t } = useLanguage()
   const [copied, setCopied] = useState(false)
 
@@ -25,7 +25,7 @@ export default function CopyButton({ text, className = '' }) {
   return (
     <button type="button" onClick={handleCopy} className={`btn-secondary ${className}`}>
       <IconCopy className="h-4 w-4" />
-      {copied ? t('common.copied') : t('common.copy')}
+      {copied ? t('common.copied') : label || t('common.copy')}
     </button>
   )
 }

@@ -4,6 +4,7 @@ import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import PaymentTokenField from '../components/PaymentTokenField.jsx'
 import { omitEmptyFields } from '../config/paymentTokenFields.js'
 import {
   DO_PAYMENT_ENVIRONMENTS,
@@ -370,20 +371,7 @@ export default function DoPayment() {
           {/* Basic info */}
           <div className="card space-y-3 p-4">
             <h3 className="font-semibold text-slate-800">{t('doPayment.basicInfo')}</h3>
-            <div>
-              <label className="label">🔑 Payment Token</label>
-              <div className="flex gap-2">
-                <input
-                  className="input font-mono text-xs"
-                  value={paymentToken}
-                  onChange={(e) => setPaymentToken(e.target.value)}
-                  placeholder="kSA..."
-                />
-                <button type="button" onClick={pasteToken} className="btn-secondary whitespace-nowrap">
-                  📋 {t('doPayment.pasteToken')}
-                </button>
-              </div>
-            </div>
+            <PaymentTokenField value={paymentToken} onChange={setPaymentToken} onPaste={pasteToken} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">🧾 Client ID</label>
