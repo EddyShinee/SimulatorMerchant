@@ -107,6 +107,16 @@ export default function SimulatorLayout() {
         </div>
 
         <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {t('nav.sectionPosStandalone')}
+        </p>
+        <NavItem
+          to="/app/pos-standalone"
+          icon={IconApi}
+          label={t('nav.posStandalone')}
+          onClick={closeMobile}
+        />
+
+        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
           {t('nav.sectionTools')}
         </p>
         <NavItem

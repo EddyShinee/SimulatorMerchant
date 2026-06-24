@@ -25,6 +25,7 @@ if (!process.env.JWT_SECRET) {
 import authRouter from './routes/auth.js'
 import simulatorRouter from './routes/simulator.js'
 import paymentActionRouter from './routes/paymentAction.js'
+import posStandaloneRouter from './routes/posStandalone.js'
 import { requireAuth } from './middleware/auth.js'
 
 const app = express()
@@ -56,6 +57,7 @@ app.use('/api/auth', authRouter)
 // Simulator routes (mix of public hook + protected endpoints)
 app.use('/api/simulator', simulatorRouter)
 app.use('/api/simulator', paymentActionRouter)
+app.use('/api/simulator', posStandaloneRouter)
 
 // Serve the built frontend (used for local `npm start`; on Vercel the static
 // files and SPA fallback are handled by the platform, not Express).

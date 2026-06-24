@@ -35,4 +35,13 @@ export function getApiOrigin() {
   return window.location.origin
 }
 
+// Webhook URLs must be reachable from the Node backend (not only the browser).
+// In dev, prefer the proxy target (e.g. http://localhost:4000) over the Vite port.
+export function getWebhookOrigin() {
+  if (baseURL) return baseURL.replace(/\/$/, '')
+  const devTarget = import.meta.env.VITE_DEV_PROXY_TARGET?.replace(/\/$/, '')
+  if (devTarget) return devTarget
+  return window.location.origin
+}
+
 export default api

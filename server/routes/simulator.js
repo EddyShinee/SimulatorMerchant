@@ -138,4 +138,60 @@ router.post('/proxy', async (req, res) => {
   }
 })
 
+// Transaction analysis: fetch HTML report from 2C2P / M-Pay merchant portal.
+router.post('/transaction-analysis', async (req, res) => {
+  const started = Date.now()
+  try {
+    const { url, sessionId } = req.body || {}
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'INVALID_URL', message: 'A target URL is required.' })
+    }
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'INVALID_SESSION', message: 'Session ID is required.' })
+    }
+
+    let parsed
+    try {
+      parsed = new URL(url)
+    } catch {
+      return res.status(400).json({ error: 'INVALID_URL', message: 'The target URL is malformed.' })
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'INVALID_PROTOCOL', message: 'Only http and https are allowed.' })
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120000)
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Cookie: `ASP.NET_SessionId=${sessionId.trim()}`,
+      },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+
+    const text = await response.text()
+
+    return res.json({
+      ok: response.ok,
+      durationMs: Date.now() - started,
+      status: response.status,
+      statusText: response.statusText,
+      body: text,
+      error: response.ok ? null : `HTTP ${response.status}`,
+    })
+  } catch (err) {
+    const aborted = err?.name === 'AbortError'
+    return res.status(aborted ? 504 : 502).json({
+      ok: false,
+      error: aborted ? 'TIMEOUT' : 'REQUEST_FAILED',
+      message: aborted ? 'The request timed out after 120s.' : err.message,
+      durationMs: Date.now() - started,
+    })
+  }
+})
+
 export default router

@@ -4,8 +4,8 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import * as jose from 'jose'
-import forge from 'node-forge'
 import { requireAuth } from '../middleware/auth.js'
+import { loadPrivateKey } from '../utils/privateKey.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(__dirname, '../..')
@@ -34,49 +34,6 @@ router.get('/payment-action/default-keys', (req, res) => {
       : null,
   })
 })
-
-// Load a private key (KeyObject) from an uploaded file (base64).
-// Supports pfx/p12 (via node-forge), pem/key and der.
-function loadPrivateKey(base64, filename, password) {
-  const lower = (filename || '').toLowerCase()
-  const buffer = Buffer.from(base64, 'base64')
-
-  if (lower.endsWith('.pfx') || lower.endsWith('.p12')) {
-    const p12Der = forge.util.createBuffer(buffer.toString('binary'))
-    const p12Asn1 = forge.asn1.fromDer(p12Der)
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password || '')
-    let bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
-    let bag = (bags[forge.pki.oids.pkcs8ShroudedKeyBag] || [])[0]
-    if (!bag) {
-      bags = p12.getBags({ bagType: forge.pki.oids.keyBag })
-      bag = (bags[forge.pki.oids.keyBag] || [])[0]
-    }
-    if (!bag || !bag.key) {
-      throw new Error('No private key found in PFX (wrong password?).')
-    }
-    const pem = forge.pki.privateKeyToPem(bag.key)
-    return crypto.createPrivateKey(pem)
-  }
-
-  if (lower.endsWith('.pem') || lower.endsWith('.key')) {
-    const pem = buffer.toString('utf8')
-    return crypto.createPrivateKey(
-      password ? { key: pem, passphrase: password } : pem
-    )
-  }
-
-  if (lower.endsWith('.der')) {
-    return crypto.createPrivateKey({
-      key: buffer,
-      format: 'der',
-      type: 'pkcs8',
-      ...(password ? { passphrase: password } : {}),
-    })
-  }
-
-  // Fallback: try PEM text
-  return crypto.createPrivateKey(buffer.toString('utf8'))
-}
 
 // Load a public key (KeyObject) from a certificate or public key file (base64).
 // Accepts: PEM public key (SPKI), PEM/DER X.509 certificate, or DER SPKI key.

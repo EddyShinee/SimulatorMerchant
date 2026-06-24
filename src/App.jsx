@@ -14,6 +14,8 @@ import PaymentInquiry from './pages/PaymentInquiry.jsx'
 import TransactionStatusInquiry from './pages/TransactionStatusInquiry.jsx'
 import PaymentOptions from './pages/PaymentOptions.jsx'
 import PaymentOptionDetails from './pages/PaymentOptionDetails.jsx'
+import Analysis from './pages/Analysis.jsx'
+import PosStandalone from './pages/PosStandalone.jsx'
 import RequestInbox from './pages/RequestInbox.jsx'
 
 // Redirect authenticated users away from auth pages.
@@ -61,7 +63,9 @@ export default function App() {
         <Route path="api/payment-pos" element={<PaymentPos />} />
         <Route path="api/payment-inquiry" element={<PaymentInquiry />} />
         <Route path="api/transaction-status-inquiry" element={<TransactionStatusInquiry />} />
+        <Route path="api/analysis" element={<Analysis />} />
         <Route path="api/:apiId" element={<ApiConsole />} />
+        <Route path="pos-standalone" element={<PosStandalone />} />
         <Route path="inbox" element={<RequestInbox />} />
       </Route>
 
