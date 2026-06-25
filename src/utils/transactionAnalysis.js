@@ -3,11 +3,44 @@ function cellText(cell) {
   return (label ? label.textContent : cell.textContent).trim()
 }
 
+/** Detect login / empty responses before parsing transaction table. */
+export function analyzeHtmlResponse(html, finalUrl = '') {
+  const text = typeof html === 'string' ? html : ''
+  const lower = text.toLowerCase()
+  const urlLower = (finalUrl || '').toLowerCase()
+
+  if (
+    urlLower.includes('/login') ||
+    lower.includes('login to my.2c2p.com') ||
+    lower.includes('id="loginform"') ||
+    /<title>[^<]*login[^<]*<\/title>/i.test(text)
+  ) {
+    return {
+      kind: 'login',
+      error: 'login_page',
+    }
+  }
+
+  if (!text.trim()) {
+    return { kind: 'empty', error: 'empty_response' }
+  }
+
+  return { kind: 'unknown', error: null }
+}
+
 /** Parse HTML table.table from 2C2P merchant portal into row objects. */
 export function parseHtmlTable(html) {
+  const precheck = analyzeHtmlResponse(html)
+  if (precheck.kind === 'login') {
+    return { error: 'login_page', rows: [] }
+  }
+  if (precheck.kind === 'empty') {
+    return { error: 'empty_response', rows: [] }
+  }
+
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const table = doc.querySelector('table.table')
-  if (!table) return { error: 'Could not find table in HTML response', rows: [] }
+  if (!table) return { error: 'no_table', rows: [] }
 
   const trs = [...table.querySelectorAll('tr')]
   if (trs.length < 2) return { error: 'No data rows found in table', rows: [] }

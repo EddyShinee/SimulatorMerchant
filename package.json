@@ -1,7 +1,7 @@
 {
   "name": "simulator-merchant",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Simulator Merchant - full-stack app with auth, CSV user storage and an API request simulator",
   "scripts": {

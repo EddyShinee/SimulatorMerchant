@@ -11,6 +11,7 @@ export default function Analysis() {
 
   const [apiKey, setApiKey] = useState(ANALYSIS_API_SELECT[0].label)
   const [sessionId, setSessionId] = useState('')
+  const [fullCookie, setFullCookie] = useState('')
   const [customUrl, setCustomUrl] = useState('')
 
   const [loading, setLoading] = useState(false)
@@ -32,7 +33,7 @@ export default function Analysis() {
     setRawHtml('')
     setMeta(null)
 
-    if (!sessionId.trim()) {
+    if (!sessionId.trim() && !fullCookie.trim()) {
       setError(t('analysis.sessionRequired'))
       return
     }
@@ -45,12 +46,14 @@ export default function Analysis() {
     try {
       const { data } = await api.post('/api/simulator/transaction-analysis', {
         url: apiUrl.trim(),
-        sessionId: sessionId.trim(),
+        sessionId: sessionId.trim() || undefined,
+        cookie: fullCookie.trim() || undefined,
       })
 
       setMeta({
         status: data.status,
         durationMs: data.durationMs,
+        finalUrl: data.finalUrl,
       })
       setRawHtml(typeof data.body === 'string' ? data.body : '')
 
@@ -60,9 +63,16 @@ export default function Analysis() {
       }
 
       const html = typeof data.body === 'string' ? data.body : ''
+
+      if (data.redirectedToLogin) {
+        setParseError(t('analysis.loginPage'))
+        return
+      }
+
       const parsed = parseHtmlTable(html)
       if (parsed.error) {
-        setParseError(parsed.error)
+        const key = `analysis.errors.${parsed.error}`
+        setParseError(t(key) !== key ? t(key) : parsed.error)
         return
       }
 
@@ -131,7 +141,20 @@ export default function Analysis() {
               placeholder="ASP.NET_SessionId"
               autoComplete="off"
             />
+            <p className="mt-1 text-xs text-slate-400">{t('analysis.sessionHint')}</p>
           </div>
+        </div>
+
+        <div>
+          <label className="label">{t('analysis.fullCookie')}</label>
+          <textarea
+            className="input min-h-[72px] font-mono text-xs"
+            value={fullCookie}
+            onChange={(e) => setFullCookie(e.target.value)}
+            placeholder="ASP.NET_SessionId=...; .ASPXAUTH=..."
+            spellCheck={false}
+          />
+          <p className="mt-1 text-xs text-slate-400">{t('analysis.fullCookieHint')}</p>
         </div>
 
         {error && (

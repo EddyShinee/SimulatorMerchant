@@ -182,13 +182,23 @@ router.post('/proxy', requireAuth, async (req, res) => {
 router.post('/transaction-analysis', requireAuth, async (req, res) => {
   const started = Date.now()
   try {
-    const { url, sessionId } = req.body || {}
+    const { url, sessionId, cookie } = req.body || {}
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'INVALID_URL', message: 'A target URL is required.' })
     }
-    if (!sessionId || typeof sessionId !== 'string') {
-      return res.status(400).json({ error: 'INVALID_SESSION', message: 'Session ID is required.' })
+
+    const cookieHeader =
+      (typeof cookie === 'string' && cookie.trim()) ||
+      (typeof sessionId === 'string' && sessionId.trim()
+        ? `ASP.NET_SessionId=${sessionId.trim()}`
+        : '')
+
+    if (!cookieHeader) {
+      return res.status(400).json({
+        error: 'INVALID_SESSION',
+        message: 'Session ID or full Cookie header is required.',
+      })
     }
 
     let parsed
@@ -207,19 +217,27 @@ router.post('/transaction-analysis', requireAuth, async (req, res) => {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        Cookie: `ASP.NET_SessionId=${sessionId.trim()}`,
+        Cookie: cookieHeader,
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       },
+      redirect: 'follow',
       signal: controller.signal,
     })
     clearTimeout(timeout)
 
     const text = await response.text()
+    const finalUrl = response.url || url
+    const redirectedToLogin = /\/login/i.test(finalUrl)
 
     return res.json({
       ok: response.ok,
       durationMs: Date.now() - started,
       status: response.status,
       statusText: response.statusText,
+      finalUrl,
+      redirectedToLogin,
       body: text,
       error: response.ok ? null : `HTTP ${response.status}`,
     })

@@ -209,13 +209,27 @@ export const translations = {
       selection: 'Selection',
       custom: 'Custom URL',
       sessionId: 'Session ID',
-      sessionRequired: 'Vui lòng nhập Session ID.',
+      sessionRequired: 'Vui lòng nhập Session ID hoặc Cookie đầy đủ.',
+      sessionHint:
+        'Copy từ DevTools → Application → Cookies sau khi đăng nhập my.m-pay.vn và search transaction.',
+      fullCookie: 'Cookie đầy đủ (tùy chọn)',
+      fullCookieHint:
+        'Nếu chỉ Session ID không đủ, paste toàn bộ Cookie từ tab Network (Request Headers). Thường cần cả .ASPXAUTH.',
+      loginPage:
+        'Server trả về trang Login — session hết hạn hoặc thiếu cookie đăng nhập. Hãy đăng nhập lại portal, search transaction, rồi copy cookie mới.',
       urlRequired: 'Vui lòng nhập API URL.',
       send: 'Gửi yêu cầu',
       sending: 'Đang gửi...',
       rawResponse: 'Raw Response (HTML)',
       noDateTimeCol: 'Không tìm thấy cột Date/Time. Các cột:',
       noValidDates: 'Không có dữ liệu datetime hợp lệ sau khi parse.',
+      errors: {
+        login_page:
+          'Phản hồi là trang đăng nhập — session không hợp lệ. Đăng nhập portal, search transaction trước, rồi copy cookie mới.',
+        empty_response: 'Phản hồi HTML trống.',
+        no_table:
+          'Không tìm thấy bảng transaction (table.table). Có thể chưa search transaction trên portal hoặc URL không đúng.',
+      },
     },
     posStandalone: {
       title: 'POS Standalone (SoftPOS)',
@@ -568,13 +582,27 @@ export const translations = {
       selection: 'Selection',
       custom: 'Custom URL',
       sessionId: 'Session ID',
-      sessionRequired: 'Please enter Session ID.',
+      sessionRequired: 'Please enter Session ID or full Cookie.',
+      sessionHint:
+        'Copy from DevTools → Application → Cookies after logging into my.m-pay.vn and running a transaction search.',
+      fullCookie: 'Full Cookie (optional)',
+      fullCookieHint:
+        'If Session ID alone fails, paste the full Cookie from Network tab request headers. Often needs .ASPXAUTH too.',
+      loginPage:
+        'Server returned the Login page — session expired or auth cookie missing. Log in again, search transactions, then copy fresh cookies.',
       urlRequired: 'Please enter API URL.',
       send: 'Send Request',
       sending: 'Sending...',
       rawResponse: 'Raw Response (HTML)',
       noDateTimeCol: 'Could not find Date/Time column. Available columns:',
       noValidDates: 'No valid datetime data found after parsing.',
+      errors: {
+        login_page:
+          'Response is a login page — invalid session. Log into the portal, search transactions first, then copy fresh cookies.',
+        empty_response: 'Empty HTML response.',
+        no_table:
+          'Transaction table (table.table) not found. You may need to search transactions on the portal first, or the URL is wrong.',
+      },
     },
     posStandalone: {
       title: 'POS Standalone (SoftPOS)',
