@@ -2,15 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "vite build",
   "outputDirectory": "dist",
-  "framework": "vite",
   "functions": {
     "api/index.js": {
       "includeFiles": "src/KeyPaymentAction/**",
       "maxDuration": 60
     }
   },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/index" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
