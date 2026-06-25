@@ -13,6 +13,7 @@ import {
   IconMenu,
   IconClose,
 } from '../components/icons.jsx'
+import { AppBrandSidebar } from '../components/AppBrand.jsx'
 
 function NavItem({ to, icon: Icon, label, onClick }) {
   return (
@@ -79,12 +80,7 @@ export default function SimulatorLayout() {
 
   const SidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
-          <IconApi className="h-5 w-5" />
-        </div>
-        <span className="text-base font-bold text-slate-900">{t('appName')}</span>
-      </div>
+      <AppBrandSidebar />
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
         <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-slate-400">

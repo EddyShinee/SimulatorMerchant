@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { AppBrandHeader } from '../components/AppBrand.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import CopyButton from '../components/CopyButton.jsx'
@@ -61,9 +62,7 @@ export default function PaymentCallbackFrontend() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-6 sm:px-8">
         <div className="mb-6 flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            Simulator Merchant
-          </span>
+          <AppBrandHeader />
           <div className="flex gap-2">
             <ThemeToggle />
             <LanguageSwitcher />

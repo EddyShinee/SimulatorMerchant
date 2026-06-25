@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
-import { IconApi } from '../components/icons.jsx'
+import { AppBrandCentered } from '../components/AppBrand.jsx'
 
 export default function Register() {
   const { register } = useAuth()
@@ -49,10 +49,8 @@ export default function Register() {
       </div>
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-md">
+          <AppBrandCentered />
           <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
-              <IconApi className="h-7 w-7" />
-            </div>
             <h1 className="text-2xl font-bold text-slate-900">{t('auth.registerTitle')}</h1>
             <p className="mt-1.5 text-sm text-slate-500">{t('auth.registerSubtitle')}</p>
           </div>
