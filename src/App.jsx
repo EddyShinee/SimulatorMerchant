@@ -17,6 +17,7 @@ import PaymentOptionDetails from './pages/PaymentOptionDetails.jsx'
 import Analysis from './pages/Analysis.jsx'
 import PosStandalone from './pages/PosStandalone.jsx'
 import RequestInbox from './pages/RequestInbox.jsx'
+import PaymentCallbackFrontend from './pages/PaymentCallbackFrontend.jsx'
 
 // Redirect authenticated users away from auth pages.
 function PublicOnly({ children }) {
@@ -68,6 +69,8 @@ export default function App() {
         <Route path="pos-standalone" element={<PosStandalone />} />
         <Route path="inbox" element={<RequestInbox />} />
       </Route>
+
+      <Route path="/callback/frontend" element={<PaymentCallbackFrontend />} />
 
       <Route path="/" element={<Navigate to="/app" replace />} />
       <Route path="*" element={<Navigate to="/app" replace />} />

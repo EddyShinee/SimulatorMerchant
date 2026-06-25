@@ -2,6 +2,9 @@ import express from 'express'
 import crypto from 'crypto'
 import { requireAuth } from '../middleware/auth.js'
 
+import { parsePaymentResponse, encodeCallbackDisplayToken } from '../utils/paymentResponse.js'
+import { callbackDisplayUrl, resolveFrontendOrigin } from '../utils/frontendOrigin.js'
+
 const router = express.Router()
 
 // In-memory ring buffer of captured inbound requests.
@@ -23,6 +26,45 @@ function captureRequest(req) {
   if (capturedRequests.length > MAX_CAPTURED) capturedRequests.length = MAX_CAPTURED
   return entry
 }
+
+function redirectToCallbackPage(req, res, token) {
+  res.redirect(302, callbackDisplayUrl(req, token))
+}
+
+function frontendCallbackRedirect(req, res) {
+  // Already has display token (e.g. user opened wrong API URL) → send to SPA
+  if (req.query.d && typeof req.query.d === 'string') {
+    return redirectToCallbackPage(req, res, req.query.d)
+  }
+
+  const entry = captureRequest(req)
+  const raw =
+    req.body?.paymentResponse ??
+    req.query?.paymentResponse ??
+    req.body?.payload ??
+    req.query?.payload ??
+    null
+  const parsed =
+    parsePaymentResponse(raw) ??
+    (req.body && Object.keys(req.body).length > 0 ? req.body : null) ??
+    (req.query && Object.keys(req.query).length > 0 ? req.query : null)
+
+  const token = encodeCallbackDisplayToken({
+    raw,
+    parsed,
+    receivedAt: entry.receivedAt,
+    method: entry.method,
+    path: entry.path,
+  })
+
+  redirectToCallbackPage(req, res, token)
+}
+
+// Frontend payment return — capture + redirect to React result page
+router.all('/callback/frontend', frontendCallbackRedirect)
+router.all('/hook/callback-frontend', frontendCallbackRedirect)
+// Malformed paths (e.g. .../callback/null/callback/frontend?d=...) — still show result page
+router.all(/^\/callback\/.*\/callback\/frontend\/?$/, frontendCallbackRedirect)
 
 // ---------------------------------------------------------------------------
 // PUBLIC: inbound request receiver ("đón request từ GET/POST")
@@ -46,23 +88,21 @@ router.all(/^\/hook(\/.*)?$/, (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// PROTECTED endpoints below
+// PROTECTED endpoints (auth per-route — do NOT use router.use(requireAuth))
 // ---------------------------------------------------------------------------
-router.use(requireAuth)
 
-// List captured inbound requests
-router.get('/requests', (req, res) => {
+router.get('/requests', requireAuth, (req, res) => {
   res.json({ count: capturedRequests.length, requests: capturedRequests })
 })
 
 // Clear captured inbound requests
-router.delete('/requests', (req, res) => {
+router.delete('/requests', requireAuth, (req, res) => {
   capturedRequests.length = 0
   res.json({ ok: true, count: 0 })
 })
 
 // Outbound API caller: server performs the request and returns the response.
-router.post('/proxy', async (req, res) => {
+router.post('/proxy', requireAuth, async (req, res) => {
   const started = Date.now()
   try {
     const { method = 'GET', url, headers = {}, body } = req.body || {}
@@ -139,7 +179,7 @@ router.post('/proxy', async (req, res) => {
 })
 
 // Transaction analysis: fetch HTML report from 2C2P / M-Pay merchant portal.
-router.post('/transaction-analysis', async (req, res) => {
+router.post('/transaction-analysis', requireAuth, async (req, res) => {
   const started = Date.now()
   try {
     const { url, sessionId } = req.body || {}

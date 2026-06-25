@@ -29,7 +29,7 @@ function initialAdvancedValues() {
   // Default the return URLs to this project's own webhook receiver so the
   // callbacks are captured in the Request Inbox.
   const origin = getApiOrigin()
-  values.frontendReturnUrl = `${origin}/api/simulator/hook/callback-frontend`
+  values.frontendReturnUrl = `${origin}/api/simulator/callback/frontend`
   values.backendReturnUrl = `${origin}/api/simulator/hook/callback-backend`
   return values
 }
