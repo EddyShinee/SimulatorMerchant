@@ -3,20 +3,30 @@ import {
   CHART_TYPES,
   TIME_FILTERS,
 } from '../config/analysisConfig.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import {
   addTimeBucket,
+  computeConversionMetrics,
+  computeHourlyProfile,
   computeProfileStats,
   computeSuccessRate,
-  countByGroupAndStatus,
+  countByChannelAndStatus,
+  countByResponseCode,
+  downloadTransactionCsv,
   formatDateTime,
   pivotTable,
   rateByGroupAndStatus,
+  successRateByChannel,
+  sumAmountByChannel,
   sumAmountByGroupAndStatus,
   sumAmountByStatus,
+  topRejectedByAmount,
 } from '../utils/transactionAnalysis.js'
 import StatusTimeChart from './analysis/StatusTimeChart.jsx'
 import SingleSeriesChart from './analysis/SingleSeriesChart.jsx'
 import AmountPieChart from './analysis/AmountPieChart.jsx'
+import FunnelChart from './analysis/FunnelChart.jsx'
+import ChannelSrChart from './analysis/ChannelSrChart.jsx'
 
 function Metric({ label, value }) {
   return (
@@ -101,7 +111,15 @@ function Section({ title, children, defaultOpen = true }) {
 }
 
 export default function AnalysisDashboard({ rows, meta }) {
+  const { t } = useLanguage()
   const profile = useMemo(() => computeProfileStats(rows), [rows])
+  const conversion = useMemo(() => computeConversionMetrics(rows), [rows])
+  const hourlyData = useMemo(() => computeHourlyProfile(rows), [rows])
+  const channelSr = useMemo(() => successRateByChannel(rows), [rows])
+  const channelAmount = useMemo(() => sumAmountByChannel(rows), [rows])
+  const channelStatus = useMemo(() => countByChannelAndStatus(rows), [rows])
+  const responseCodes = useMemo(() => countByResponseCode(rows), [rows])
+  const topRejected = useMemo(() => topRejectedByAmount(rows, 10), [rows])
 
   const [timeCount, setTimeCount] = useState('Day')
   const [chartCount, setChartCount] = useState('Bar')
@@ -115,6 +133,8 @@ export default function AnalysisDashboard({ rows, meta }) {
 
   const hasStatus = rows.some((r) => r.status)
   const hasAmount = rows.some((r) => r.transactionAmount != null)
+  const hasChannel = rows.some((r) => r.channel)
+  const hasResponse = responseCodes.length > 0
 
   const countData = useMemo(() => {
     const { rows: bucketed, groupCol } = addTimeBucket(rows, timeCount)
@@ -142,10 +162,19 @@ export default function AnalysisDashboard({ rows, meta }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label="Total Transactions" value={profile.total} />
-        <Metric label="Response Time" value={`${(meta.durationMs / 1000).toFixed(2)}s`} />
-        <Metric label="Status Code" value={meta.status} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid flex-1 gap-3 sm:grid-cols-3">
+          <Metric label="Total Transactions" value={profile.total} />
+          <Metric label="Response Time" value={`${(meta.durationMs / 1000).toFixed(2)}s`} />
+          <Metric label="Status Code" value={meta.status} />
+        </div>
+        <button
+          type="button"
+          onClick={() => downloadTransactionCsv(rows)}
+          className="btn-secondary shrink-0"
+        >
+          ⬇ {t('analysis.insights.exportCsv')}
+        </button>
       </div>
 
       <Section title="📋 Profile Report Information">
@@ -199,6 +228,18 @@ export default function AnalysisDashboard({ rows, meta }) {
                     <td className="py-1">Mean</td>
                     <td className="py-1 text-right">{Math.round(profile.amountStats.mean).toLocaleString()}</td>
                   </tr>
+                  <tr>
+                    <td className="py-1">P50</td>
+                    <td className="py-1 text-right">{Math.round(profile.amountStats.p50).toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1">P90</td>
+                    <td className="py-1 text-right">{Math.round(profile.amountStats.p90).toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1">P99</td>
+                    <td className="py-1 text-right">{Math.round(profile.amountStats.p99).toLocaleString()}</td>
+                  </tr>
                 </tbody>
               </table>
             ) : (
@@ -215,6 +256,164 @@ export default function AnalysisDashboard({ rows, meta }) {
           </p>
         </div>
       </Section>
+
+      {hasStatus && (
+        <Section title={`🎯 ${t('analysis.insights.conversion')}`}>
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Metric label={t('analysis.insights.srRate')} value={`${conversion.srRate}%`} />
+            <Metric label={t('analysis.insights.declineRate')} value={`${conversion.declineRate}%`} />
+            <Metric label={t('analysis.insights.expiredRate')} value={`${conversion.expiredRate}%`} />
+            {hasAmount && (
+              <>
+                <Metric
+                  label={t('analysis.insights.successAmount')}
+                  value={`${conversion.successAmount.toLocaleString()} VND`}
+                />
+                <Metric
+                  label={t('analysis.insights.lostAmount')}
+                  value={`${conversion.lostAmount.toLocaleString()} VND`}
+                />
+              </>
+            )}
+          </div>
+          <FunnelChart data={conversion.funnel} title={t('analysis.insights.funnel')} />
+        </Section>
+      )}
+
+      {hasChannel && hasStatus && (
+        <Section title={`📡 ${t('analysis.insights.channel')}`}>
+          <ChannelSrChart data={channelSr} title={t('analysis.insights.channelSr')} />
+          <div className="mt-6">
+            <StatusTimeChart
+              data={channelStatus}
+              chartType="Bar"
+              title={t('analysis.insights.channelCount')}
+            />
+          </div>
+          {hasAmount && channelAmount.length > 0 && (
+            <div className="mt-6">
+              <SingleSeriesChart
+                data={channelAmount}
+                xKey="channel"
+                yKey="totalAmount"
+                chartType="Bar"
+                title={t('analysis.insights.channelAmount')}
+                color="#3b82f6"
+                valueFormatter={(v) => `${Number(v).toLocaleString()} VND`}
+              />
+            </div>
+          )}
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm text-brand-600">View Channel SR Table</summary>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-2 py-1 text-left">{t('analysis.insights.channelCol')}</th>
+                    <th className="px-2 py-1 text-right">Total</th>
+                    <th className="px-2 py-1 text-right">SR Rate</th>
+                    <th className="px-2 py-1 text-right">Decline</th>
+                    <th className="px-2 py-1 text-right">Expired</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {channelSr.map((row) => (
+                    <tr key={row.channel} className="border-b border-slate-100 dark:border-slate-800">
+                      <td className="px-2 py-1 font-mono">{row.channel}</td>
+                      <td className="px-2 py-1 text-right">{row.total}</td>
+                      <td className="px-2 py-1 text-right">{row.srRate}%</td>
+                      <td className="px-2 py-1 text-right">{row.declineRate}%</td>
+                      <td className="px-2 py-1 text-right">{row.expiredRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </Section>
+      )}
+
+      {hasStatus && (
+        <Section title={`🕐 ${t('analysis.insights.hourly')}`} defaultOpen={false}>
+          <SingleSeriesChart
+            data={hourlyData}
+            xKey="label"
+            yKey="count"
+            chartType="Bar"
+            title={t('analysis.insights.hourlyCount')}
+            color="#64748b"
+          />
+          <div className="mt-6">
+            <SingleSeriesChart
+              data={hourlyData}
+              xKey="label"
+              yKey="srRate"
+              chartType="Line"
+              title={t('analysis.insights.hourlySr')}
+              color="#22c55e"
+              yMax={100}
+              valueFormatter={(v) => `${v}%`}
+            />
+          </div>
+        </Section>
+      )}
+
+      {hasResponse && (
+        <Section title={`🔢 ${t('analysis.insights.responseCodes')}`} defaultOpen={false}>
+          <SingleSeriesChart
+            data={responseCodes.slice(0, 15)}
+            xKey="code"
+            yKey="count"
+            chartType="Bar"
+            color="#8b5cf6"
+          />
+          <table className="mt-4 w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="py-1 text-left">{t('analysis.insights.response')}</th>
+                <th className="py-1 text-right">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {responseCodes.map(({ code, count }) => (
+                <tr key={code} className="border-b border-slate-100 dark:border-slate-800">
+                  <td className="py-1 font-mono">{code}</td>
+                  <td className="py-1 text-right">{count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
+
+      {hasStatus && hasAmount && topRejected.length > 0 && (
+        <Section title={`⚠️ ${t('analysis.insights.topRejected')}`} defaultOpen={false}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="px-2 py-1 text-left">{t('analysis.insights.invoice')}</th>
+                  <th className="px-2 py-1 text-left">{t('analysis.insights.channelCol')}</th>
+                  <th className="px-2 py-1 text-right">{t('analysis.insights.amount')}</th>
+                  <th className="px-2 py-1 text-left">{t('analysis.insights.response')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topRejected.map((row, i) => (
+                  <tr key={i} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="px-2 py-1 font-mono">{row.invoiceNo || '—'}</td>
+                    <td className="px-2 py-1">{row.channel || '—'}</td>
+                    <td className="px-2 py-1 text-right text-red-600 dark:text-red-400">
+                      {row.transactionAmount.toLocaleString()}
+                    </td>
+                    <td className="px-2 py-1 font-mono">{row.responseCode || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
 
       {hasStatus && (
         <>

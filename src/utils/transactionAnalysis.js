@@ -120,6 +120,15 @@ export function enrichTransactionRows(rows, columns) {
   const statusCol = findColumn(columns, 'status')
   const amountCol =
     findColumn(columns, 'transaction amount') || findColumn(columns, 'amount')
+  const channelCol =
+    findColumn(columns, 'channel code') ||
+    findColumn(columns, 'payment channel') ||
+    findColumn(columns, 'channel')
+  const invoiceCol = findColumn(columns, 'invoice')
+  const responseCol =
+    findColumn(columns, 'response code') ||
+    findColumn(columns, 'resp code') ||
+    findColumn(columns, 'response')
 
   const enriched = rows
     .map((row) => {
@@ -133,16 +142,30 @@ export function enrichTransactionRows(rows, columns) {
         const n = Number(raw)
         transactionAmount = Number.isFinite(n) ? n : null
       }
+      const channel = channelCol ? String(row[channelCol] || '').trim() || null : null
+      const invoiceNo = invoiceCol ? String(row[invoiceCol] || '').trim() || null : null
+      const responseCode = responseCol ? String(row[responseCol] || '').trim() || null : null
       return {
         ...row,
         parsedDateTime,
         status,
         transactionAmount,
+        channel,
+        invoiceNo,
+        responseCode,
       }
     })
     .filter((r) => r.parsedDateTime)
 
-  return { rows: enriched, datetimeCol, statusCol, amountCol }
+  return {
+    rows: enriched,
+    datetimeCol,
+    statusCol,
+    amountCol,
+    channelCol,
+    invoiceCol,
+    responseCol,
+  }
 }
 
 export function addTimeBucket(rows, filterType) {
@@ -221,6 +244,179 @@ export function sumAmountByStatus(rows) {
   return [...map.entries()].map(([status, totalAmount]) => ({ status, totalAmount }))
 }
 
+export function sumAmountByChannel(rows) {
+  const map = new Map()
+  for (const row of rows) {
+    if (!row.channel || row.transactionAmount == null) continue
+    map.set(row.channel, (map.get(row.channel) || 0) + row.transactionAmount)
+  }
+  return [...map.entries()]
+    .map(([channel, totalAmount]) => ({ channel, totalAmount }))
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+}
+
+function roundPct(n) {
+  return Math.round(n * 10000) / 100
+}
+
+function statusTotals(rows) {
+  const counts = {}
+  for (const r of rows) {
+    if (r.status) counts[r.status] = (counts[r.status] || 0) + 1
+  }
+  const approved = counts.Approved || 0
+  const settled = counts.Settled || 0
+  const rejected = counts.Rejected || 0
+  const expired = counts['Payment Expired'] || 0
+  const pending = counts.Pending || 0
+  const srDenom = approved + settled + rejected + expired
+  return { counts, approved, settled, rejected, expired, pending, srDenom }
+}
+
+export function computeConversionMetrics(rows) {
+  const { counts, approved, settled, rejected, expired, pending, srDenom } = statusTotals(rows)
+  const srCount = approved + settled
+  const funnel = [
+    { step: 'Total', count: rows.length, fill: '#64748b' },
+    { step: 'Approved', count: approved, fill: '#22c55e' },
+    { step: 'Settled', count: settled, fill: '#3b82f6' },
+    { step: 'Rejected', count: rejected, fill: '#ef4444' },
+    { step: 'Payment Expired', count: expired, fill: '#f97316' },
+    { step: 'Pending', count: pending, fill: '#eab308' },
+  ]
+
+  const successAmount = rows
+    .filter((r) => (r.status === 'Approved' || r.status === 'Settled') && r.transactionAmount != null)
+    .reduce((s, r) => s + r.transactionAmount, 0)
+  const lostAmount = rows
+    .filter(
+      (r) =>
+        (r.status === 'Rejected' || r.status === 'Payment Expired') && r.transactionAmount != null
+    )
+    .reduce((s, r) => s + r.transactionAmount, 0)
+
+  return {
+    statusCounts: counts,
+    approved,
+    settled,
+    rejected,
+    expired,
+    pending,
+    srCount,
+    srRate: srDenom > 0 ? roundPct(srCount / srDenom) : 0,
+    declineRate: srDenom > 0 ? roundPct(rejected / srDenom) : 0,
+    expiredRate: srDenom > 0 ? roundPct(expired / srDenom) : 0,
+    funnel,
+    successAmount,
+    lostAmount,
+  }
+}
+
+export function successRateByChannel(rows) {
+  const channels = [...new Set(rows.map((r) => r.channel).filter(Boolean))].sort()
+  return channels
+    .map((channel) => {
+      const slice = rows.filter((r) => r.channel === channel)
+      const { approved, settled, rejected, expired, srDenom } = statusTotals(slice)
+      const srCount = approved + settled
+      return {
+        channel,
+        total: slice.length,
+        srCount,
+        srRate: srDenom > 0 ? roundPct(srCount / srDenom) : 0,
+        declineRate: srDenom > 0 ? roundPct(rejected / srDenom) : 0,
+        expiredRate: srDenom > 0 ? roundPct(expired / srDenom) : 0,
+      }
+    })
+    .sort((a, b) => b.total - a.total)
+}
+
+export function countByChannelAndStatus(rows) {
+  return countByGroupAndStatus(rows, 'channel')
+}
+
+export function computeHourlyProfile(rows) {
+  const hours = Array.from({ length: 24 }, (_, i) => ({
+    hour: i,
+    label: `${String(i).padStart(2, '0')}:00`,
+    count: 0,
+    approved: 0,
+  }))
+  for (const row of rows) {
+    if (!row.parsedDateTime) continue
+    const h = row.parsedDateTime.getHours()
+    hours[h].count++
+    if (row.status === 'Approved' || row.status === 'Settled') hours[h].approved++
+  }
+  return hours.map((h) => ({
+    ...h,
+    srRate: h.count > 0 ? roundPct(h.approved / h.count) : 0,
+  }))
+}
+
+export function countByResponseCode(rows) {
+  const map = new Map()
+  for (const row of rows) {
+    if (!row.responseCode) continue
+    map.set(row.responseCode, (map.get(row.responseCode) || 0) + 1)
+  }
+  return [...map.entries()]
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function topRejectedByAmount(rows, limit = 10) {
+  return rows
+    .filter((r) => r.status === 'Rejected' && r.transactionAmount != null)
+    .sort((a, b) => b.transactionAmount - a.transactionAmount)
+    .slice(0, limit)
+}
+
+export function percentile(sorted, p) {
+  if (!sorted.length) return null
+  const idx = (sorted.length - 1) * p
+  const lo = Math.floor(idx)
+  const hi = Math.ceil(idx)
+  if (lo === hi) return sorted[lo]
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo)
+}
+
+export function computeAmountPercentiles(rows) {
+  const amounts = rows.map((r) => r.transactionAmount).filter((n) => n != null).sort((a, b) => a - b)
+  if (!amounts.length) return null
+  return {
+    p50: percentile(amounts, 0.5),
+    p90: percentile(amounts, 0.9),
+    p99: percentile(amounts, 0.99),
+  }
+}
+
+const CSV_SKIP = new Set(['parsedDateTime'])
+
+export function exportRowsToCsv(rows) {
+  if (!rows.length) return ''
+  const keys = Object.keys(rows[0]).filter((k) => !CSV_SKIP.has(k))
+  const escape = (v) => {
+    let s = v
+    if (s instanceof Date) s = formatDateTime(s)
+    s = String(s ?? '').replace(/"/g, '""')
+    return `"${s}"`
+  }
+  const lines = [keys.join(','), ...rows.map((row) => keys.map((k) => escape(row[k])).join(','))]
+  return lines.join('\n')
+}
+
+export function downloadTransactionCsv(rows, filename = 'transactions.csv') {
+  const csv = exportRowsToCsv(rows)
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function computeSuccessRate(rows, groupCol) {
   const buckets = [...new Set(rows.map((r) => r[groupCol]).filter(Boolean))].sort()
   const statusCounts = countByGroupAndStatus(rows, groupCol)
@@ -264,6 +460,7 @@ export function computeProfileStats(rows) {
             min: Math.min(...amounts),
             max: Math.max(...amounts),
             mean: amounts.reduce((a, b) => a + b, 0) / amounts.length,
+            ...computeAmountPercentiles(rows),
           }
         : null,
   }
