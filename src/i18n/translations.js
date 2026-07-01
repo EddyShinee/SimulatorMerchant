@@ -19,6 +19,7 @@ export const translations = {
       none: 'Chưa có dữ liệu',
       waitingResponse: 'Đang chờ phản hồi...',
       pleaseWait: 'Vui lòng đợi trong giây lát',
+      timeoutExceeded: 'Đã vượt thời gian chờ — đang hủy request...',
     },
     auth: {
       loginTitle: 'Đăng nhập',
@@ -161,7 +162,7 @@ export const translations = {
       copyInvoice: 'Sao chép Invoice ID',
       paymentChannel: 'Payment Channel',
       timeout: 'Timeout (giây)',
-      timeoutHint: 'Thời gian chờ response từ API (5–300s, mặc định 300s).',
+      timeoutHint: 'Thời gian chờ response từ API (1–300s, mặc định 300s).',
     },
     paymentInquiry: {
       title: 'Payment Inquiry',
@@ -419,6 +420,7 @@ export const translations = {
       none: 'No data yet',
       waitingResponse: 'Waiting for response...',
       pleaseWait: 'Please wait a moment',
+      timeoutExceeded: 'Past timeout limit — cancelling request...',
     },
     auth: {
       loginTitle: 'Sign in',
@@ -561,7 +563,7 @@ export const translations = {
       copyInvoice: 'Copy Invoice ID',
       paymentChannel: 'Payment Channel',
       timeout: 'Timeout (seconds)',
-      timeoutHint: 'Wait time for API response (5–300s, default 300s).',
+      timeoutHint: 'Wait time for API response (1–300s, default 300s).',
     },
     paymentInquiry: {
       title: 'Payment Inquiry',

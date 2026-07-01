@@ -13,5 +13,5 @@ export const PAYMENT_POS_ENV_OPTIONS = [
 ]
 
 export const DEFAULT_REQUEST_TIMEOUT_SEC = 300
-export const MIN_REQUEST_TIMEOUT_SEC = 5
+export const MIN_REQUEST_TIMEOUT_SEC = 1
 export const MAX_REQUEST_TIMEOUT_SEC = 300

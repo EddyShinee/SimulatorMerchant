@@ -116,16 +116,23 @@ export default function PaymentPos() {
         },
       }
 
-      const { data } = await api.post('/api/simulator/proxy', {
-        method: 'POST',
-        url: apiUrl,
-        headers: { 'Content-Type': 'application/json' },
-        body: apiPayload,
-        timeoutMs: Math.min(
+      const requestTimeoutMs =
+        Math.min(
           MAX_REQUEST_TIMEOUT_SEC,
           Math.max(MIN_REQUEST_TIMEOUT_SEC, Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC)
-        ) * 1000,
-      })
+        ) * 1000
+
+      const { data } = await api.post(
+        '/api/simulator/proxy',
+        {
+          method: 'POST',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' },
+          body: apiPayload,
+          timeoutMs: requestTimeoutMs,
+        },
+        { timeout: requestTimeoutMs + 5000 }
+      )
 
       let decodedResponse = null
       const respBody = data?.body
@@ -169,7 +176,7 @@ export default function PaymentPos() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} timeoutSec={Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🔐 {t('paymentPos.title')}</h1>

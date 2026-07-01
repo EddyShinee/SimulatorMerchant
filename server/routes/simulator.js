@@ -104,6 +104,11 @@ router.delete('/requests', requireAuth, (req, res) => {
 // Outbound API caller: server performs the request and returns the response.
 router.post('/proxy', requireAuth, async (req, res) => {
   const started = Date.now()
+  const DEFAULT_TIMEOUT_MS = 15000
+  const MIN_TIMEOUT_MS = 1000
+  const MAX_TIMEOUT_MS = 300000
+  let resolvedTimeoutMs = DEFAULT_TIMEOUT_MS
+
   try {
     const { method = 'GET', url, headers = {}, body, timeoutMs } = req.body || {}
 
@@ -122,6 +127,13 @@ router.post('/proxy', requireAuth, async (req, res) => {
         .json({ error: 'INVALID_PROTOCOL', message: 'Only http and https are allowed.' })
     }
 
+    if (timeoutMs != null && timeoutMs !== '') {
+      const n = Number(timeoutMs)
+      if (Number.isFinite(n) && n > 0) {
+        resolvedTimeoutMs = Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.round(n)))
+      }
+    }
+
     const upperMethod = String(method).toUpperCase()
     const fetchOptions = {
       method: upperMethod,
@@ -134,25 +146,30 @@ router.post('/proxy', requireAuth, async (req, res) => {
       }
     }
 
-    const DEFAULT_TIMEOUT_MS = 15000
-    const MIN_TIMEOUT_MS = 5000
-    const MAX_TIMEOUT_MS = 300000
-    let resolvedTimeoutMs = DEFAULT_TIMEOUT_MS
-    if (timeoutMs != null && timeoutMs !== '') {
-      const n = Number(timeoutMs)
-      if (Number.isFinite(n) && n > 0) {
-        resolvedTimeoutMs = Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.round(n)))
-      }
-    }
-
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), resolvedTimeoutMs)
     fetchOptions.signal = controller.signal
 
-    const response = await fetch(url, fetchOptions)
-    clearTimeout(timeout)
+    const fetchWork = (async () => {
+      const response = await fetch(url, fetchOptions)
+      const text = await response.text()
+      return { response, text }
+    })()
 
-    const text = await response.text()
+    let timeoutId
+    const timeoutWork = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort()
+        reject(Object.assign(new Error('Request timed out'), { name: 'AbortError' }))
+      }, resolvedTimeoutMs)
+    })
+
+    let response
+    let text
+    try {
+      ;({ response, text } = await Promise.race([fetchWork, timeoutWork]))
+    } finally {
+      clearTimeout(timeoutId)
+    }
     let parsedBody
     const contentType = response.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {
