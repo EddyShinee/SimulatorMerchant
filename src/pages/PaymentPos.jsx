@@ -8,6 +8,9 @@ import { DEFAULT_SECRET_KEY, generateIdempotencyId } from '../config/paymentToke
 import {
   PAYMENT_POS_ENVIRONMENTS as ENVIRONMENTS,
   PAYMENT_POS_ENV_OPTIONS as ENVIRONMENT_OPTIONS,
+  DEFAULT_REQUEST_TIMEOUT_SEC,
+  MIN_REQUEST_TIMEOUT_SEC,
+  MAX_REQUEST_TIMEOUT_SEC,
 } from '../config/paymentPosConfig.js'
 
 const PAYMENT_CHANNELS = ['POSCC', 'VNQR']
@@ -71,6 +74,7 @@ export default function PaymentPos() {
   )
   const [customerName, setCustomerName] = useState('Eddy')
   const [customerEmail, setCustomerEmail] = useState('eddy.vu@2c2p.com')
+  const [timeoutSec, setTimeoutSec] = useState(DEFAULT_REQUEST_TIMEOUT_SEC)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -117,6 +121,10 @@ export default function PaymentPos() {
         url: apiUrl,
         headers: { 'Content-Type': 'application/json' },
         body: apiPayload,
+        timeoutMs: Math.min(
+          MAX_REQUEST_TIMEOUT_SEC,
+          Math.max(MIN_REQUEST_TIMEOUT_SEC, Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC)
+        ) * 1000,
       })
 
       let decodedResponse = null
@@ -194,6 +202,18 @@ export default function PaymentPos() {
                     setEnv('custom')
                   }}
                 />
+              </div>
+              <div>
+                <label className="label">{t('paymentPos.timeout')}</label>
+                <input
+                  type="number"
+                  className="input"
+                  min={MIN_REQUEST_TIMEOUT_SEC}
+                  max={MAX_REQUEST_TIMEOUT_SEC}
+                  value={timeoutSec}
+                  onChange={(e) => setTimeoutSec(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-slate-400">{t('paymentPos.timeoutHint')}</p>
               </div>
             </div>
           </div>

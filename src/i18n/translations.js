@@ -160,6 +160,8 @@ export const translations = {
       finalApiPayload: 'API Payload cuối cùng',
       copyInvoice: 'Sao chép Invoice ID',
       paymentChannel: 'Payment Channel',
+      timeout: 'Timeout (giây)',
+      timeoutHint: 'Thời gian chờ response từ API (5–300s, mặc định 300s).',
     },
     paymentInquiry: {
       title: 'Payment Inquiry',
@@ -558,6 +560,8 @@ export const translations = {
       finalApiPayload: 'Final API Payload',
       copyInvoice: 'Copy Invoice ID',
       paymentChannel: 'Payment Channel',
+      timeout: 'Timeout (seconds)',
+      timeoutHint: 'Wait time for API response (5–300s, default 300s).',
     },
     paymentInquiry: {
       title: 'Payment Inquiry',

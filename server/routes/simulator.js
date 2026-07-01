@@ -105,7 +105,7 @@ router.delete('/requests', requireAuth, (req, res) => {
 router.post('/proxy', requireAuth, async (req, res) => {
   const started = Date.now()
   try {
-    const { method = 'GET', url, headers = {}, body } = req.body || {}
+    const { method = 'GET', url, headers = {}, body, timeoutMs } = req.body || {}
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'INVALID_URL', message: 'A target URL is required.' })
@@ -134,8 +134,19 @@ router.post('/proxy', requireAuth, async (req, res) => {
       }
     }
 
+    const DEFAULT_TIMEOUT_MS = 15000
+    const MIN_TIMEOUT_MS = 5000
+    const MAX_TIMEOUT_MS = 300000
+    let resolvedTimeoutMs = DEFAULT_TIMEOUT_MS
+    if (timeoutMs != null && timeoutMs !== '') {
+      const n = Number(timeoutMs)
+      if (Number.isFinite(n) && n > 0) {
+        resolvedTimeoutMs = Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.round(n)))
+      }
+    }
+
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    const timeout = setTimeout(() => controller.abort(), resolvedTimeoutMs)
     fetchOptions.signal = controller.signal
 
     const response = await fetch(url, fetchOptions)
@@ -172,7 +183,9 @@ router.post('/proxy', requireAuth, async (req, res) => {
     return res.status(aborted ? 504 : 502).json({
       ok: false,
       error: aborted ? 'TIMEOUT' : 'REQUEST_FAILED',
-      message: aborted ? 'The request timed out after 15s.' : err.message,
+      message: aborted
+        ? `The request timed out after ${Math.round(resolvedTimeoutMs / 1000)}s.`
+        : err.message,
       durationMs: Date.now() - started,
     })
   }

@@ -11,3 +11,7 @@ export const PAYMENT_POS_ENV_OPTIONS = [
   { value: 'mpay', label: 'MPay' },
   { value: 'custom', label: 'Custom' },
 ]
+
+export const DEFAULT_REQUEST_TIMEOUT_SEC = 300
+export const MIN_REQUEST_TIMEOUT_SEC = 5
+export const MAX_REQUEST_TIMEOUT_SEC = 300
