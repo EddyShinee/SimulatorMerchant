@@ -154,6 +154,9 @@ router.post('/proxy', requireAuth, async (req, res) => {
       const text = await response.text()
       return { response, text }
     })()
+    fetchWork.catch(() => {
+      /* timeout may win the race; ignore late rejections */
+    })
 
     let timeoutId
     const timeoutWork = new Promise((_, reject) => {

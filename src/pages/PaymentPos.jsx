@@ -103,9 +103,21 @@ export default function PaymentPos() {
     }
 
     setLoading(true)
+
+    let jwtToken = null
+    let apiPayload = null
+
+    const partialResult = (extra = {}) => ({
+      payloadData,
+      jwtToken,
+      apiPayload,
+      invoiceNo: finalInvoice,
+      ...extra,
+    })
+
     try {
-      const jwtToken = await signJwtHS256(payloadData, secretKey)
-      const apiPayload = {
+      jwtToken = await signJwtHS256(payloadData, secretKey)
+      apiPayload = {
         paymentToken: jwtToken,
         clientID: randomClientId(),
         locale: 'en',
@@ -131,7 +143,8 @@ export default function PaymentPos() {
           body: apiPayload,
           timeoutMs: requestTimeoutMs,
         },
-        { timeout: requestTimeoutMs + 5000 }
+        // Let the server enforce timeout; client waits a bit longer for the proxy JSON response.
+        { timeout: requestTimeoutMs + 30000 }
       )
 
       let decodedResponse = null
@@ -148,25 +161,31 @@ export default function PaymentPos() {
             })()
       if (respObj?.payload) decodedResponse = decodeJwtPayload(respObj.payload)
 
-      setResult({
-        payloadData,
-        jwtToken,
-        apiPayload,
-        invoiceNo: finalInvoice,
-        status: data?.status,
-        statusText: data?.statusText,
-        durationMs: data?.durationMs,
-        response: respBody,
-        decodedResponse,
-        error: data?.error ? data?.message : null,
-      })
+      setResult(
+        partialResult({
+          status: data?.status,
+          statusText: data?.statusText,
+          durationMs: data?.durationMs,
+          response: respBody,
+          decodedResponse,
+          error: data?.error ? data?.message : null,
+        })
+      )
 
       // Prepare unique values for the next request
       setInvoiceNo('')
       setIdempotencyId(generateIdempotencyId())
     } catch (err) {
       const d = err.response?.data
-      setError(d?.message || err.message || t('errors.network'))
+      const message = d?.message || err.message || t('errors.network')
+      setError(message)
+      setResult(
+        partialResult({
+          status: err.response?.status,
+          durationMs: d?.durationMs,
+          error: message,
+        })
+      )
     } finally {
       setLoading(false)
     }
@@ -358,11 +377,15 @@ export default function PaymentPos() {
                 title={`📤 ${t('paymentPos.unencryptedPayload')}`}
                 text={JSON.stringify(result.payloadData, null, 2)}
               />
-              <ResultCard title={`🔏 ${t('paymentPos.encryptedPayload')}`} text={result.jwtToken} mono />
-              <ResultCard
-                title={`📦 ${t('paymentPos.finalApiPayload')}`}
-                text={JSON.stringify(result.apiPayload, null, 2)}
-              />
+              {result.jwtToken && (
+                <ResultCard title={`🔏 ${t('paymentPos.encryptedPayload')}`} text={result.jwtToken} mono />
+              )}
+              {result.apiPayload && (
+                <ResultCard
+                  title={`📦 ${t('paymentPos.finalApiPayload')}`}
+                  text={JSON.stringify(result.apiPayload, null, 2)}
+                />
+              )}
 
               {result.response != null && (
                 <ResultCard
