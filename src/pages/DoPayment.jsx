@@ -17,8 +17,7 @@ import {
   MY2C2P_SDK_URL,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
-import { PAYMENT_OPTION_DETAILS_ENVIRONMENTS } from '../config/paymentOptionDetailsConfig.js'
-import { fetchPaymentOptions, fetchAllPaymentOptionDetails } from '../utils/paymentChannelApi.js'
+import { fetchPaymentOptions, fetchAllPaymentOptionDetails, resolveDetailsUrl } from '../utils/paymentChannelApi.js'
 import {
   parsePaymentOptions,
   channelSelectionToFlow,
@@ -313,10 +312,7 @@ export default function DoPayment() {
 
     const optionsUrl =
       env === 'custom' ? PAYMENT_OPTIONS_ENVIRONMENTS.sandbox : PAYMENT_OPTIONS_ENVIRONMENTS[env]
-    const detailsUrl =
-      env === 'custom'
-        ? PAYMENT_OPTION_DETAILS_ENVIRONMENTS.sandbox
-        : PAYMENT_OPTION_DETAILS_ENVIRONMENTS[env]
+    const detailsUrl = resolveDetailsUrl(env, optionsUrl)
 
     setAutoFetchBusy(true)
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -16,14 +17,12 @@ import {
   channelSelectionToFlow,
 } from '../utils/paymentOptionParse.js'
 import PaymentCategoryPicker from '../components/PaymentCategoryPicker.jsx'
-import PaymentChannelPicker from '../components/PaymentChannelPicker.jsx'
-import { fetchAllPaymentOptionDetails } from '../utils/paymentChannelApi.js'
+import { fetchAllPaymentOptionDetails, resolveDetailsUrl } from '../utils/paymentChannelApi.js'
 import {
   PAYMENT_OPTIONS_ENVIRONMENTS as ENVIRONMENTS,
   PAYMENT_OPTIONS_ENV_OPTIONS as ENVIRONMENT_OPTIONS,
   DEFAULT_BROWSER_DETAILS,
 } from '../config/paymentOptionsConfig.js'
-import { PAYMENT_OPTION_DETAILS_ENVIRONMENTS as DETAILS_ENVIRONMENTS } from '../config/paymentOptionDetailsConfig.js'
 
 function randomClientId() {
   return crypto.randomUUID().replace(/-/g, '')
@@ -52,10 +51,8 @@ export default function PaymentOptions() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [parsedOptions, setParsedOptions] = useState(null)
-  const [channelGroups, setChannelGroups] = useState(flow.channelGroups || [])
   const [fetchProgress, setFetchProgress] = useState('')
-  const [activeChannel, setActiveChannel] = useState(null)
-  const [activeContext, setActiveContext] = useState(null)
+  const [detailsPrefetch, setDetailsPrefetch] = useState(null)
 
   const handleEnv = (value) => {
     setEnv(value)
@@ -70,8 +67,8 @@ export default function PaymentOptions() {
     setError('')
     setResult(null)
     setParsedOptions(null)
-    setChannelGroups([])
     setFetchProgress('')
+    setDetailsPrefetch(null)
 
     if (!paymentToken.trim()) {
       setError(t('paymentOptions.tokenRequired'))
@@ -113,47 +110,59 @@ export default function PaymentOptions() {
       const parsed = parsePaymentOptions(data?.body)
       setParsedOptions(parsed)
 
-      let groups = []
-      let appliedChannel = false
-      if (data?.status >= 200 && data?.status < 300 && parsed.ok && parsed.categories.length) {
-        const detailsUrl =
-          env === 'custom' ? DETAILS_ENVIRONMENTS.sandbox : DETAILS_ENVIRONMENTS[env] || DETAILS_ENVIRONMENTS.sandbox
+      let channelCount = 0
+      if (data?.status >= 200 && data?.status < 300 && parsed.categories.length) {
+        if (parsed.ok) {
+          const detailsUrl = resolveDetailsUrl(env, apiUrl)
 
-        const detailResults = await fetchAllPaymentOptionDetails({
-          url: detailsUrl,
-          paymentToken: paymentToken.trim(),
-          categories: parsed.categories,
-          clientId: clientId.trim() || randomClientId(),
-          locale: locale.trim() || 'en',
-          signal,
-          onProgress: (p) =>
-            setFetchProgress(
-              t('paymentOptions.fetchingDetails')
-                .replace('{current}', String(p.current))
-                .replace('{total}', String(p.total))
-                .replace('{label}', p.label)
-            ),
-        })
+          const detailResults = await fetchAllPaymentOptionDetails({
+            url: detailsUrl,
+            paymentToken: paymentToken.trim(),
+            categories: parsed.categories,
+            clientId: clientId.trim() || randomClientId(),
+            locale: locale.trim() || 'en',
+            signal,
+            onProgress: (p) =>
+              setFetchProgress(
+                t('paymentOptions.fetchingDetails')
+                  .replace('{current}', String(p.current))
+                  .replace('{total}', String(p.total))
+                  .replace('{label}', p.label)
+              ),
+          })
 
-        groups = buildChannelGroups(parsed.categories, detailResults)
-        setChannelGroups(groups)
-        updateFlow({ channelGroups: groups, optionCategories: parsed.categories })
+          const groups = buildChannelGroups(parsed.categories, detailResults)
+          channelCount = countChannelsInGroups(groups)
+          const failed = detailResults.filter((r) => !r.ok).length
 
-        const defaultGroup = groups.find(
-          (g) => g.categoryCode === parsed.defaultSelection?.categoryCode && g.groupCode === parsed.defaultSelection?.groupCode
-        ) || groups[0]
-        const firstChannel = defaultGroup?.channels?.find((c) => !c.isDown)
-        if (firstChannel && defaultGroup) {
-          const ctx = {
-            categoryCode: defaultGroup.categoryCode,
-            groupCode: defaultGroup.groupCode,
-            categoryName: defaultGroup.categoryName,
-            groupName: defaultGroup.groupName,
+          updateFlow({ channelGroups: groups, optionCategories: parsed.categories })
+
+          const defaultGroup =
+            groups.find(
+              (g) =>
+                g.categoryCode === parsed.defaultSelection?.categoryCode &&
+                g.groupCode === parsed.defaultSelection?.groupCode
+            ) || groups[0]
+          const firstChannel = defaultGroup?.channels?.find((c) => !c.isDown)
+          if (firstChannel && defaultGroup) {
+            updateFlow(
+              channelSelectionToFlow(firstChannel, {
+                categoryCode: defaultGroup.categoryCode,
+                groupCode: defaultGroup.groupCode,
+                categoryName: defaultGroup.categoryName,
+                groupName: defaultGroup.groupName,
+              })
+            )
+          } else if (parsed.defaultSelection) {
+            updateFlow(categorySelectionToFlow(parsed.defaultSelection))
           }
-          setActiveChannel(firstChannel)
-          setActiveContext(ctx)
-          updateFlow(channelSelectionToFlow(firstChannel, ctx))
-          appliedChannel = true
+
+          setDetailsPrefetch({ channelCount, failed, categoryCount: parsed.categories.length })
+        } else {
+          updateFlow({ optionCategories: parsed.categories })
+          if (parsed.defaultSelection) {
+            updateFlow(categorySelectionToFlow(parsed.defaultSelection))
+          }
         }
       }
 
@@ -167,16 +176,12 @@ export default function PaymentOptions() {
       })
 
       if (data?.status >= 200 && data?.status < 300) {
-        const channelCount = countChannelsInGroups(groups)
-        toast.success(
-          channelCount > 0
-            ? t('paymentOptions.allDetailsLoaded').replace('{count}', String(channelCount))
-            : t('common.requestSuccess')
-        )
-        if (parsed.ok && parsed.defaultSelection && !appliedChannel) {
-          updateFlow(categorySelectionToFlow(parsed.defaultSelection))
+        if (channelCount > 0) {
+          toast.success(t('paymentOptions.allDetailsLoaded').replace('{count}', String(channelCount)))
+        } else {
+          toast.success(t('common.requestSuccess'))
         }
-        if (groups.length > 0) recordStep('payment-options', 'success')
+        if (parsed.ok) recordStep('payment-options', 'success')
       } else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
       if (isAbortError(err)) {
@@ -196,19 +201,13 @@ export default function PaymentOptions() {
       })
     } finally {
       stop()
+      setFetchProgress('')
     }
   }
 
   const handleSelectCategory = (row) => {
     updateFlow(categorySelectionToFlow(row))
     toast.success(t('paymentOptions.categorySaved').replace('{code}', `${row.categoryCode} / ${row.groupCode}`))
-  }
-
-  const handleSelectChannel = (channel, context) => {
-    setActiveChannel(channel)
-    setActiveContext(context)
-    updateFlow(channelSelectionToFlow(channel, context))
-    toast.success(t('paymentOptionDetails.channelSaved').replace('{name}', channel.name))
   }
 
   const responseText =
@@ -218,17 +217,21 @@ export default function PaymentOptions() {
         : JSON.stringify(result.response, null, 2)
       : null
 
+  const hasCategories = (parsedOptions?.categories?.length ?? 0) > 0
+
   return (
     <div className="space-y-6">
       <LoadingOverlay show={loading} title={fetchProgress || undefined} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
-        <h1 className="text-2xl font-bold text-slate-900">🧾 {t('paymentOptions.title')}</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">🧾 {t('paymentOptions.title')}</h1>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-5">
-          <h2 className="text-lg font-semibold text-slate-900">⚙️ {t('paymentToken.configuration')}</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            ⚙️ {t('paymentToken.configuration')}
+          </h2>
 
           <div className="card p-4">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -257,7 +260,7 @@ export default function PaymentOptions() {
           </div>
 
           <div className="card space-y-3 p-4">
-            <h3 className="font-semibold text-slate-800">{t('doPayment.basicInfo')}</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t('doPayment.basicInfo')}</h3>
             <PaymentTokenField value={paymentToken} onChange={setPaymentToken} />
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -284,7 +287,9 @@ export default function PaymentOptions() {
 
           <div className="card space-y-3 p-4">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold text-slate-800">🌐 {t('paymentOptions.browserDetails')}</h3>
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                🌐 {t('paymentOptions.browserDetails')}
+              </h3>
               <button type="button" onClick={handleResetBrowser} className="text-xs text-brand-600 hover:underline">
                 ↩ {t('paymentOptions.resetBrowser')}
               </button>
@@ -298,7 +303,7 @@ export default function PaymentOptions() {
           </div>
 
           {error && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
               ⚠️ {error}
             </div>
           )}
@@ -315,7 +320,8 @@ export default function PaymentOptions() {
 
           <PaymentApiResultsPanel
             hasResult={!!result}
-            hasChannels={channelGroups.length > 0 || (parsedOptions?.categories?.length ?? 0) > 0}
+            hasChannels={hasCategories}
+            channelsTabLabel={t('paymentApiResults.tabCategories')}
             statusBadges={
               result && (result.status != null || result.error) ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -345,16 +351,31 @@ export default function PaymentOptions() {
             }
             channelsContent={
               <>
-                {channelGroups.length > 0 && (
-                  <PaymentChannelPicker
-                    groups={channelGroups}
-                    selected={flow}
-                    activeChannel={activeChannel}
-                    activeContext={activeContext}
-                    onSelect={handleSelectChannel}
-                  />
+                {detailsPrefetch && detailsPrefetch.channelCount > 0 && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                    <p>
+                      {t('paymentOptions.detailsPrefetched').replace(
+                        '{count}',
+                        String(detailsPrefetch.channelCount)
+                      )}
+                    </p>
+                    {detailsPrefetch.failed > 0 && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        {t('paymentOptions.detailsPrefetchPartial').replace(
+                          '{failed}',
+                          String(detailsPrefetch.failed)
+                        )}
+                      </p>
+                    )}
+                    <Link
+                      to="/app/payment-flow/details"
+                      className="mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      {t('paymentOptions.openDetailsPage')} →
+                    </Link>
+                  </div>
                 )}
-                {parsedOptions?.categories?.length > 0 && (
+                {hasCategories && (
                   <PaymentCategoryPicker
                     categories={parsedOptions.categories}
                     selected={{ categoryCode: flow.categoryCode, groupCode: flow.groupCode }}

@@ -281,6 +281,7 @@ export const translations = {
     },
     paymentApiResults: {
       tabChannels: 'Kênh thanh toán',
+      tabCategories: 'Phương thức (category)',
       tabRaw: 'Raw JSON',
     },
     paymentOptions: {
@@ -305,6 +306,10 @@ export const translations = {
       categorySaved: 'Đã lưu {code} vào Payment Flow.',
       fetchingDetails: 'Đang lấy Details {current}/{total}: {label}',
       allDetailsLoaded: 'Đã lấy {count} kênh từ tất cả category.',
+      detailsPrefetched: 'Đã gọi Details nền: {count} kênh sẵn sàng.',
+      detailsPrefetchPartial: '{failed} category Details thất bại.',
+      openDetailsPage: 'Mở Payment Option Details để chọn kênh',
+      openOptionsPage: 'Mở Payment Options',
     },
     paymentOptionDetails: {
       title: 'Payment Option Details',
@@ -333,6 +338,7 @@ export const translations = {
       fetchAll: 'Lấy tất cả category',
       fetchingAll: 'Đang lấy tất cả...',
       needOptionsFirst: 'Chạy Payment Options trước để lấy danh sách category.',
+      noChannelsYet: 'Chưa có kênh. Gửi yêu cầu với categoryCode/groupCode hoặc bấm「Lấy tất cả category」.',
     },
     analysis: {
       title: 'Transaction Analysis',
@@ -825,6 +831,7 @@ export const translations = {
     },
     paymentApiResults: {
       tabChannels: 'Payment channels',
+      tabCategories: 'Categories',
       tabRaw: 'Raw JSON',
     },
     paymentOptions: {
@@ -849,6 +856,10 @@ export const translations = {
       categorySaved: 'Saved {code} to Payment Flow.',
       fetchingDetails: 'Fetching Details {current}/{total}: {label}',
       allDetailsLoaded: 'Loaded {count} channels from all categories.',
+      detailsPrefetched: 'Details prefetched in background: {count} channels ready.',
+      detailsPrefetchPartial: '{failed} category Details request(s) failed.',
+      openDetailsPage: 'Open Payment Option Details to pick a channel',
+      openOptionsPage: 'Open Payment Options',
     },
     paymentOptionDetails: {
       title: 'Payment Option Details',
@@ -876,7 +887,8 @@ export const translations = {
       channelSearchNoResults: 'No matching channels.',
       fetchAll: 'Fetch all categories',
       fetchingAll: 'Fetching all...',
-      needOptionsFirst: 'Run Payment Options first to load category list.',
+      needOptionsFirst: 'Run Payment Options first to load the category list.',
+      noChannelsYet: 'No channels yet. Send a request with categoryCode/groupCode or click「Fetch all categories」.',
     },
     analysis: {
       title: 'Transaction Analysis',

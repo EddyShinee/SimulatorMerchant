@@ -45,10 +45,12 @@ export default function PaymentApiResultsPanel({
   responseTitle,
   requestText,
   responseText,
+  channelsTabLabel,
   footerContent,
 }) {
   const { t } = useLanguage()
   const [tab, setTab] = useState(hasChannels ? 'channels' : 'raw')
+  const channelsLabel = channelsTabLabel || t('paymentApiResults.tabChannels')
 
   useEffect(() => {
     if (hasChannels) setTab('channels')
@@ -64,7 +66,7 @@ export default function PaymentApiResultsPanel({
   }
 
   const tabs = [
-    hasChannels && { id: 'channels', label: t('paymentApiResults.tabChannels') },
+    hasChannels && { id: 'channels', label: channelsLabel },
     hasResult && { id: 'raw', label: t('paymentApiResults.tabRaw') },
   ].filter(Boolean)
 

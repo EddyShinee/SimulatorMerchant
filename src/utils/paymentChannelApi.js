@@ -1,9 +1,33 @@
 import api from '../api/client.js'
 import { DEFAULT_BROWSER_DETAILS } from '../config/paymentOptionsConfig.js'
+import { PAYMENT_OPTION_DETAILS_ENVIRONMENTS } from '../config/paymentOptionDetailsConfig.js'
+import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
 import { parsePaymentOptionDetails } from './paymentOptionParse.js'
 
 function randomClientId() {
   return crypto.randomUUID()
+}
+
+/** Match Details URL to the Options environment / custom URL. */
+export function resolveDetailsUrl(env, optionsUrl = '') {
+  if (env !== 'custom') {
+    return PAYMENT_OPTION_DETAILS_ENVIRONMENTS[env] || PAYMENT_OPTION_DETAILS_ENVIRONMENTS.sandbox
+  }
+
+  for (const key of Object.keys(PAYMENT_OPTIONS_ENVIRONMENTS)) {
+    if (optionsUrl === PAYMENT_OPTIONS_ENVIRONMENTS[key]) {
+      return PAYMENT_OPTION_DETAILS_ENVIRONMENTS[key]
+    }
+  }
+
+  if (/paymentoption$/i.test(optionsUrl)) {
+    return optionsUrl.replace(/paymentoption$/i, 'paymentoptiondetails')
+  }
+  if (/paymentOption$/i.test(optionsUrl)) {
+    return optionsUrl.replace(/paymentOption$/i, 'paymentOptionDetails')
+  }
+
+  return PAYMENT_OPTION_DETAILS_ENVIRONMENTS.sandbox
 }
 
 export async function fetchPaymentOptions({

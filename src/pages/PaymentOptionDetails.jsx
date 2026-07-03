@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -47,7 +48,7 @@ export default function PaymentOptionDetails() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [parsedDetails, setParsedDetails] = useState(null)
-  const [channelGroups, setChannelGroups] = useState(flow.channelGroups || [])
+  const [channelGroups, setChannelGroups] = useState([])
   const [fetchProgress, setFetchProgress] = useState('')
   const [activeChannel, setActiveChannel] = useState(null)
   const [activeContext, setActiveContext] = useState(null)
@@ -56,10 +57,6 @@ export default function PaymentOptionDetails() {
     if (flow.categoryCode) setCategoryCode(flow.categoryCode)
     if (flow.groupCode) setGroupCode(flow.groupCode)
   }, [flow.categoryCode, flow.groupCode])
-
-  useEffect(() => {
-    if (flow.channelGroups?.length) setChannelGroups(flow.channelGroups)
-  }, [flow.channelGroups])
 
   useEffect(() => {
     if (flow.selectedChannelName && flow.channelCode) {
@@ -94,11 +91,10 @@ export default function PaymentOptionDetails() {
     if (value !== 'custom') setApiUrl(ENVIRONMENTS[value])
   }
 
-  const mergeGroupIntoList = (groups, group) => {
-    const key = `${group.categoryCode}:${group.groupCode}`
-    const rest = groups.filter((g) => `${g.categoryCode}:${g.groupCode}` !== key)
-    return group.channels?.length ? [...rest, group] : rest
-  }
+  const lookupCategoryMeta = (catCode, grpCode) =>
+    flow.optionCategories?.find(
+      (c) => c.categoryCode === catCode && c.groupCode === grpCode
+    ) || null
 
   const handleFetchAll = async () => {
     const categories = flow.optionCategories || []
@@ -156,6 +152,7 @@ export default function PaymentOptionDetails() {
     setError('')
     setResult(null)
     setParsedDetails(null)
+    setChannelGroups([])
 
     if (!paymentToken.trim()) {
       setError(t('paymentOptionDetails.tokenRequired'))
@@ -187,29 +184,35 @@ export default function PaymentOptionDetails() {
       const parsed = parsePaymentOptionDetails(data?.body)
       setParsedDetails(parsed)
 
+      const catCode = parsed.categoryCode || categoryCode.trim()
+      const grpCode = parsed.groupCode || groupCode.trim()
+      const meta = lookupCategoryMeta(catCode, grpCode)
+
       const singleGroup = {
-        categoryCode: parsed.categoryCode || categoryCode.trim(),
-        categoryName: flow.categoryName,
-        groupCode: parsed.groupCode || groupCode.trim(),
-        groupName: flow.groupName,
+        categoryCode: catCode,
+        categoryName: meta?.categoryName || flow.categoryName,
+        groupCode: grpCode,
+        groupName: meta?.groupName || flow.groupName,
         ok: parsed.ok,
         channels: parsed.channels || [],
       }
 
       if (data?.status >= 200 && data?.status < 300 && parsed.ok && singleGroup.channels.length) {
-        const nextGroups = mergeGroupIntoList(channelGroups, singleGroup)
-        setChannelGroups(nextGroups)
+        setChannelGroups([singleGroup])
         updateFlow({
           paymentToken: paymentToken.trim(),
-          categoryCode: categoryCode.trim(),
-          groupCode: groupCode.trim(),
-          channelGroups: nextGroups,
+          categoryCode: catCode,
+          groupCode: grpCode,
+          categoryName: singleGroup.categoryName,
+          groupName: singleGroup.groupName,
+          channelGroups: [singleGroup],
         })
       } else {
+        setChannelGroups(singleGroup.channels.length ? [singleGroup] : [])
         updateFlow({
           paymentToken: paymentToken.trim(),
-          categoryCode: categoryCode.trim(),
-          groupCode: groupCode.trim(),
+          categoryCode: catCode,
+          groupCode: grpCode,
         })
       }
 
@@ -227,10 +230,10 @@ export default function PaymentOptionDetails() {
         const firstUp = parsed.channels?.find((c) => !c.isDown)
         if (parsed.ok && firstUp) {
           const ctx = {
-            categoryCode: parsed.categoryCode || categoryCode.trim(),
-            groupCode: parsed.groupCode || groupCode.trim(),
-            categoryName: flow.categoryName,
-            groupName: flow.groupName,
+            categoryCode: catCode,
+            groupCode: grpCode,
+            categoryName: singleGroup.categoryName,
+            groupName: singleGroup.groupName,
           }
           setActiveChannel(firstUp)
           setActiveContext(ctx)
@@ -268,20 +271,7 @@ export default function PaymentOptionDetails() {
     toast.success(t('paymentOptionDetails.channelSaved').replace('{name}', channel.name))
   }
 
-  const displayGroups =
-    channelGroups.length > 0
-      ? channelGroups
-      : parsedDetails?.channels?.length
-        ? [
-            {
-              categoryCode: parsedDetails.categoryCode || categoryCode,
-              groupCode: parsedDetails.groupCode || groupCode,
-              categoryName: flow.categoryName,
-              groupName: flow.groupName,
-              channels: parsedDetails.channels,
-            },
-          ]
-        : []
+  const displayGroups = channelGroups
 
   const responseText =
     result?.response != null
@@ -425,13 +415,25 @@ export default function PaymentOptionDetails() {
             }
             channelsContent={
               <>
-                <PaymentChannelPicker
-                  groups={displayGroups}
-                  selected={flow}
-                  activeChannel={activeChannel}
-                  activeContext={activeContext}
-                  onSelect={handleSelectChannel}
-                />
+                {displayGroups.length > 0 ? (
+                  <PaymentChannelPicker
+                    groups={displayGroups}
+                    selected={flow}
+                    activeChannel={activeChannel}
+                    activeContext={activeContext}
+                    onSelect={handleSelectChannel}
+                  />
+                ) : (
+                  <div className="card space-y-2 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <p>{t('paymentOptionDetails.noChannelsYet')}</p>
+                    <Link
+                      to="/app/payment-flow/options"
+                      className="inline-block text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      {t('paymentOptions.openOptionsPage')} →
+                    </Link>
+                  </div>
+                )}
                 {parsedDetails && !parsedDetails.ok && parsedDetails.respCode && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                     respCode: {parsedDetails.respCode} — {parsedDetails.respDesc}
