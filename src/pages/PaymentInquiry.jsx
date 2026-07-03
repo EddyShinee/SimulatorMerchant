@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import PasteButton from '../components/PasteButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
-import { signJwtHS256, decodeJwtPayload } from '../utils/jwt.js'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { signJwtHS256 } from '../utils/jwt.js'
+import { parseProxyBody, proxyErrorMessage } from '../utils/proxyResponse.js'
 import { DEFAULT_SECRET_KEY } from '../config/paymentTokenFields.js'
 import {
   PAYMENT_INQUIRY_ENVIRONMENTS as ENVIRONMENTS,
@@ -30,6 +36,10 @@ function ResultCard({ title, text, mono }) {
 
 export default function PaymentInquiry() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow, recordStep } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
+  const [searchParams] = useSearchParams()
 
   const [env, setEnv] = useState('sandbox')
   const [apiUrl, setApiUrl] = useState(ENVIRONMENTS.sandbox)
@@ -38,12 +48,19 @@ export default function PaymentInquiry() {
     if (env !== 'custom') setApiUrl(ENVIRONMENTS[env])
   }, [env])
 
-  const [merchantId, setMerchantId] = useState('704704000000000')
-  const [invoiceNo, setInvoiceNo] = useState('254b77aabc')
-  const [locale, setLocale] = useState('en')
-  const [secretKey, setSecretKey] = useState(DEFAULT_SECRET_KEY)
+  useEffect(() => {
+    const inv = searchParams.get('invoiceNo')
+    if (inv?.trim()) {
+      setInvoiceNo(inv.trim())
+      updateFlow({ invoiceNo: inv.trim() })
+    }
+  }, [searchParams, updateFlow])
 
-  const [loading, setLoading] = useState(false)
+  const [merchantId, setMerchantId] = useState(flow.merchantId || '704704000000000')
+  const [invoiceNo, setInvoiceNo] = useState(flow.invoiceNo || '254b77aabc')
+  const [locale, setLocale] = useState('en')
+  const [secretKey, setSecretKey] = useState(flow.secretKey || DEFAULT_SECRET_KEY)
+
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
@@ -52,13 +69,9 @@ export default function PaymentInquiry() {
     if (value !== 'custom') setApiUrl(ENVIRONMENTS[value])
   }
 
-  const handlePasteInvoice = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text?.trim()) setInvoiceNo(text.trim())
-    } catch {
-      setError(t('errors.clipboardDenied') || 'Cannot read clipboard')
-    }
+  const handlePasteInvoice = (text) => {
+    if (text) setInvoiceNo(text)
+    else toast.error(t('errors.clipboardDenied') || 'Cannot read clipboard')
   }
 
   const handleSend = async () => {
@@ -67,6 +80,7 @@ export default function PaymentInquiry() {
 
     if (!secretKey?.trim()) {
       setError(t('paymentInquiry.secretRequired'))
+      toast.warning(t('paymentInquiry.secretRequired'))
       return
     }
 
@@ -76,31 +90,28 @@ export default function PaymentInquiry() {
       locale: locale.trim() || 'en',
     }
 
-    setLoading(true)
+    const signal = start()
+    let jwtToken = null
+    let finalPayload = null
     try {
-      const jwtToken = await signJwtHS256(payloadData, secretKey)
-      const finalPayload = { payload: jwtToken }
+      jwtToken = await signJwtHS256(payloadData, secretKey)
+      finalPayload = { payload: jwtToken }
 
-      const { data } = await api.post('/api/simulator/proxy', {
-        method: 'POST',
-        url: apiUrl,
-        headers: { 'Content-Type': 'application/json' },
-        body: finalPayload,
-      })
+      const { data } = await api.post(
+        '/api/simulator/proxy',
+        {
+          method: 'POST',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' },
+          body: finalPayload,
+        },
+        { signal }
+      )
 
-      let decodedResponse = null
       const respBody = data?.body
-      const respObj =
-        respBody && typeof respBody === 'object'
-          ? respBody
-          : (() => {
-              try {
-                return JSON.parse(respBody)
-              } catch {
-                return null
-              }
-            })()
-      if (respObj?.payload) decodedResponse = decodeJwtPayload(respObj.payload)
+      const { decodedResponse } = parseProxyBody(respBody)
+
+      updateFlow({ merchantId, secretKey, invoiceNo: invoiceNo.trim() })
 
       setResult({
         payloadData,
@@ -112,17 +123,39 @@ export default function PaymentInquiry() {
         decodedResponse,
         error: data?.error ? data?.message : null,
       })
+
+      if (data?.status >= 200 && data?.status < 300) {
+        toast.success(t('common.requestSuccess'))
+        recordStep('payment-inquiry', 'success', { invoiceNo: invoiceNo.trim() })
+      } else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
-      const d = err.response?.data
-      setError(d?.message || err.message || t('errors.network'))
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult({
+          payloadData,
+          finalPayload,
+          jwtToken,
+          error: t('common.requestCancelled'),
+        })
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      setError(message)
+      toast.error(message)
+      setResult({
+        payloadData,
+        finalPayload,
+        jwtToken,
+        error: message,
+      })
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🧾 {t('paymentInquiry.title')}</h1>
@@ -166,9 +199,7 @@ export default function PaymentInquiry() {
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <label className="label mb-0">🧾 invoiceNo</label>
-                <button type="button" onClick={handlePasteInvoice} className="text-xs text-brand-600 hover:underline">
-                  📋 {t('paymentInquiry.pasteInvoice')}
-                </button>
+                <PasteButton onPaste={handlePasteInvoice} />
               </div>
               <input className="input" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
             </div>

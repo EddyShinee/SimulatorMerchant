@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import PaymentTokenField from '../components/PaymentTokenField.jsx'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import {
   PAYMENT_OPTION_DETAILS_ENVIRONMENTS as ENVIRONMENTS,
   PAYMENT_OPTION_DETAILS_ENV_OPTIONS as ENVIRONMENT_OPTIONS,
@@ -33,6 +37,9 @@ function ResultCard({ title, text, mono }) {
 
 export default function PaymentOptionDetails() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   const [env, setEnv] = useState('sandbox')
   const [apiUrl, setApiUrl] = useState(ENVIRONMENTS.sandbox)
@@ -41,13 +48,12 @@ export default function PaymentOptionDetails() {
     if (env !== 'custom') setApiUrl(ENVIRONMENTS[env])
   }, [env])
 
-  const [paymentToken, setPaymentToken] = useState('')
+  const [paymentToken, setPaymentToken] = useState(flow.paymentToken || '')
   const [clientId, setClientId] = useState(randomClientId)
   const [locale, setLocale] = useState('en')
   const [categoryCode, setCategoryCode] = useState('GCARD')
   const [groupCode, setGroupCode] = useState('CC')
 
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
@@ -62,6 +68,7 @@ export default function PaymentOptionDetails() {
 
     if (!paymentToken.trim()) {
       setError(t('paymentOptionDetails.tokenRequired'))
+      toast.warning(t('paymentOptionDetails.tokenRequired'))
       return
     }
 
@@ -73,14 +80,20 @@ export default function PaymentOptionDetails() {
       groupCode: groupCode.trim(),
     }
 
-    setLoading(true)
+    const signal = start()
     try {
-      const { data } = await api.post('/api/simulator/proxy', {
-        method: 'POST',
-        url: apiUrl,
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      })
+      const { data } = await api.post(
+        '/api/simulator/proxy',
+        {
+          method: 'POST',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        },
+        { signal }
+      )
+
+      updateFlow({ paymentToken: paymentToken.trim() })
 
       setResult({
         payload,
@@ -90,11 +103,27 @@ export default function PaymentOptionDetails() {
         response: data?.body,
         error: data?.error ? data?.message : null,
       })
+
+      if (data?.status >= 200 && data?.status < 300) toast.success(t('common.requestSuccess'))
+      else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult({ payload, error: t('common.requestCancelled') })
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      setError(message)
+      toast.error(message)
       const d = err.response?.data
-      setError(d?.message || err.message || t('errors.network'))
+      setResult({
+        payload,
+        status: err.response?.status,
+        durationMs: d?.durationMs,
+        error: message,
+      })
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
@@ -107,7 +136,7 @@ export default function PaymentOptionDetails() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🧾 {t('paymentOptionDetails.title')}</h1>

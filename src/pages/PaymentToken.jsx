@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react'
-import api, { getApiOrigin } from '../api/client.js'
+import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import InvoiceCopyBar from '../components/InvoiceCopyBar.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { signJwtHS256, decodeJwtPayload } from '../utils/jwt.js'
+import { parseProxyBody, proxyErrorMessage } from '../utils/proxyResponse.js'
 import {
   PARAM_CATEGORIES,
   PAYMENT_CHANNEL_OPTIONS,
@@ -16,6 +20,7 @@ import {
   generateIdempotencyId,
   omitEmptyFields,
 } from '../config/paymentTokenFields.js'
+import { getApiOrigin } from '../api/client.js'
 
 // Build the initial raw-value map for every advanced field.
 function initialAdvancedValues() {
@@ -191,13 +196,16 @@ function SubMerchants({ count, setCount, rows, setRows }) {
 
 export default function PaymentToken() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow, recordStep } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   // Environment / endpoint
   const [env, setEnv] = useState('sandbox')
   const [apiUrl, setApiUrl] = useState(ENVIRONMENTS.sandbox)
 
   // Basic fields
-  const [merchantId, setMerchantId] = useState(DEFAULT_MERCHANT_ID)
+  const [merchantId, setMerchantId] = useState(flow.merchantId || DEFAULT_MERCHANT_ID)
   const [invoiceNo, setInvoiceNo] = useState('')
   const [idempotencyId, setIdempotencyId] = useState(generateIdempotencyId)
   const [description, setDescription] = useState('')
@@ -219,10 +227,9 @@ export default function PaymentToken() {
   const [subRows, setSubRows] = useState([])
 
   // Secret
-  const [secretKey, setSecretKey] = useState(DEFAULT_SECRET_KEY)
+  const [secretKey, setSecretKey] = useState(flow.secretKey || DEFAULT_SECRET_KEY)
 
   // Result
-  const [loading, setLoading] = useState(false)
   const [warnings, setWarnings] = useState([])
   const [result, setResult] = useState(null)
 
@@ -362,29 +369,31 @@ export default function PaymentToken() {
     setInvoiceNo('')
     setIdempotencyId(generateIdempotencyId())
 
-    setLoading(true)
+    const signal = start()
+    let jwtToken = null
     try {
-      const jwtToken = await signJwtHS256(payload, secretKey)
-      const { data } = await api.post('/api/simulator/proxy', {
-        method: 'POST',
-        url: apiUrl,
-        headers: { 'Content-Type': 'application/json' },
-        body: { payload: jwtToken },
-      })
+      jwtToken = await signJwtHS256(payload, secretKey)
+      const { data } = await api.post(
+        '/api/simulator/proxy',
+        {
+          method: 'POST',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' },
+          body: { payload: jwtToken },
+        },
+        { signal }
+      )
 
-      let decodedResponse = null
       const respBody = data?.body
-      const respObj =
-        respBody && typeof respBody === 'object'
-          ? respBody
-          : (() => {
-              try {
-                return JSON.parse(respBody)
-              } catch {
-                return null
-              }
-            })()
-      if (respObj?.payload) decodedResponse = decodeJwtPayload(respObj.payload)
+      const { decodedResponse } = parseProxyBody(respBody)
+      const paymentTokenValue = decodedResponse?.paymentToken
+
+      updateFlow({
+        merchantId,
+        secretKey,
+        invoiceNo: finalInvoice,
+        ...(paymentTokenValue ? { paymentToken: paymentTokenValue } : {}),
+      })
 
       setResult({
         payload,
@@ -398,16 +407,34 @@ export default function PaymentToken() {
         ok: data?.ok,
         error: data?.error ? data?.message : null,
       })
+
+      if (data?.status >= 200 && data?.status < 300) {
+        toast.success(t('common.requestSuccess'))
+        recordStep('payment-token', 'success', { invoiceNo: finalInvoice })
+      } else {
+        toast.warning(data?.message || `HTTP ${data?.status}`)
+      }
     } catch (err) {
-      const data = err.response?.data
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult({
+          payload,
+          invoiceNo: finalInvoice,
+          jwtToken,
+          error: t('common.requestCancelled'),
+        })
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      toast.error(message)
       setResult({
         payload,
         invoiceNo: finalInvoice,
-        jwtToken: null,
-        error: data?.message || err.message || t('errors.network'),
+        jwtToken,
+        error: message,
       })
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
@@ -422,7 +449,7 @@ export default function PaymentToken() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
           POST

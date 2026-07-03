@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
-import { signJwtHS256, decodeJwtPayload } from '../utils/jwt.js'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { signJwtHS256 } from '../utils/jwt.js'
+import { parseProxyBody, proxyErrorMessage } from '../utils/proxyResponse.js'
 import { DEFAULT_SECRET_KEY, generateIdempotencyId } from '../config/paymentTokenFields.js'
 import {
   PAYMENT_POS_ENVIRONMENTS as ENVIRONMENTS,
@@ -53,6 +57,9 @@ function ResultCard({ title, text, mono }) {
 
 export default function PaymentPos() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   const [env, setEnv] = useState('mpay')
   const [apiUrl, setApiUrl] = useState(ENVIRONMENTS.mpay)
@@ -61,22 +68,21 @@ export default function PaymentPos() {
     if (env !== 'custom') setApiUrl(ENVIRONMENTS[env])
   }, [env])
 
-  const [merchantId, setMerchantId] = useState('704704000000211')
-  const [invoiceNo, setInvoiceNo] = useState('')
+  const [merchantId, setMerchantId] = useState(flow.merchantId || '704704000000211')
+  const [invoiceNo, setInvoiceNo] = useState(flow.invoiceNo || '')
   const [idempotencyId, setIdempotencyId] = useState(generateIdempotencyId)
   const [amount, setAmount] = useState(5000)
   const [currencyCode, setCurrencyCode] = useState('VND')
   const [paymentChannel, setPaymentChannel] = useState('POSCC')
   const [userDefined1, setUserDefined1] = useState('00024500937')
-  const [secretKey, setSecretKey] = useState(DEFAULT_SECRET_KEY)
+  const [secretKey, setSecretKey] = useState(flow.secretKey || DEFAULT_SECRET_KEY)
   const [responseReturnUrl, setResponseReturnUrl] = useState(
     'https://webhook.site/08fd12ec-4a71-4499-968c-0dbe729b8686'
   )
   const [customerName, setCustomerName] = useState('Eddy')
   const [customerEmail, setCustomerEmail] = useState('eddy.vu@2c2p.com')
-  const [timeoutSec, setTimeoutSec] = useState(DEFAULT_REQUEST_TIMEOUT_SEC)
+  const [timeoutSec, setTimeoutSec] = useState(flow.posTimeoutSec ?? DEFAULT_REQUEST_TIMEOUT_SEC)
 
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
@@ -102,7 +108,7 @@ export default function PaymentPos() {
       userDefined1,
     }
 
-    setLoading(true)
+    const signal = start()
 
     let jwtToken = null
     let apiPayload = null
@@ -143,23 +149,18 @@ export default function PaymentPos() {
           body: apiPayload,
           timeoutMs: requestTimeoutMs,
         },
-        // Let the server enforce timeout; client waits a bit longer for the proxy JSON response.
-        { timeout: requestTimeoutMs + 30000 }
+        { signal, timeout: requestTimeoutMs + 30000 }
       )
 
-      let decodedResponse = null
       const respBody = data?.body
-      const respObj =
-        respBody && typeof respBody === 'object'
-          ? respBody
-          : (() => {
-              try {
-                return JSON.parse(respBody)
-              } catch {
-                return null
-              }
-            })()
-      if (respObj?.payload) decodedResponse = decodeJwtPayload(respObj.payload)
+      const { decodedResponse } = parseProxyBody(respBody)
+
+      updateFlow({
+        merchantId,
+        secretKey,
+        invoiceNo: finalInvoice,
+        posTimeoutSec: Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC,
+      })
 
       setResult(
         partialResult({
@@ -172,13 +173,21 @@ export default function PaymentPos() {
         })
       )
 
-      // Prepare unique values for the next request
+      if (data?.status >= 200 && data?.status < 300) toast.success(t('common.requestSuccess'))
+      else toast.warning(data?.message || `HTTP ${data?.status}`)
+
       setInvoiceNo('')
       setIdempotencyId(generateIdempotencyId())
     } catch (err) {
-      const d = err.response?.data
-      const message = d?.message || err.message || t('errors.network')
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult(partialResult({ error: t('common.requestCancelled') }))
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
       setError(message)
+      toast.error(message)
+      const d = err.response?.data
       setResult(
         partialResult({
           status: err.response?.status,
@@ -187,7 +196,7 @@ export default function PaymentPos() {
         })
       )
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
@@ -195,7 +204,11 @@ export default function PaymentPos() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} timeoutSec={Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC} />
+      <LoadingOverlay
+        show={loading}
+        onCancel={cancel}
+        timeoutSec={Number(timeoutSec) || DEFAULT_REQUEST_TIMEOUT_SEC}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🔐 {t('paymentPos.title')}</h1>

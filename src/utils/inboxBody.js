@@ -71,3 +71,74 @@ export function analyzeInboxBody(body) {
   const decodedText = JSON.stringify(decoded, null, 2)
   return { rawText, jwtToken, decoded, decodedText }
 }
+
+const HEADER_JWT_KEYS = ['webhook-jwt', 'x-webhook-jwt', 'authorization']
+
+export function extractJwtFromHeaders(headers) {
+  if (!headers || typeof headers !== 'object') return null
+
+  const lower = {}
+  for (const [k, v] of Object.entries(headers)) {
+    lower[String(k).toLowerCase()] = v
+  }
+
+  for (const key of HEADER_JWT_KEYS) {
+    let val = lower[key]
+    if (val == null || val === '') continue
+    val = String(val)
+    if (key === 'authorization') {
+      if (/^bearer\s+/i.test(val)) val = val.replace(/^bearer\s+/i, '')
+      else continue
+    }
+    if (looksLikeJwt(val)) return val.trim()
+  }
+
+  return null
+}
+
+export function extractInvoiceFromDecoded(decoded) {
+  if (!decoded || typeof decoded !== 'object') return null
+  const keys = ['invoiceNo', 'invoiceNumber', 'invoice', 'invoiceID', 'invoiceId']
+  for (const k of keys) {
+    const v = decoded[k]
+    if (v != null && String(v).trim()) return String(v).trim()
+  }
+  return null
+}
+
+/** Full inbox analysis: body + headers JWT, invoice extraction. */
+export function analyzeInboxRequest(request) {
+  const bodyAnalysis = analyzeInboxBody(request?.body)
+  const headerJwt = extractJwtFromHeaders(request?.headers)
+
+  let headerDecoded = null
+  let headerDecodedText = null
+  if (headerJwt) {
+    headerDecoded = decodeJwtPayload(headerJwt)
+    headerDecodedText = JSON.stringify(headerDecoded, null, 2)
+  }
+
+  const invoiceNo =
+    extractInvoiceFromDecoded(bodyAnalysis.decoded) ||
+    extractInvoiceFromDecoded(headerDecoded)
+
+  const hasJwt = !!(bodyAnalysis.jwtToken || headerJwt)
+
+  return {
+    ...bodyAnalysis,
+    headerJwt,
+    headerDecoded,
+    headerDecodedText,
+    invoiceNo,
+    hasJwt,
+  }
+}
+
+export function matchesInboxPathFilter(path, filter) {
+  if (!filter || filter === 'all') return true
+  const p = String(path || '').toLowerCase()
+  if (filter === 'callback') return p.includes('callback')
+  if (filter === 'pos') return p.includes('pos-standalone')
+  if (filter === 'hook') return p.includes('/hook')
+  return true
+}

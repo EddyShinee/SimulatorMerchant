@@ -1,20 +1,27 @@
 import { useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import PasteButton from '../components/PasteButton.jsx'
 import AnalysisDashboard from '../components/AnalysisDashboard.jsx'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import { ANALYSIS_API_SELECT } from '../config/analysisConfig.js'
 import { enrichTransactionRows, parseHtmlTable } from '../utils/transactionAnalysis.js'
 
 export default function Analysis() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   const [apiKey, setApiKey] = useState(ANALYSIS_API_SELECT[0].label)
-  const [sessionId, setSessionId] = useState('')
-  const [fullCookie, setFullCookie] = useState('')
+  const [sessionId, setSessionId] = useState(flow.analysisSessionId || '')
+  const [fullCookie, setFullCookie] = useState(flow.analysisFullCookie || '')
   const [customUrl, setCustomUrl] = useState('')
 
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [rawHtml, setRawHtml] = useState('')
   const [meta, setMeta] = useState(null)
@@ -35,20 +42,31 @@ export default function Analysis() {
 
     if (!sessionId.trim() && !fullCookie.trim()) {
       setError(t('analysis.sessionRequired'))
+      toast.warning(t('analysis.sessionRequired'))
       return
     }
     if (!apiUrl.trim()) {
       setError(t('analysis.urlRequired'))
+      toast.warning(t('analysis.urlRequired'))
       return
     }
 
-    setLoading(true)
+    updateFlow({
+      analysisSessionId: sessionId.trim(),
+      analysisFullCookie: fullCookie.trim(),
+    })
+
+    const signal = start()
     try {
-      const { data } = await api.post('/api/simulator/transaction-analysis', {
-        url: apiUrl.trim(),
-        sessionId: sessionId.trim() || undefined,
-        cookie: fullCookie.trim() || undefined,
-      })
+      const { data } = await api.post(
+        '/api/simulator/transaction-analysis',
+        {
+          url: apiUrl.trim(),
+          sessionId: sessionId.trim() || undefined,
+          cookie: fullCookie.trim() || undefined,
+        },
+        { signal }
+      )
 
       setMeta({
         status: data.status,
@@ -58,7 +76,9 @@ export default function Analysis() {
       setRawHtml(typeof data.body === 'string' ? data.body : '')
 
       if (!data.ok && data.status !== 200) {
-        setError(data.message || `HTTP ${data.status}`)
+        const msg = data.message || `HTTP ${data.status}`
+        setError(msg)
+        toast.error(msg)
         return
       }
 
@@ -66,40 +86,50 @@ export default function Analysis() {
 
       if (data.redirectedToLogin) {
         setParseError(t('analysis.loginPage'))
+        toast.warning(t('analysis.loginPage'))
         return
       }
 
       const parsed = parseHtmlTable(html)
       if (parsed.error) {
         const key = `analysis.errors.${parsed.error}`
-        setParseError(t(key) !== key ? t(key) : parsed.error)
+        const msg = t(key) !== key ? t(key) : parsed.error
+        setParseError(msg)
+        toast.warning(msg)
         return
       }
 
       const { rows: enriched, datetimeCol } = enrichTransactionRows(parsed.rows, parsed.headers)
       if (!datetimeCol) {
-        setParseError(
-          `${t('analysis.noDateTimeCol')} ${parsed.headers.join(', ')}`
-        )
+        const msg = `${t('analysis.noDateTimeCol')} ${parsed.headers.join(', ')}`
+        setParseError(msg)
+        toast.warning(msg)
         return
       }
       if (!enriched.length) {
         setParseError(t('analysis.noValidDates'))
+        toast.warning(t('analysis.noValidDates'))
         return
       }
 
       setRows(enriched)
+      toast.success(t('common.requestSuccess'))
     } catch (err) {
-      const d = err.response?.data
-      setError(d?.message || err.message || t('errors.network'))
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      setError(message)
+      toast.error(message)
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">GET</span>
         <h1 className="text-2xl font-bold text-slate-900">📊 {t('analysis.title')}</h1>
@@ -133,7 +163,10 @@ export default function Analysis() {
             )}
           </div>
           <div>
-            <label className="label">🔑 {t('analysis.sessionId')}</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label className="label mb-0">🔑 {t('analysis.sessionId')}</label>
+              <PasteButton onPaste={(text) => text && setSessionId(text)} />
+            </div>
             <input
               className="input font-mono text-xs"
               value={sessionId}
@@ -146,7 +179,10 @@ export default function Analysis() {
         </div>
 
         <div>
-          <label className="label">{t('analysis.fullCookie')}</label>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="label mb-0">{t('analysis.fullCookie')}</label>
+            <PasteButton onPaste={(text) => text && setFullCookie(text)} />
+          </div>
           <textarea
             className="input min-h-[72px] font-mono text-xs"
             value={fullCookie}

@@ -93,3 +93,14 @@ export function IconCopy(props) {
     </svg>
   )
 }
+
+export function IconFlow(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <circle cx="12" cy="18" r="2.5" />
+      <path d="M8 6.5h8M7 8l4 8M17 8l-4 8" />
+    </svg>
+  )
+}

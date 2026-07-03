@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import SimulatorLayout from './layouts/SimulatorLayout.jsx'
+import PaymentFlowLayout from './layouts/PaymentFlowLayout.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -17,6 +18,7 @@ import PaymentOptionDetails from './pages/PaymentOptionDetails.jsx'
 import Analysis from './pages/Analysis.jsx'
 import PosStandalone from './pages/PosStandalone.jsx'
 import RequestInbox from './pages/RequestInbox.jsx'
+import PaymentFlowHub from './pages/PaymentFlowHub.jsx'
 import PaymentCallbackFrontend from './pages/PaymentCallbackFrontend.jsx'
 
 // Redirect authenticated users away from auth pages.
@@ -56,6 +58,14 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="payment-flow" element={<PaymentFlowLayout />}>
+          <Route index element={<PaymentFlowHub />} />
+          <Route path="token" element={<PaymentToken />} />
+          <Route path="pay" element={<DoPayment />} />
+          <Route path="inbox" element={<RequestInbox />} />
+          <Route path="inquiry" element={<PaymentInquiry />} />
+          <Route path="status" element={<TransactionStatusInquiry />} />
+        </Route>
         <Route path="api/payment-token" element={<PaymentToken />} />
         <Route path="api/payment-options" element={<PaymentOptions />} />
         <Route path="api/payment-option-details" element={<PaymentOptionDetails />} />

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 // Full-screen modal shown while a request is in flight, with a live timer.
-export default function LoadingOverlay({ show, title, timeoutSec }) {
+export default function LoadingOverlay({ show, title, timeoutSec, onCancel }) {
   const { t } = useLanguage()
   const [elapsed, setElapsed] = useState(0)
   const startRef = useRef(0)
@@ -32,15 +32,20 @@ export default function LoadingOverlay({ show, title, timeoutSec }) {
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
           {title || t('common.waitingResponse')}
         </p>
-        <p className={`mt-2 text-3xl font-bold tabular-nums ${overLimit ? 'text-amber-600' : 'text-brand-600'}`}>
+        <p
+          className={`mt-2 text-3xl font-bold tabular-nums ${overLimit ? 'text-amber-600' : 'text-brand-600'}`}
+        >
           {elapsed.toFixed(1)}s
-          {limit != null && (
-            <span className="text-lg font-medium text-slate-400"> / {limit}s</span>
-          )}
+          {limit != null && <span className="text-lg font-medium text-slate-400"> / {limit}s</span>}
         </p>
         <p className="mt-1 text-xs text-slate-400">
           {overLimit ? t('common.timeoutExceeded') : t('common.pleaseWait')}
         </p>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="btn-secondary mt-4 w-full">
+            {t('common.cancel')}
+          </button>
+        )}
       </div>
     </div>
   )

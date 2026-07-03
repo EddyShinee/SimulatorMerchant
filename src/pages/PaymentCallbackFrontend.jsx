@@ -148,7 +148,14 @@ export default function PaymentCallbackFrontend() {
             )}
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link to="/app/api/payment-inquiry" className="btn-primary flex-1 text-center">
+              <Link
+                to={
+                  parsed?.invoiceNo
+                    ? `/app/payment-flow/inquiry?invoiceNo=${encodeURIComponent(parsed.invoiceNo)}`
+                    : '/app/payment-flow/inquiry'
+                }
+                className="btn-primary flex-1 text-center"
+              >
                 {t('paymentCallback.paymentInquiry')}
               </Link>
               <Link to="/app/inbox" className="btn-secondary flex-1 text-center">

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import PasteButton from '../components/PasteButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import {
   PAYMENT_ACTION_ENVIRONMENTS,
   PAYMENT_ACTION_ENV_OPTIONS,
@@ -221,6 +226,9 @@ function LoyaltyEditor({ value, onChange, title }) {
 
 export default function PaymentAction() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   // Environment
   const [env, setEnv] = useState('sandbox')
@@ -240,7 +248,7 @@ export default function PaymentAction() {
   // Request params
   const [version, setVersion] = useState('4.3')
   const [mid, setMid] = useState('704704000000211')
-  const [invoiceNo, setInvoiceNo] = useState('01a00a81-364c-48f4-8278-3aef4ec61399')
+  const [invoiceNo, setInvoiceNo] = useState(flow.invoiceNo || '01a00a81-364c-48f4-8278-3aef4ec61399')
   const [amount, setAmount] = useState('5000')
   const [processType, setProcessType] = useState('I')
   const [timestamp, setTimestamp] = useState(generateTimestamp)
@@ -259,7 +267,6 @@ export default function PaymentAction() {
   const [topLoyalty, setTopLoyalty] = useState(emptyLoyalty)
 
   // Result
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
@@ -317,10 +324,11 @@ export default function PaymentAction() {
     setResult(null)
     if (!useDefaultKeys && (!privateKeyFile || !publicCertFile)) {
       setError(t('paymentAction.keysRequired'))
+      toast.warning(t('paymentAction.keysRequired'))
       return
     }
 
-    setLoading(true)
+    const signal = start()
     try {
       const payloadBody = { apiUrl, xml: xmlPreview, password, useDefaultKeys }
       if (!useDefaultKeys) {
@@ -331,13 +339,23 @@ export default function PaymentAction() {
         payloadBody.privateKey = { base64: privBase64, filename: privateKeyFile.name }
         payloadBody.publicCert = { base64: pubBase64, filename: publicCertFile.name }
       }
-      const { data } = await api.post('/api/simulator/payment-action', payloadBody)
+      const { data } = await api.post('/api/simulator/payment-action', payloadBody, { signal })
+      updateFlow({ invoiceNo: invoiceNo.trim() })
       setResult(data)
+      if (data?.success !== false) toast.success(t('common.requestSuccess'))
+      else toast.warning(data?.message || t('errors.network'))
     } catch (err) {
-      const d = err.response?.data
-      setError(d?.message || err.message || t('errors.network'))
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult({ error: t('common.requestCancelled'), xml: xmlPreview })
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      setError(message)
+      toast.error(message)
+      setResult({ error: message, xml: xmlPreview })
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
@@ -345,7 +363,7 @@ export default function PaymentAction() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🔐 {t('paymentAction.title')}</h1>
@@ -445,7 +463,10 @@ export default function PaymentAction() {
                 <input className="input" value={mid} onChange={(e) => setMid(e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <label className="label">Invoice No</label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="label mb-0">Invoice No</label>
+                  <PasteButton onPaste={(text) => text && setInvoiceNo(text)} />
+                </div>
                 <input className="input" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
               </div>
               <div>

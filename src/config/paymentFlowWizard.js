@@ -1,0 +1,55 @@
+export const WIZARD_STEPS = [
+  {
+    id: 'payment-token',
+    path: '/app/payment-flow/token',
+    labelKey: 'wizard.steps.token',
+    shortKey: 'wizard.steps.tokenShort',
+    descKey: 'wizard.steps.tokenDesc',
+  },
+  {
+    id: 'do-payment',
+    path: '/app/payment-flow/pay',
+    labelKey: 'wizard.steps.doPayment',
+    shortKey: 'wizard.steps.doPaymentShort',
+    descKey: 'wizard.steps.doPaymentDesc',
+  },
+  {
+    id: 'inbox',
+    path: '/app/payment-flow/inbox',
+    labelKey: 'wizard.steps.inbox',
+    shortKey: 'wizard.steps.inboxShort',
+    descKey: 'wizard.steps.inboxDesc',
+  },
+  {
+    id: 'payment-inquiry',
+    path: '/app/payment-flow/inquiry',
+    labelKey: 'wizard.steps.inquiry',
+    shortKey: 'wizard.steps.inquiryShort',
+    descKey: 'wizard.steps.inquiryDesc',
+  },
+  {
+    id: 'transaction-status',
+    path: '/app/payment-flow/status',
+    labelKey: 'wizard.steps.txnStatus',
+    shortKey: 'wizard.steps.txnStatusShort',
+    descKey: 'wizard.steps.txnStatusDesc',
+  },
+]
+
+const FLOW_PREFIX = '/app/payment-flow'
+
+export function isPaymentFlowRoute(pathname) {
+  return pathname === FLOW_PREFIX || pathname.startsWith(`${FLOW_PREFIX}/`)
+}
+
+export function getWizardStepIndex(pathname) {
+  if (pathname === FLOW_PREFIX || pathname === `${FLOW_PREFIX}/`) return -1
+  return WIZARD_STEPS.findIndex((s) => pathname === s.path || pathname.startsWith(`${s.path}/`))
+}
+
+export function getNextWizardStep(pathname) {
+  const idx = getWizardStepIndex(pathname)
+  if (idx < 0) return WIZARD_STEPS[0]
+  if (idx >= WIZARD_STEPS.length - 1) return null
+  return WIZARD_STEPS[idx + 1]
+}

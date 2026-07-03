@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
+import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import PaymentTokenField from '../components/PaymentTokenField.jsx'
+import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
+import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import { omitEmptyFields } from '../config/paymentTokenFields.js'
 import {
   DO_PAYMENT_ENVIRONMENTS,
@@ -173,13 +177,16 @@ function CardEncryption({ cardNumber, expiryMonth, expiryYear, cvv, onEncrypted 
 
 export default function DoPayment() {
   const { t } = useLanguage()
+  const toast = useToast()
+  const { flow, updateFlow, recordStep } = usePaymentFlow()
+  const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   // Environment
   const [env, setEnv] = useState('sandbox')
   const [apiUrl, setApiUrl] = useState(DO_PAYMENT_ENVIRONMENTS.sandbox)
 
   // Basic info
-  const [paymentToken, setPaymentToken] = useState('')
+  const [paymentToken, setPaymentToken] = useState(flow.paymentToken || '')
   const [clientId, setClientId] = useState(() => crypto.randomUUID())
   const [clientIp, setClientIp] = useState('47.89.102.11')
   const [locale, setLocale] = useState('en')
@@ -207,7 +214,6 @@ export default function DoPayment() {
   const [securePayToken, setSecurePayToken] = useState('')
 
   // Result
-  const [loading, setLoading] = useState(false)
   const [warning, setWarning] = useState('')
   const [result, setResult] = useState(null)
 
@@ -220,8 +226,9 @@ export default function DoPayment() {
     try {
       const text = await navigator.clipboard.readText()
       if (text) setPaymentToken(text.trim())
+      else toast.warning(t('errors.clipboardDenied') || 'Cannot read clipboard')
     } catch {
-      /* clipboard not available */
+      toast.error(t('errors.clipboardDenied') || 'Cannot read clipboard')
     }
   }
 
@@ -257,10 +264,12 @@ export default function DoPayment() {
 
     if (!paymentToken.trim()) {
       setWarning(t('doPayment.tokenRequired'))
+      toast.warning(t('doPayment.tokenRequired'))
       return
     }
     if (!clientId.trim()) {
       setWarning(t('doPayment.clientIdRequired'))
+      toast.warning(t('doPayment.clientIdRequired'))
       return
     }
 
@@ -290,14 +299,18 @@ export default function DoPayment() {
       },
     })
 
-    setLoading(true)
+    const signal = start()
     try {
-      const { data } = await api.post('/api/simulator/proxy', {
-        method: 'POST',
-        url: apiUrl,
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      })
+      const { data } = await api.post(
+        '/api/simulator/proxy',
+        {
+          method: 'POST',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        },
+        { signal }
+      )
 
       const respBody = data?.body
       let respObj = respBody && typeof respBody === 'object' ? respBody : null
@@ -310,6 +323,8 @@ export default function DoPayment() {
       }
       const dataField = respObj && respObj.data != null ? respObj.data : null
 
+      updateFlow({ paymentToken: paymentToken.trim() })
+
       setResult({
         payload,
         status: data?.status,
@@ -320,17 +335,28 @@ export default function DoPayment() {
         qrType,
         error: data?.error ? data?.message : null,
       })
+
+      if (data?.status >= 200 && data?.status < 300) {
+        toast.success(t('common.requestSuccess'))
+        recordStep('do-payment', 'success')
+      } else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
-      const d = err.response?.data
-      setResult({ payload, error: d?.message || err.message || t('errors.network') })
+      if (isAbortError(err)) {
+        toast.warning(t('common.requestCancelled'))
+        setResult({ payload, error: t('common.requestCancelled') })
+        return
+      }
+      const message = proxyErrorMessage(err, t('errors.network'))
+      setResult({ payload, error: message })
+      toast.error(message)
     } finally {
-      setLoading(false)
+      stop()
     }
   }
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} />
+      <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">💳 {t('doPayment.title')}</h1>
