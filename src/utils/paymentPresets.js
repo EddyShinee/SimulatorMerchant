@@ -10,6 +10,17 @@ const DEFAULTS = {
   analysisSessionId: '',
   analysisFullCookie: '',
   flowTimeline: [],
+  categoryCode: '',
+  groupCode: '',
+  categoryName: '',
+  groupName: '',
+  channelCode: '',
+  agentCode: '',
+  agentChannelCode: '',
+  selectedChannelName: '',
+  requiresCard: false,
+  channelGroups: [],
+  optionCategories: [],
 }
 
 export function loadPaymentPresets() {

@@ -9,10 +9,21 @@ import PaymentTokenField from '../components/PaymentTokenField.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import {
+  parsePaymentOptions,
+  categorySelectionToFlow,
+  buildChannelGroups,
+  countChannelsInGroups,
+  channelSelectionToFlow,
+} from '../utils/paymentOptionParse.js'
+import PaymentCategoryPicker from '../components/PaymentCategoryPicker.jsx'
+import PaymentChannelPicker from '../components/PaymentChannelPicker.jsx'
+import { fetchAllPaymentOptionDetails } from '../utils/paymentChannelApi.js'
+import {
   PAYMENT_OPTIONS_ENVIRONMENTS as ENVIRONMENTS,
   PAYMENT_OPTIONS_ENV_OPTIONS as ENVIRONMENT_OPTIONS,
   DEFAULT_BROWSER_DETAILS,
 } from '../config/paymentOptionsConfig.js'
+import { PAYMENT_OPTION_DETAILS_ENVIRONMENTS as DETAILS_ENVIRONMENTS } from '../config/paymentOptionDetailsConfig.js'
 
 function randomClientId() {
   return crypto.randomUUID().replace(/-/g, '')
@@ -58,6 +69,11 @@ export default function PaymentOptions() {
 
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [parsedOptions, setParsedOptions] = useState(null)
+  const [channelGroups, setChannelGroups] = useState(flow.channelGroups || [])
+  const [fetchProgress, setFetchProgress] = useState('')
+  const [activeChannel, setActiveChannel] = useState(null)
+  const [activeContext, setActiveContext] = useState(null)
 
   const handleEnv = (value) => {
     setEnv(value)
@@ -71,6 +87,9 @@ export default function PaymentOptions() {
   const handleSend = async () => {
     setError('')
     setResult(null)
+    setParsedOptions(null)
+    setChannelGroups([])
+    setFetchProgress('')
 
     if (!paymentToken.trim()) {
       setError(t('paymentOptions.tokenRequired'))
@@ -109,6 +128,53 @@ export default function PaymentOptions() {
 
       updateFlow({ paymentToken: paymentToken.trim() })
 
+      const parsed = parsePaymentOptions(data?.body)
+      setParsedOptions(parsed)
+
+      let groups = []
+      let appliedChannel = false
+      if (data?.status >= 200 && data?.status < 300 && parsed.ok && parsed.categories.length) {
+        const detailsUrl =
+          env === 'custom' ? DETAILS_ENVIRONMENTS.sandbox : DETAILS_ENVIRONMENTS[env] || DETAILS_ENVIRONMENTS.sandbox
+
+        const detailResults = await fetchAllPaymentOptionDetails({
+          url: detailsUrl,
+          paymentToken: paymentToken.trim(),
+          categories: parsed.categories,
+          clientId: clientId.trim() || randomClientId(),
+          locale: locale.trim() || 'en',
+          signal,
+          onProgress: (p) =>
+            setFetchProgress(
+              t('paymentOptions.fetchingDetails')
+                .replace('{current}', String(p.current))
+                .replace('{total}', String(p.total))
+                .replace('{label}', p.label)
+            ),
+        })
+
+        groups = buildChannelGroups(parsed.categories, detailResults)
+        setChannelGroups(groups)
+        updateFlow({ channelGroups: groups, optionCategories: parsed.categories })
+
+        const defaultGroup = groups.find(
+          (g) => g.categoryCode === parsed.defaultSelection?.categoryCode && g.groupCode === parsed.defaultSelection?.groupCode
+        ) || groups[0]
+        const firstChannel = defaultGroup?.channels?.find((c) => !c.isDown)
+        if (firstChannel && defaultGroup) {
+          const ctx = {
+            categoryCode: defaultGroup.categoryCode,
+            groupCode: defaultGroup.groupCode,
+            categoryName: defaultGroup.categoryName,
+            groupName: defaultGroup.groupName,
+          }
+          setActiveChannel(firstChannel)
+          setActiveContext(ctx)
+          updateFlow(channelSelectionToFlow(firstChannel, ctx))
+          appliedChannel = true
+        }
+      }
+
       setResult({
         payload,
         status: data?.status,
@@ -118,8 +184,17 @@ export default function PaymentOptions() {
         error: data?.error ? data?.message : null,
       })
 
-      if (data?.status >= 200 && data?.status < 300) toast.success(t('common.requestSuccess'))
-      else toast.warning(data?.message || `HTTP ${data?.status}`)
+      if (data?.status >= 200 && data?.status < 300) {
+        const channelCount = countChannelsInGroups(groups)
+        toast.success(
+          channelCount > 0
+            ? t('paymentOptions.allDetailsLoaded').replace('{count}', String(channelCount))
+            : t('common.requestSuccess')
+        )
+        if (parsed.ok && parsed.defaultSelection && !appliedChannel) {
+          updateFlow(categorySelectionToFlow(parsed.defaultSelection))
+        }
+      } else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
       if (isAbortError(err)) {
         toast.warning(t('common.requestCancelled'))
@@ -141,6 +216,18 @@ export default function PaymentOptions() {
     }
   }
 
+  const handleSelectCategory = (row) => {
+    updateFlow(categorySelectionToFlow(row))
+    toast.success(t('paymentOptions.categorySaved').replace('{code}', `${row.categoryCode} / ${row.groupCode}`))
+  }
+
+  const handleSelectChannel = (channel, context) => {
+    setActiveChannel(channel)
+    setActiveContext(context)
+    updateFlow(channelSelectionToFlow(channel, context))
+    toast.success(t('paymentOptionDetails.channelSaved').replace('{name}', channel.name))
+  }
+
   const responseText =
     result?.response != null
       ? typeof result.response === 'string'
@@ -150,7 +237,7 @@ export default function PaymentOptions() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay show={loading} onCancel={cancel} />
+      <LoadingOverlay show={loading} title={fetchProgress || undefined} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
         <h1 className="text-2xl font-bold text-slate-900">🧾 {t('paymentOptions.title')}</h1>
@@ -278,6 +365,30 @@ export default function PaymentOptions() {
 
               {responseText != null && (
                 <ResultCard title={`📥 ${t('paymentOptions.responseTitle')}`} text={responseText} mono />
+              )}
+
+              {channelGroups.length > 0 && (
+                <PaymentChannelPicker
+                  groups={channelGroups}
+                  selected={flow}
+                  activeChannel={activeChannel}
+                  activeContext={activeContext}
+                  onSelect={handleSelectChannel}
+                />
+              )}
+
+              {parsedOptions?.categories?.length > 0 && (
+                <PaymentCategoryPicker
+                  categories={parsedOptions.categories}
+                  selected={{ categoryCode: flow.categoryCode, groupCode: flow.groupCode }}
+                  onSelect={handleSelectCategory}
+                />
+              )}
+
+              {parsedOptions && !parsedOptions.ok && parsedOptions.respCode && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  respCode: {parsedOptions.respCode} — {parsedOptions.respDesc}
+                </div>
               )}
             </div>
           )}

@@ -16,6 +16,15 @@ import {
   QR_TYPE_OPTIONS,
   MY2C2P_SDK_URL,
 } from '../config/doPaymentConfig.js'
+import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
+import { PAYMENT_OPTION_DETAILS_ENVIRONMENTS } from '../config/paymentOptionDetailsConfig.js'
+import { fetchPaymentOptions, fetchAllPaymentOptionDetails } from '../utils/paymentChannelApi.js'
+import {
+  parsePaymentOptions,
+  channelSelectionToFlow,
+  buildChannelGroups,
+} from '../utils/paymentOptionParse.js'
+import PaymentChannelPicker from '../components/PaymentChannelPicker.jsx'
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -192,9 +201,14 @@ export default function DoPayment() {
   const [locale, setLocale] = useState('en')
 
   // Channel code
-  const [channelCode, setChannelCode] = useState('CC')
-  const [agentCode, setAgentCode] = useState('')
-  const [agentChannelCode, setAgentChannelCode] = useState('')
+  const [channelCode, setChannelCode] = useState(flow.channelCode || 'CC')
+  const [agentCode, setAgentCode] = useState(flow.agentCode || '')
+  const [agentChannelCode, setAgentChannelCode] = useState(flow.agentChannelCode || '')
+
+  const [autoFetchBusy, setAutoFetchBusy] = useState(false)
+  const [channelGroups, setChannelGroups] = useState(flow.channelGroups || [])
+  const [activeChannel, setActiveChannel] = useState(null)
+  const [activeContext, setActiveContext] = useState(null)
 
   // Payment information
   const [customerName, setCustomerName] = useState('NGUYEN VAN A')
@@ -213,10 +227,60 @@ export default function DoPayment() {
   const [cvv, setCvv] = useState('123')
   const [securePayToken, setSecurePayToken] = useState('')
   const [sendCardDetails, setSendCardDetails] = useState(true)
+  const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
   useEffect(() => {
-    setSendCardDetails(channelCode.trim().toUpperCase() === 'CC')
-  }, [channelCode])
+    const isCc = channelCode.trim().toUpperCase() === 'CC'
+    if (flow.selectedChannelName) {
+      setSendCardDetails(Boolean(flow.requiresCard))
+    } else {
+      setSendCardDetails(isCc)
+    }
+    if (!isCc) setSendSecurePayToken(false)
+  }, [channelCode, flow.requiresCard, flow.selectedChannelName])
+
+  useEffect(() => {
+    if (flow.channelCode) setChannelCode(flow.channelCode)
+    if (flow.agentCode != null) setAgentCode(flow.agentCode)
+    if (flow.agentChannelCode != null) setAgentChannelCode(flow.agentChannelCode)
+  }, [flow.channelCode, flow.agentCode, flow.agentChannelCode])
+
+  useEffect(() => {
+    if (flow.channelGroups?.length) setChannelGroups(flow.channelGroups)
+  }, [flow.channelGroups])
+
+  useEffect(() => {
+    if (flow.selectedChannelName && flow.channelCode) {
+      setActiveChannel({
+        name: flow.selectedChannelName,
+        channelCode: flow.channelCode,
+        agentCode: flow.agentCode || '',
+        agentChannelCode: flow.agentChannelCode || '',
+        requiresCard: flow.requiresCard,
+      })
+      setActiveContext({
+        categoryCode: flow.categoryCode,
+        groupCode: flow.groupCode,
+        categoryName: flow.categoryName,
+        groupName: flow.groupName,
+      })
+    }
+  }, [
+    flow.selectedChannelName,
+    flow.channelCode,
+    flow.agentCode,
+    flow.agentChannelCode,
+    flow.categoryCode,
+    flow.groupCode,
+    flow.categoryName,
+    flow.groupName,
+    flow.requiresCard,
+  ])
+
+  const handleEncryptedToken = (token) => {
+    setSecurePayToken(token)
+    setSendSecurePayToken(true)
+  }
 
   // Result
   const [warning, setWarning] = useState('')
@@ -226,6 +290,109 @@ export default function DoPayment() {
     setEnv(value)
     if (value !== 'custom') setApiUrl(DO_PAYMENT_ENVIRONMENTS[value])
   }
+
+  const applyChannelFromFlow = (patch) => {
+    updateFlow(patch)
+    if (patch.channelCode != null) setChannelCode(patch.channelCode)
+    if (patch.agentCode != null) setAgentCode(patch.agentCode)
+    if (patch.agentChannelCode != null) setAgentChannelCode(patch.agentChannelCode)
+  }
+
+  const handleSelectChannel = (channel, context) => {
+    setActiveChannel(channel)
+    setActiveContext(context)
+    applyChannelFromFlow(channelSelectionToFlow(channel, context))
+    toast.success(t('doPayment.autoFetchApplied').replace('{name}', channel.name))
+  }
+
+  const handleAutoFetchChannel = async () => {
+    if (!paymentToken.trim()) {
+      toast.warning(t('doPayment.tokenRequired'))
+      return
+    }
+
+    const optionsUrl =
+      env === 'custom' ? PAYMENT_OPTIONS_ENVIRONMENTS.sandbox : PAYMENT_OPTIONS_ENVIRONMENTS[env]
+    const detailsUrl =
+      env === 'custom'
+        ? PAYMENT_OPTION_DETAILS_ENVIRONMENTS.sandbox
+        : PAYMENT_OPTION_DETAILS_ENVIRONMENTS[env]
+
+    setAutoFetchBusy(true)
+
+    try {
+      const { proxy: optionsProxy } = await fetchPaymentOptions({
+        url: optionsUrl,
+        paymentToken,
+        clientId,
+        locale,
+      })
+
+      if (!(optionsProxy?.status >= 200 && optionsProxy?.status < 300)) {
+        toast.warning(optionsProxy?.message || `Options HTTP ${optionsProxy?.status}`)
+        return
+      }
+
+      const optionsParsed = parsePaymentOptions(optionsProxy.body)
+      if (!optionsParsed.ok || !optionsParsed.categories.length) {
+        toast.warning(optionsParsed.respDesc || t('doPayment.autoFetchOptionsFailed'))
+        return
+      }
+
+      const detailResults = await fetchAllPaymentOptionDetails({
+        url: detailsUrl,
+        paymentToken,
+        categories: optionsParsed.categories,
+        clientId,
+        locale,
+      })
+
+      const groups = buildChannelGroups(optionsParsed.categories, detailResults)
+      setChannelGroups(groups)
+      updateFlow({ channelGroups: groups, optionCategories: optionsParsed.categories })
+
+      const allChannels = groups.flatMap((g) =>
+        (g.channels || []).filter((c) => !c.isDown).map((c) => ({ channel: c, group: g }))
+      )
+
+      if (!allChannels.length) {
+        toast.warning(t('doPayment.autoFetchAllDown'))
+        return
+      }
+
+      const preferred =
+        allChannels.find(
+          ({ channel, group }) =>
+            group.categoryCode === flow.categoryCode &&
+            group.groupCode === flow.groupCode &&
+            channel.name === flow.selectedChannelName
+        ) ||
+        allChannels.find(({ channel }) => /visa/i.test(channel.name)) ||
+        allChannels[0]
+
+      const ctx = {
+        categoryCode: preferred.group.categoryCode,
+        groupCode: preferred.group.groupCode,
+        categoryName: preferred.group.categoryName,
+        groupName: preferred.group.groupName,
+      }
+      setActiveChannel(preferred.channel)
+      setActiveContext(ctx)
+      applyChannelFromFlow(channelSelectionToFlow(preferred.channel, ctx))
+      toast.success(t('doPayment.autoFetchPickChannel'))
+    } catch (err) {
+      toast.error(proxyErrorMessage(err, t('errors.network')))
+    } finally {
+      setAutoFetchBusy(false)
+    }
+  }
+
+  const flowChannelLabel =
+    flow.categoryCode && flow.selectedChannelName
+      ? `${flow.categoryCode} / ${flow.groupCode} → ${flow.selectedChannelName} (${flow.channelCode})`
+      : flow.channelCode
+        ? flow.channelCode
+        : null
 
   const pasteToken = async () => {
     try {
@@ -279,20 +446,19 @@ export default function DoPayment() {
     }
 
     const paymentBody = { ...paymentData }
+    if (sendSecurePayToken && securePayToken.trim()) {
+      paymentBody.securePayToken = securePayToken.trim()
+    }
     if (sendCardDetails) {
-      if (securePayToken.trim()) {
-        paymentBody.securePayToken = securePayToken.trim()
-      } else {
-        Object.assign(
-          paymentBody,
-          omitEmptyFields({
-            cardNo: cardNumber ? cardNumber.replace(/\s/g, '') : '',
-            expiryMonth,
-            expiryYear,
-            securityCode: cvv,
-          })
-        )
-      }
+      Object.assign(
+        paymentBody,
+        omitEmptyFields({
+          cardNo: cardNumber ? cardNumber.replace(/\s/g, '') : '',
+          expiryMonth,
+          expiryYear,
+          securityCode: cvv,
+        })
+      )
     }
 
     const payload = omitEmptyFields({
@@ -330,7 +496,12 @@ export default function DoPayment() {
       }
       const dataField = respObj && respObj.data != null ? respObj.data : null
 
-      updateFlow({ paymentToken: paymentToken.trim() })
+      updateFlow({
+        paymentToken: paymentToken.trim(),
+        channelCode: channelCode.trim(),
+        agentCode: agentCode.trim(),
+        agentChannelCode: agentChannelCode.trim(),
+      })
 
       setResult({
         payload,
@@ -423,10 +594,25 @@ export default function DoPayment() {
 
           {/* Channel code */}
           <div className="card space-y-3 p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-slate-800">💰 {t('doPayment.channelCode')}</h3>
-              <CopyButton text={JSON.stringify(codeJson, null, 2)} />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoFetchChannel}
+                  disabled={loading || autoFetchBusy}
+                  className="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300"
+                >
+                  {autoFetchBusy ? t('doPayment.autoFetching') : `⚡ ${t('doPayment.autoFetchChannel')}`}
+                </button>
+                <CopyButton text={JSON.stringify(codeJson, null, 2)} />
+              </div>
             </div>
+            {flowChannelLabel && (
+              <div className="rounded-lg border border-brand-200 bg-brand-50/80 px-3 py-2 text-xs text-brand-800 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-200">
+                📌 {t('doPayment.flowChannelBadge')}: <span className="font-mono font-semibold">{flowChannelLabel}</span>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="label">Channel Code</label>
@@ -448,6 +634,16 @@ export default function DoPayment() {
             <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
               {JSON.stringify(codeJson, null, 2)}
             </pre>
+
+            {channelGroups.length > 0 && (
+              <PaymentChannelPicker
+                groups={channelGroups}
+                selected={flow}
+                activeChannel={activeChannel}
+                activeContext={activeContext}
+                onSelect={handleSelectChannel}
+              />
+            )}
           </div>
 
           {/* Payment information */}
@@ -516,11 +712,11 @@ export default function DoPayment() {
             </pre>
           </div>
 
-          {/* Card details */}
+          {/* Card details — raw PAN / expiry / CVV */}
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
-                🔐 {t('doPayment.cardDetails')}
+                💳 {t('doPayment.rawCardDetails')}
               </h3>
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-600 dark:bg-slate-800/80">
                 <input
@@ -537,9 +733,6 @@ export default function DoPayment() {
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {sendCardDetails ? t('doPayment.sendCardDetailsOn') : t('doPayment.sendCardDetailsOff')}
             </p>
-            <div
-              className={`space-y-3 transition ${sendCardDetails ? '' : 'pointer-events-none opacity-40'}`}
-            >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">💳 Card Number</label>
@@ -558,6 +751,29 @@ export default function DoPayment() {
                 <input className="input" maxLength={4} value={expiryYear} onChange={(e) => setExpiryYear(e.target.value)} />
               </div>
             </div>
+          </div>
+
+          {/* 2C2P encryption → securePayToken (independent from raw card fields) */}
+          <div className="card space-y-3 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                🔐 {t('doPayment.securePaySection')}
+              </h3>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-600 dark:bg-slate-800/80">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+                  checked={sendSecurePayToken}
+                  onChange={(e) => setSendSecurePayToken(e.target.checked)}
+                />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {t('doPayment.sendSecurePayToken')}
+                </span>
+              </label>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {sendSecurePayToken ? t('doPayment.sendSecurePayTokenOn') : t('doPayment.sendSecurePayTokenOff')}
+            </p>
             <div>
               <label className="label">🔐 securePayToken</label>
               <input
@@ -573,12 +789,11 @@ export default function DoPayment() {
                 expiryMonth={expiryMonth}
                 expiryYear={expiryYear}
                 cvv={cvv}
-                onEncrypted={setSecurePayToken}
+                onEncrypted={handleEncryptedToken}
               />
             ) : (
-              <p className="text-xs text-slate-400">ℹ️ Enter all card details to see the encryption form.</p>
+              <p className="text-xs text-slate-400">{t('doPayment.encryptNeedsCard')}</p>
             )}
-            </div>
           </div>
 
           {warning && (
