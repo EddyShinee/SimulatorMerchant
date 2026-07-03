@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import SimulatorLayout from './layouts/SimulatorLayout.jsx'
 import PaymentFlowLayout from './layouts/PaymentFlowLayout.jsx'
+import ApiPaymentLayout from './layouts/ApiPaymentLayout.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -61,15 +62,19 @@ export default function App() {
         <Route path="payment-flow" element={<PaymentFlowLayout />}>
           <Route index element={<PaymentFlowHub />} />
           <Route path="token" element={<PaymentToken />} />
+          <Route path="options" element={<PaymentOptions />} />
+          <Route path="details" element={<PaymentOptionDetails />} />
           <Route path="pay" element={<DoPayment />} />
           <Route path="inbox" element={<RequestInbox />} />
           <Route path="inquiry" element={<PaymentInquiry />} />
           <Route path="status" element={<TransactionStatusInquiry />} />
         </Route>
+        <Route element={<ApiPaymentLayout />}>
+          <Route path="api/payment-options" element={<PaymentOptions />} />
+          <Route path="api/payment-option-details" element={<PaymentOptionDetails />} />
+          <Route path="api/do-payment" element={<DoPayment />} />
+        </Route>
         <Route path="api/payment-token" element={<PaymentToken />} />
-        <Route path="api/payment-options" element={<PaymentOptions />} />
-        <Route path="api/payment-option-details" element={<PaymentOptionDetails />} />
-        <Route path="api/do-payment" element={<DoPayment />} />
         <Route path="api/payment-action" element={<PaymentAction />} />
         <Route path="api/payment-pos" element={<PaymentPos />} />
         <Route path="api/payment-inquiry" element={<PaymentInquiry />} />

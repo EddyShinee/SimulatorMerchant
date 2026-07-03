@@ -61,7 +61,7 @@ export default function PaymentCategoryPicker({ categories, selected, onSelect }
                         {t('paymentOptions.useForDetails')}
                       </button>
                       <Link
-                        to="/app/api/payment-option-details"
+                        to="/app/payment-flow/details"
                         className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                       >
                         {t('paymentOptions.openDetails')}

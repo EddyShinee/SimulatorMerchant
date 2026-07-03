@@ -7,6 +7,20 @@ export const WIZARD_STEPS = [
     descKey: 'wizard.steps.tokenDesc',
   },
   {
+    id: 'payment-options',
+    path: '/app/payment-flow/options',
+    labelKey: 'wizard.steps.options',
+    shortKey: 'wizard.steps.optionsShort',
+    descKey: 'wizard.steps.optionsDesc',
+  },
+  {
+    id: 'payment-option-details',
+    path: '/app/payment-flow/details',
+    labelKey: 'wizard.steps.details',
+    shortKey: 'wizard.steps.detailsShort',
+    descKey: 'wizard.steps.detailsDesc',
+  },
+  {
     id: 'do-payment',
     path: '/app/payment-flow/pay',
     labelKey: 'wizard.steps.doPayment',

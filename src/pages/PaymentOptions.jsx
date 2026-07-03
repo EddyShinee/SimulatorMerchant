@@ -3,9 +3,9 @@ import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
-import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import PaymentTokenField from '../components/PaymentTokenField.jsx'
+import PaymentApiResultsPanel from '../components/PaymentApiResultsPanel.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import {
@@ -29,28 +29,10 @@ function randomClientId() {
   return crypto.randomUUID().replace(/-/g, '')
 }
 
-function ResultCard({ title, text, mono }) {
-  return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-700">{title}</p>
-        <CopyButton text={text} />
-      </div>
-      <pre
-        className={`max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100 ${
-          mono ? 'break-all whitespace-pre-wrap' : ''
-        }`}
-      >
-        {text}
-      </pre>
-    </div>
-  )
-}
-
 export default function PaymentOptions() {
   const { t } = useLanguage()
   const toast = useToast()
-  const { flow, updateFlow } = usePaymentFlow()
+  const { flow, updateFlow, recordStep } = usePaymentFlow()
   const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
   const [env, setEnv] = useState('sandbox')
@@ -194,6 +176,7 @@ export default function PaymentOptions() {
         if (parsed.ok && parsed.defaultSelection && !appliedChannel) {
           updateFlow(categorySelectionToFlow(parsed.defaultSelection))
         }
+        if (groups.length > 0) recordStep('payment-options', 'success')
       } else toast.warning(data?.message || `HTTP ${data?.status}`)
     } catch (err) {
       if (isAbortError(err)) {
@@ -326,72 +309,71 @@ export default function PaymentOptions() {
         </div>
 
         <div className="space-y-5">
-          <h2 className="text-lg font-semibold text-slate-900">📊 {t('paymentToken.results')}</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            📊 {t('paymentToken.results')}
+          </h2>
 
-          {!result ? (
-            <div className="card p-8 text-center text-sm text-slate-400">{t('paymentToken.noResult')}</div>
-          ) : (
-            <div className="space-y-4">
-              {(result.status != null || result.error) && (
+          <PaymentApiResultsPanel
+            hasResult={!!result}
+            hasChannels={channelGroups.length > 0 || (parsedOptions?.categories?.length ?? 0) > 0}
+            statusBadges={
+              result && (result.status != null || result.error) ? (
                 <div className="flex flex-wrap items-center gap-2">
                   {result.status != null && (
                     <span
                       className={`rounded-md px-2 py-0.5 text-xs font-bold ${
                         result.status >= 200 && result.status < 300
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                          : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                       }`}
                     >
                       {result.status} {result.statusText || ''}
                     </span>
                   )}
                   {result.durationMs != null && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       {result.durationMs} ms
                     </span>
                   )}
                   {result.error && (
-                    <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                    <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
                       {result.error}
                     </span>
                   )}
                 </div>
-              )}
-
-              <ResultCard
-                title={`📤 ${t('paymentOptions.requestTitle')}`}
-                text={JSON.stringify(result.payload, null, 2)}
-              />
-
-              {responseText != null && (
-                <ResultCard title={`📥 ${t('paymentOptions.responseTitle')}`} text={responseText} mono />
-              )}
-
-              {channelGroups.length > 0 && (
-                <PaymentChannelPicker
-                  groups={channelGroups}
-                  selected={flow}
-                  activeChannel={activeChannel}
-                  activeContext={activeContext}
-                  onSelect={handleSelectChannel}
-                />
-              )}
-
-              {parsedOptions?.categories?.length > 0 && (
-                <PaymentCategoryPicker
-                  categories={parsedOptions.categories}
-                  selected={{ categoryCode: flow.categoryCode, groupCode: flow.groupCode }}
-                  onSelect={handleSelectCategory}
-                />
-              )}
-
-              {parsedOptions && !parsedOptions.ok && parsedOptions.respCode && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  respCode: {parsedOptions.respCode} — {parsedOptions.respDesc}
-                </div>
-              )}
-            </div>
-          )}
+              ) : null
+            }
+            channelsContent={
+              <>
+                {channelGroups.length > 0 && (
+                  <PaymentChannelPicker
+                    groups={channelGroups}
+                    selected={flow}
+                    activeChannel={activeChannel}
+                    activeContext={activeContext}
+                    onSelect={handleSelectChannel}
+                  />
+                )}
+                {parsedOptions?.categories?.length > 0 && (
+                  <PaymentCategoryPicker
+                    categories={parsedOptions.categories}
+                    selected={{ categoryCode: flow.categoryCode, groupCode: flow.groupCode }}
+                    onSelect={handleSelectCategory}
+                  />
+                )}
+                {parsedOptions && !parsedOptions.ok && parsedOptions.respCode && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                    respCode: {parsedOptions.respCode} — {parsedOptions.respDesc}
+                  </div>
+                )}
+              </>
+            }
+            requestTitle={`📤 ${t('paymentOptions.requestTitle')}`}
+            responseTitle={`📥 ${t('paymentOptions.responseTitle')}`}
+            requestText={result ? JSON.stringify(result.payload, null, 2) : null}
+            responseText={responseText}
+            footerContent={null}
+          />
         </div>
       </div>
     </div>
