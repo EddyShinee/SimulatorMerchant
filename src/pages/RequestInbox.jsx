@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import api, { getApiOrigin } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import { analyzeInboxBody } from '../utils/inboxBody.js'
 
 function methodBadge(method) {
   const map = {
@@ -22,6 +23,42 @@ function Section({ title, data }) {
       <pre className="overflow-auto rounded-md bg-slate-900 p-3 text-xs text-slate-100">
         {typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
       </pre>
+    </div>
+  )
+}
+
+function BodySection({ body, t }) {
+  if (body == null || (typeof body === 'object' && Object.keys(body).length === 0)) return null
+
+  const { rawText, jwtToken, decodedText } = analyzeInboxBody(body)
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {t('inbox.bodyRaw')}
+          </p>
+          <CopyButton text={rawText} label={t('inbox.copyBody')} />
+        </div>
+        <pre className="max-h-80 overflow-auto rounded-md bg-slate-900 p-3 text-xs text-slate-100">
+          {rawText}
+        </pre>
+      </div>
+
+      {jwtToken && decodedText && (
+        <div>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              {t('inbox.bodyDecoded')}
+            </p>
+            <CopyButton text={decodedText} label={t('inbox.copyDecoded')} />
+          </div>
+          <pre className="max-h-80 overflow-auto rounded-md bg-slate-900 p-3 text-xs text-emerald-100">
+            {decodedText}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }
@@ -134,7 +171,7 @@ export default function RequestInbox() {
               </summary>
               <div className="space-y-3 border-t border-slate-100 px-4 py-4">
                 <Section title={t('inbox.query')} data={r.query} />
-                <Section title={t('inbox.body')} data={r.body} />
+                <BodySection body={r.body} t={t} />
                 <Section title={t('inbox.headers')} data={r.headers} />
               </div>
             </details>
