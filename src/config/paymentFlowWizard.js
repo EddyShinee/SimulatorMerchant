@@ -53,3 +53,19 @@ export function getNextWizardStep(pathname) {
   if (idx >= WIZARD_STEPS.length - 1) return null
   return WIZARD_STEPS[idx + 1]
 }
+
+const DONE_STATUSES = new Set(['success', 'received', 'viewed'])
+
+export function isWizardStepDone(stepId, flowTimeline = []) {
+  const entry = flowTimeline.find((e) => e.stepId === stepId)
+  return entry != null && DONE_STATUSES.has(entry.status)
+}
+
+/** Suggest the next incomplete step from saved timeline. */
+export function getSuggestedNextStep(flow) {
+  const timeline = flow?.flowTimeline || []
+  for (const step of WIZARD_STEPS) {
+    if (!isWizardStepDone(step.id, timeline)) return step
+  }
+  return null
+}

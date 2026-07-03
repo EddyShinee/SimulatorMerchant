@@ -212,6 +212,11 @@ export default function DoPayment() {
   const [expiryYear, setExpiryYear] = useState('2029')
   const [cvv, setCvv] = useState('123')
   const [securePayToken, setSecurePayToken] = useState('')
+  const [sendCardDetails, setSendCardDetails] = useState(true)
+
+  useEffect(() => {
+    setSendCardDetails(channelCode.trim().toUpperCase() === 'CC')
+  }, [channelCode])
 
   // Result
   const [warning, setWarning] = useState('')
@@ -274,18 +279,20 @@ export default function DoPayment() {
     }
 
     const paymentBody = { ...paymentData }
-    if (securePayToken.trim()) {
-      paymentBody.securePayToken = securePayToken.trim()
-    } else {
-      Object.assign(
-        paymentBody,
-        omitEmptyFields({
-          cardNo: cardNumber ? cardNumber.replace(/\s/g, '') : '',
-          expiryMonth,
-          expiryYear,
-          securityCode: cvv,
-        })
-      )
+    if (sendCardDetails) {
+      if (securePayToken.trim()) {
+        paymentBody.securePayToken = securePayToken.trim()
+      } else {
+        Object.assign(
+          paymentBody,
+          omitEmptyFields({
+            cardNo: cardNumber ? cardNumber.replace(/\s/g, '') : '',
+            expiryMonth,
+            expiryYear,
+            securityCode: cvv,
+          })
+        )
+      }
     }
 
     const payload = omitEmptyFields({
@@ -511,7 +518,28 @@ export default function DoPayment() {
 
           {/* Card details */}
           <div className="card space-y-3 p-4">
-            <h3 className="font-semibold text-slate-800">🔐 {t('doPayment.cardDetails')}</h3>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                🔐 {t('doPayment.cardDetails')}
+              </h3>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-600 dark:bg-slate-800/80">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+                  checked={sendCardDetails}
+                  onChange={(e) => setSendCardDetails(e.target.checked)}
+                />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {t('doPayment.sendCardDetails')}
+                </span>
+              </label>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {sendCardDetails ? t('doPayment.sendCardDetailsOn') : t('doPayment.sendCardDetailsOff')}
+            </p>
+            <div
+              className={`space-y-3 transition ${sendCardDetails ? '' : 'pointer-events-none opacity-40'}`}
+            >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">💳 Card Number</label>
@@ -550,10 +578,11 @@ export default function DoPayment() {
             ) : (
               <p className="text-xs text-slate-400">ℹ️ Enter all card details to see the encryption form.</p>
             )}
+            </div>
           </div>
 
           {warning && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
               ⚠️ {warning}
             </div>
           )}
