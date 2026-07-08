@@ -14,6 +14,7 @@ import {
   IconLogout,
   IconMenu,
   IconClose,
+  IconPayout,
 } from '../components/icons.jsx'
 import { AppBrandSidebar } from '../components/AppBrand.jsx'
 import { PaymentFlowProvider } from '../context/PaymentFlowContext.jsx'
@@ -80,6 +81,8 @@ function usePageTitle(pathname, t) {
   if (isPaymentFlowRoute(pathname)) return t('nav.paymentFlow')
   if (pathname.includes('/inbox')) return t('nav.requestInbox')
   if (pathname.includes('/pos-standalone')) return t('nav.posStandalone')
+  if (pathname.includes('/payout/inquiry')) return t('nav.payoutInquiry')
+  if (pathname.includes('/payout/create')) return t('nav.payoutCreate')
   const apiMatch = pathname.match(/\/app\/api\/([^/]+)/)
   if (apiMatch) {
     const api = API_CATALOG.find((a) => a.id === apiMatch[1])
@@ -138,6 +141,22 @@ export default function SimulatorLayout() {
             />
           ))}
         </div>
+
+        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {t('nav.sectionPayout')}
+        </p>
+        <NavItem
+          to="/app/payout/create"
+          icon={IconPayout}
+          label={t('nav.payoutCreate')}
+          onClick={closeMobile}
+        />
+        <NavItem
+          to="/app/payout/inquiry"
+          icon={IconPayout}
+          label={t('nav.payoutInquiry')}
+          onClick={closeMobile}
+        />
 
         <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
           {t('nav.sectionPosStandalone')}

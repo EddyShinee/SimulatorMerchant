@@ -1,6 +1,6 @@
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-export default function PasteButton({ onPaste, className = '' }) {
+export default function PasteButton({ onPaste, className = '', label }) {
   const { t } = useLanguage()
 
   const handleClick = async () => {
@@ -13,8 +13,8 @@ export default function PasteButton({ onPaste, className = '' }) {
   }
 
   return (
-    <button type="button" onClick={handleClick} className={`text-xs text-brand-600 hover:underline ${className}`}>
-      📋 {t('common.paste')}
+    <button type="button" onClick={handleClick} className={`text-xs text-brand-600 hover:underline dark:text-brand-400 ${className}`}>
+      📋 {label || t('common.paste')}
     </button>
   )
 }

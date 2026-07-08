@@ -21,6 +21,7 @@ const DEFAULTS = {
   requiresCard: false,
   channelGroups: [],
   optionCategories: [],
+  payoutRequestId: '',
 }
 
 export function loadPaymentPresets() {
