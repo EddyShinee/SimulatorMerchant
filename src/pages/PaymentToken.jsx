@@ -232,6 +232,7 @@ export default function PaymentToken() {
   // Result
   const [warnings, setWarnings] = useState([])
   const [result, setResult] = useState(null)
+  const [showIframe, setShowIframe] = useState(false)
 
   const setAdvancedValue = (name, val) => setAdvanced((prev) => ({ ...prev, [name]: val }))
 
@@ -343,6 +344,7 @@ export default function PaymentToken() {
   const handleGenerate = async () => {
     setWarnings([])
     setResult(null)
+    setShowIframe(false)
 
     const finalInvoice = invoiceNo.trim() || generateInvoiceNo()
     const desc = description.trim() || `Eddy - Payment ${finalInvoice}`
@@ -441,6 +443,7 @@ export default function PaymentToken() {
   const webPaymentUrl = result?.decodedResponse?.webPaymentUrl
   const paymentTokenValue = result?.decodedResponse?.paymentToken
   const resultInvoiceNo = result?.invoiceNo || result?.payload?.invoiceNo
+  const iframeModeEnabled = result?.payload?.iframeMode === true
 
   const activeCategory = useMemo(
     () => PARAM_CATEGORIES.find((c) => c.id === activeTab) || PARAM_CATEGORIES[0],
@@ -806,9 +809,53 @@ export default function PaymentToken() {
                         🌐 {t('paymentToken.openPaymentUrl')}
                       </a>
                     )}
+                    {webPaymentUrl && iframeModeEnabled && (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => setShowIframe(true)}
+                      >
+                        🖼️ {t('paymentToken.openInIframe')}
+                      </button>
+                    )}
                     {paymentTokenValue && (
                       <CopyButton text={paymentTokenValue} />
                     )}
+                  </div>
+                </div>
+              )}
+
+              {showIframe && webPaymentUrl && iframeModeEnabled && (
+                <div className="card space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        🖼️ {t('paymentToken.iframePreview')}
+                      </p>
+                      <p className="mt-0.5 break-all font-mono text-[11px] text-slate-400">{webPaymentUrl}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={webPaymentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-secondary"
+                      >
+                        🌐 {t('paymentToken.openPaymentUrl')}
+                      </a>
+                      <button type="button" className="btn-secondary" onClick={() => setShowIframe(false)}>
+                        {t('paymentToken.closeIframe')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                    <iframe
+                      title={t('paymentToken.iframePreview')}
+                      src={webPaymentUrl}
+                      className="h-[70vh] w-full min-h-[480px] bg-white"
+                      allow="payment *; clipboard-write *"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
                   </div>
                 </div>
               )}
