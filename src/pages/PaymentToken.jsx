@@ -445,6 +445,31 @@ export default function PaymentToken() {
   const resultInvoiceNo = result?.invoiceNo || result?.payload?.invoiceNo
   const iframeModeEnabled = result?.payload?.iframeMode === true
 
+  const openPaymentPopup = () => {
+    if (!webPaymentUrl) return
+    const width = 480
+    const height = 760
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
+    const features = [
+      `width=${width}`,
+      `height=${height}`,
+      `left=${left}`,
+      `top=${top}`,
+      'scrollbars=yes',
+      'resizable=yes',
+      'noopener=yes',
+      'noreferrer=yes',
+    ].join(',')
+    const popup = window.open(webPaymentUrl, '2c2p-payment-iframe', features)
+    if (!popup) {
+      toast.warning(t('paymentToken.popupBlocked'))
+      setShowIframe(true)
+      return
+    }
+    popup.focus()
+  }
+
   const activeCategory = useMemo(
     () => PARAM_CATEGORIES.find((c) => c.id === activeTab) || PARAM_CATEGORIES[0],
     [activeTab]
@@ -810,13 +835,14 @@ export default function PaymentToken() {
                       </a>
                     )}
                     {webPaymentUrl && iframeModeEnabled && (
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={() => setShowIframe(true)}
-                      >
-                        🖼️ {t('paymentToken.openInIframe')}
-                      </button>
+                      <>
+                        <button type="button" className="btn-primary" onClick={openPaymentPopup}>
+                          🗔 {t('paymentToken.openPopup')}
+                        </button>
+                        <button type="button" className="btn-secondary" onClick={() => setShowIframe(true)}>
+                          🖼️ {t('paymentToken.openInIframe')}
+                        </button>
+                      </>
                     )}
                     {paymentTokenValue && (
                       <CopyButton text={paymentTokenValue} />
@@ -826,33 +852,34 @@ export default function PaymentToken() {
               )}
 
               {showIframe && webPaymentUrl && iframeModeEnabled && (
-                <div className="card space-y-3 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        🖼️ {t('paymentToken.iframePreview')}
-                      </p>
-                      <p className="mt-0.5 break-all font-mono text-[11px] text-slate-400">{webPaymentUrl}</p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px]"
+                    aria-label={t('paymentToken.closeIframe')}
+                    onClick={() => setShowIframe(false)}
+                  />
+                  <div className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          🖼️ {t('paymentToken.iframePreview')}
+                        </p>
+                        <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">{webPaymentUrl}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <button type="button" className="btn-secondary" onClick={openPaymentPopup}>
+                          🗔 {t('paymentToken.openPopup')}
+                        </button>
+                        <button type="button" className="btn-secondary" onClick={() => setShowIframe(false)}>
+                          {t('paymentToken.closeIframe')}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={webPaymentUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-secondary"
-                      >
-                        🌐 {t('paymentToken.openPaymentUrl')}
-                      </a>
-                      <button type="button" className="btn-secondary" onClick={() => setShowIframe(false)}>
-                        {t('paymentToken.closeIframe')}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                     <iframe
                       title={t('paymentToken.iframePreview')}
                       src={webPaymentUrl}
-                      className="h-[70vh] w-full min-h-[480px] bg-white"
+                      className="h-[75vh] w-full min-h-[520px] bg-white"
                       allow="payment *; clipboard-write *"
                       referrerPolicy="no-referrer-when-downgrade"
                     />
