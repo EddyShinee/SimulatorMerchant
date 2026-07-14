@@ -445,31 +445,6 @@ export default function PaymentToken() {
   const resultInvoiceNo = result?.invoiceNo || result?.payload?.invoiceNo
   const iframeModeEnabled = result?.payload?.iframeMode === true
 
-  const openPaymentPopup = () => {
-    if (!webPaymentUrl) return
-    const width = 480
-    const height = 760
-    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
-    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
-    const features = [
-      `width=${width}`,
-      `height=${height}`,
-      `left=${left}`,
-      `top=${top}`,
-      'scrollbars=yes',
-      'resizable=yes',
-      'noopener=yes',
-      'noreferrer=yes',
-    ].join(',')
-    const popup = window.open(webPaymentUrl, '2c2p-payment-iframe', features)
-    if (!popup) {
-      toast.warning(t('paymentToken.popupBlocked'))
-      setShowIframe(true)
-      return
-    }
-    popup.focus()
-  }
-
   const activeCategory = useMemo(
     () => PARAM_CATEGORIES.find((c) => c.id === activeTab) || PARAM_CATEGORIES[0],
     [activeTab]
@@ -835,14 +810,9 @@ export default function PaymentToken() {
                       </a>
                     )}
                     {webPaymentUrl && iframeModeEnabled && (
-                      <>
-                        <button type="button" className="btn-primary" onClick={openPaymentPopup}>
-                          🗔 {t('paymentToken.openPopup')}
-                        </button>
-                        <button type="button" className="btn-secondary" onClick={() => setShowIframe(true)}>
-                          🖼️ {t('paymentToken.openInIframe')}
-                        </button>
-                      </>
+                      <button type="button" className="btn-primary" onClick={() => setShowIframe(true)}>
+                        🖼️ {t('paymentToken.openInIframe')}
+                      </button>
                     )}
                     {paymentTokenValue && (
                       <CopyButton text={paymentTokenValue} />
@@ -868,9 +838,6 @@ export default function PaymentToken() {
                         <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">{webPaymentUrl}</p>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        <button type="button" className="btn-secondary" onClick={openPaymentPopup}>
-                          🗔 {t('paymentToken.openPopup')}
-                        </button>
                         <button type="button" className="btn-secondary" onClick={() => setShowIframe(false)}>
                           {t('paymentToken.closeIframe')}
                         </button>
