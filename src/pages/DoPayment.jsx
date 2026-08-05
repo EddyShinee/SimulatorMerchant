@@ -14,6 +14,8 @@ import {
   DO_PAYMENT_ENVIRONMENTS,
   DO_PAYMENT_ENV_OPTIONS,
   QR_TYPE_OPTIONS,
+  INTEREST_TYPE_OPTIONS,
+  INSTALLMENT_PERIOD_OPTIONS,
   MY2C2P_SDK_URL,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
@@ -216,7 +218,9 @@ export default function DoPayment() {
   const [mobileNoPrefix, setMobileNoPrefix] = useState('1')
   const [cardEmail, setCardEmail] = useState('eddy.vu@2c2p.com')
   const [ipp, setIpp] = useState(false)
-  const [installmentPeriod, setInstallmentPeriod] = useState('')
+  const [isIppChosen, setIsIppChosen] = useState(true)
+  const [installmentPeriod, setInstallmentPeriod] = useState('3')
+  const [interestType, setInterestType] = useState('M')
   const [qrType, setQrType] = useState('')
 
   // Card details
@@ -228,14 +232,27 @@ export default function DoPayment() {
   const [sendCardDetails, setSendCardDetails] = useState(true)
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
+  const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
+  const ippEnabled = isIppChannel || ipp
+
   useEffect(() => {
-    const isCc = channelCode.trim().toUpperCase() === 'CC'
+    const code = channelCode.trim().toUpperCase()
+    const isCc = code === 'CC'
+    const isIpp = code === 'IPP'
     if (flow.selectedChannelName) {
       setSendCardDetails(Boolean(flow.requiresCard))
     } else {
       setSendCardDetails(isCc)
     }
-    if (!isCc) setSendSecurePayToken(false)
+    if (isIpp) {
+      setIpp(true)
+      setIsIppChosen(true)
+      setSendSecurePayToken(true)
+      setInstallmentPeriod((prev) => prev || '3')
+      setInterestType((prev) => prev || 'M')
+    } else if (!isCc) {
+      setSendSecurePayToken(false)
+    }
   }, [channelCode, flow.requiresCard, flow.selectedChannelName])
 
   useEffect(() => {
@@ -408,9 +425,11 @@ export default function DoPayment() {
 
   const buildPaymentData = () => {
     const optional = {}
-    if (ipp) {
-      optional.interestType = 'Y'
-      if (installmentPeriod.trim()) optional.installmentPeriod = installmentPeriod.trim()
+    if (ippEnabled) {
+      optional.isIppChosen = isIppChosen
+      if (interestType) optional.interestType = interestType
+      const period = Number.parseInt(String(installmentPeriod).trim(), 10)
+      if (Number.isInteger(period) && period > 0) optional.installmentPeriod = period
     }
     if (qrType) optional.qrType = qrType
     return omitEmptyFields({
@@ -681,25 +700,65 @@ export default function DoPayment() {
                 </select>
               </div>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                  checked={ipp}
+                  checked={ippEnabled}
+                  disabled={isIppChannel}
                   onChange={(e) => setIpp(e.target.checked)}
                 />
-                {t('doPayment.ippPayment')} (interestType = Y)
+                {t('doPayment.ippPayment')}
+                {isIppChannel && (
+                  <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                    channelCode=IPP
+                  </span>
+                )}
               </label>
-              {ipp && (
-                <div className="mt-2">
-                  <label className="label">{t('doPayment.installmentPeriod')}</label>
-                  <input
-                    className="input"
-                    value={installmentPeriod}
-                    onChange={(e) => setInstallmentPeriod(e.target.value)}
-                    placeholder="e.g. 3, 6, 12"
-                  />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.ippHint')}</p>
+              {ippEnabled && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="label">isIppChosen</label>
+                    <select
+                      className="input font-mono text-xs"
+                      value={isIppChosen ? 'true' : 'false'}
+                      onChange={(e) => setIsIppChosen(e.target.value === 'true')}
+                    >
+                      <option value="true">true</option>
+                      <option value="false">false</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.installmentPeriod')}</label>
+                    <select
+                      className="input font-mono text-xs"
+                      value={installmentPeriod}
+                      onChange={(e) => setInstallmentPeriod(e.target.value)}
+                    >
+                      {INSTALLMENT_PERIOD_OPTIONS.map((months) => (
+                        <option key={months} value={String(months)}>
+                          {t('doPayment.installmentPeriodOption').replace('{months}', String(months))}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.interestType')}</label>
+                    <select
+                      className="input font-mono text-xs"
+                      value={interestType}
+                      onChange={(e) => setInterestType(e.target.value)}
+                    >
+                      {INTEREST_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[10px] text-slate-400">{t('doPayment.interestTypeHint')}</p>
+                  </div>
                 </div>
               )}
             </div>
