@@ -217,7 +217,6 @@ export default function DoPayment() {
   const [mobileNo, setMobileNo] = useState('1')
   const [mobileNoPrefix, setMobileNoPrefix] = useState('1')
   const [cardEmail, setCardEmail] = useState('eddy.vu@2c2p.com')
-  const [ipp, setIpp] = useState(false)
   const [isIppChosen, setIsIppChosen] = useState(true)
   const [installmentPeriod, setInstallmentPeriod] = useState('3')
   const [interestType, setInterestType] = useState('M')
@@ -233,7 +232,6 @@ export default function DoPayment() {
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
-  const ippEnabled = isIppChannel || ipp
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
@@ -245,7 +243,6 @@ export default function DoPayment() {
       setSendCardDetails(isCc)
     }
     if (isIpp) {
-      setIpp(true)
       setIsIppChosen(true)
       setSendSecurePayToken(true)
       setInstallmentPeriod((prev) => prev || '3')
@@ -425,7 +422,7 @@ export default function DoPayment() {
 
   const buildPaymentData = () => {
     const optional = {}
-    if (ippEnabled) {
+    if (isIppChannel) {
       optional.isIppChosen = isIppChosen
       if (interestType) optional.interestType = interestType
       const period = Number.parseInt(String(installmentPeriod).trim(), 10)
@@ -700,24 +697,17 @@ export default function DoPayment() {
                 </select>
               </div>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                  checked={ippEnabled}
-                  disabled={isIppChannel}
-                  onChange={(e) => setIpp(e.target.checked)}
-                />
-                {t('doPayment.ippPayment')}
-                {isIppChannel && (
+            {isIppChannel && (
+              <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {t('doPayment.ippPayment')}
+                  </h4>
                   <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
                     channelCode=IPP
                   </span>
-                )}
-              </label>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.ippHint')}</p>
-              {ippEnabled && (
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.ippHint')}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   <div>
                     <label className="label">isIppChosen</label>
@@ -760,8 +750,8 @@ export default function DoPayment() {
                     <p className="mt-1 text-[10px] text-slate-400">{t('doPayment.interestTypeHint')}</p>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
               {JSON.stringify(paymentData, null, 2)}
             </pre>
