@@ -11,15 +11,15 @@ import {
   createCredential,
   updateCredential,
   deleteCredential,
-  countWebAuthnCredentials,
 } from '../utils/merchantStore.js'
 import {
-  buildRegistrationOptions,
-  verifyAndSaveRegistration,
-  buildAuthenticationOptions,
-  verifyAuthentication,
-  deleteWebAuthnCredentials,
-} from '../utils/vaultWebAuthn.js'
+  buildAuthEnrollOptions,
+  finishAuthEnroll,
+  getAuthPasskeyStatus,
+  buildVaultUnlockOptions,
+  finishVaultUnlock,
+  deletePasskeys,
+} from '../utils/authWebAuthn.js'
 
 const router = express.Router()
 
@@ -74,6 +74,14 @@ function requireVaultUnlock(req, res, next) {
 
 function handleStoreError(res, err, fallbackMessage) {
   if (err?.code === 'STORE_UNAVAILABLE') return storeNotReady(res)
+  const msg = String(err?.message || err?.details || '')
+  const code = String(err?.code || '')
+  if (code === '23505' || /duplicate|unique/i.test(msg)) {
+    return res.status(409).json({
+      error: 'DUPLICATE_MID',
+      message: 'This Merchant ID already exists for that environment.',
+    })
+  }
   console.error('[merchants]', err)
   return res.status(500).json({ error: 'SERVER_ERROR', message: fallbackMessage })
 }
@@ -83,11 +91,11 @@ router.get('/vault', async (req, res) => {
   if (!isMerchantStoreConfigured()) return storeNotReady(res)
   try {
     const row = await getVaultRow(userId(req))
-    const biometricCount = row ? await countWebAuthnCredentials(userId(req)) : 0
+    const status = row ? await getAuthPasskeyStatus(userId(req)) : { enabled: false, count: 0 }
     return res.json({
       configured: Boolean(row),
-      biometricEnabled: biometricCount > 0,
-      biometricCount,
+      biometricEnabled: Boolean(status.enabled),
+      biometricCount: status.count || 0,
     })
   } catch (err) {
     return handleStoreError(res, err, 'Failed to read vault status.')
@@ -200,10 +208,16 @@ router.post('/vault/webauthn/register/options', requireVaultUnlock, async (req, 
     if (!vault) {
       return res.status(404).json({ error: 'VAULT_NOT_FOUND', message: 'Vault is not configured yet.' })
     }
-    const result = await buildRegistrationOptions(req, userId(req), req.user?.email)
+    const result = await buildAuthEnrollOptions(req, userId(req), req.user?.email)
     return res.json(result)
   } catch (err) {
     console.error('[webauthn:register/options]', err?.code || err?.name, err?.message, err)
+    if (err?.code === 'STORE_UNAVAILABLE' || err?.code === 'BAD_REQUEST') {
+      return res.status(err.code === 'STORE_UNAVAILABLE' ? 503 : 400).json({
+        error: err.code,
+        message: err.message,
+      })
+    }
     return res.status(500).json({
       error: 'WEBAUTHN_OPTIONS_FAILED',
       message: err?.message || 'Failed to start biometric registration.',
@@ -215,7 +229,9 @@ router.post('/vault/webauthn/register/options', requireVaultUnlock, async (req, 
 router.post('/vault/webauthn/register', requireVaultUnlock, async (req, res) => {
   if (!isMerchantStoreConfigured()) return storeNotReady(res)
   try {
-    await verifyAndSaveRegistration(req, userId(req), {
+    await finishAuthEnroll(req, {
+      userId: userId(req),
+      email: req.user?.email,
       response: req.body?.response,
       challengeToken: req.body?.challengeToken,
       challengeId: req.body?.challengeId,
@@ -223,8 +239,11 @@ router.post('/vault/webauthn/register', requireVaultUnlock, async (req, res) => 
     return res.json({ ok: true, biometricEnabled: true })
   } catch (err) {
     console.error('[webauthn:register]', err?.code || err?.name, err?.message)
-    if (err?.code === 'BAD_REQUEST' || err?.code === 'INVALID_CHALLENGE') {
-      return res.status(400).json({ error: err.code, message: err.message })
+    if (err?.code === 'BAD_REQUEST' || err?.code === 'INVALID_CHALLENGE' || err?.code === 'STORE_UNAVAILABLE') {
+      return res.status(err.code === 'STORE_UNAVAILABLE' ? 503 : 400).json({
+        error: err.code,
+        message: err.message,
+      })
     }
     if (err?.code === 'WEBAUTHN_FAILED') {
       return res.status(400).json({ error: 'WEBAUTHN_FAILED', message: err.message })
@@ -241,13 +260,14 @@ router.post('/vault/webauthn/auth/options', async (req, res) => {
     if (!vault) {
       return res.status(404).json({ error: 'VAULT_NOT_FOUND', message: 'Vault is not configured yet.' })
     }
-    const result = await buildAuthenticationOptions(req, userId(req))
+    const result = await buildVaultUnlockOptions(req, userId(req))
     return res.json(result)
   } catch (err) {
     if (err?.code === 'NO_BIOMETRIC') {
       return res.status(404).json({
         error: 'NO_BIOMETRIC',
-        message: 'Touch ID is not set up yet. Unlock with password first, then enable Touch ID.',
+        message:
+          'Touch ID is not set up yet. Unlock with password, then enable Touch ID (same credential used for login).',
       })
     }
     console.error('[webauthn:auth/options]', err?.code || err?.name, err?.message, err)
@@ -262,7 +282,7 @@ router.post('/vault/webauthn/auth/options', async (req, res) => {
 router.post('/vault/webauthn/unlock', async (req, res) => {
   if (!isMerchantStoreConfigured()) return storeNotReady(res)
   try {
-    await verifyAuthentication(req, userId(req), {
+    await finishVaultUnlock(req, userId(req), {
       response: req.body?.response,
       challengeToken: req.body?.challengeToken,
       challengeId: req.body?.challengeId,
@@ -280,11 +300,11 @@ router.post('/vault/webauthn/unlock', async (req, res) => {
   }
 })
 
-// DELETE /api/merchants/vault/webauthn — remove all Touch ID credentials
+// DELETE /api/merchants/vault/webauthn — remove shared Touch ID (login + vault)
 router.delete('/vault/webauthn', requireVaultUnlock, async (req, res) => {
   if (!isMerchantStoreConfigured()) return storeNotReady(res)
   try {
-    await deleteWebAuthnCredentials(userId(req))
+    await deletePasskeys(userId(req))
     return res.json({ ok: true, biometricEnabled: false })
   } catch (err) {
     return handleStoreError(res, err, 'Failed to remove biometric.')

@@ -18,20 +18,20 @@ CREATE POLICY "Users can read own profile"
   ON public.app_profiles
   FOR SELECT
   TO authenticated
-  USING (auth.uid() = id);
+  USING ((select auth.uid()) = id);
 
 CREATE POLICY "Users can insert own profile"
   ON public.app_profiles
   FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK ((select auth.uid()) = id);
 
 CREATE POLICY "Users can update own profile"
   ON public.app_profiles
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  USING ((select auth.uid()) = id)
+  WITH CHECK ((select auth.uid()) = id);
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER

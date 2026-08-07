@@ -22,6 +22,7 @@ import {
   findAuthPasskeyByCredentialId,
   saveAuthPasskey,
   updateAuthPasskeyCounter,
+  deleteAuthPasskeys,
   getSupabaseAdmin,
 } from './merchantStore.js'
 import { getSupabase, isSupabaseConfigured } from './supabaseClient.js'
@@ -285,7 +286,11 @@ export async function finishAuthLogin(req, { response, challengeToken, challenge
     throw err
   }
 
-  if (payload.email && String(payload.email).toLowerCase() !== String(matched.email).toLowerCase()) {
+  if (
+    payload.email &&
+    matched.email &&
+    String(payload.email).toLowerCase() !== String(matched.email).toLowerCase()
+  ) {
     const err = new Error('Touch ID does not match this email.')
     err.code = 'WEBAUTHN_FAILED'
     throw err
@@ -422,6 +427,90 @@ export async function getAuthPasskeyStatus(userId) {
   assertPasskeyStoreReady()
   const list = await listAuthPasskeysByUserId(userId)
   return { enabled: list.length > 0, count: list.length }
+}
+
+/** Vault unlock — same passkey store as login. */
+export async function buildVaultUnlockOptions(req, userId) {
+  assertPasskeyStoreReady()
+  const uid = String(userId)
+  const { rpID } = getWebAuthnRpConfig(req)
+  const existing = await listAuthPasskeysByUserId(uid)
+  if (!existing.length) {
+    const err = new Error(
+      'No Touch ID registered. Unlock with password, then enable Touch ID (same as login).'
+    )
+    err.code = 'NO_BIOMETRIC'
+    throw err
+  }
+  const options = await generateAuthenticationOptions({
+    rpID,
+    userVerification: 'preferred',
+    allowCredentials: existing.map((c) => ({
+      id: c.credentialId,
+      transports: c.transports?.length ? c.transports : undefined,
+    })),
+  })
+  const challengeToken = signWebAuthnChallenge(uid, options.challenge, 'vault-auth')
+  return { options, challengeToken, challengeId: challengeToken }
+}
+
+export async function finishVaultUnlock(req, userId, { response, challengeToken, challengeId }) {
+  assertPasskeyStoreReady()
+  const uid = String(userId)
+  const token = challengeToken || challengeId
+  if (!response || !token) {
+    const err = new Error('Missing WebAuthn response or challenge token.')
+    err.code = 'BAD_REQUEST'
+    throw err
+  }
+
+  const { rpID, expectedOrigin } = getWebAuthnRpConfig(req)
+  const expectedChallenge = readWebAuthnChallenge(uid, token, 'vault-auth')
+  const credId = response?.id || response?.rawId
+  const matched = await findAuthPasskeyByCredentialId(credId)
+  if (!matched || String(matched.userId) !== uid) {
+    const err = new Error('Unknown Touch ID credential. Enable Touch ID first.')
+    err.code = 'UNKNOWN_CREDENTIAL'
+    throw err
+  }
+
+  let verification
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      requireUserVerification: false,
+      authenticator: {
+        credentialID: isoBase64URL.toBuffer(matched.credentialId),
+        credentialPublicKey: isoBase64URL.toBuffer(matched.publicKey),
+        counter: matched.counter,
+        transports: matched.transports,
+      },
+    })
+  } catch (err) {
+    const wrapped = new Error(err?.message || 'Biometric verification failed')
+    wrapped.code = 'WEBAUTHN_FAILED'
+    throw wrapped
+  }
+
+  if (!verification.verified) {
+    const err = new Error('Biometric verification failed')
+    err.code = 'WEBAUTHN_FAILED'
+    throw err
+  }
+
+  const newCounter = verification.authenticationInfo?.newCounter
+  if (typeof newCounter === 'number') {
+    await updateAuthPasskeyCounter(matched.credentialId, newCounter)
+  }
+  return true
+}
+
+export async function deletePasskeys(userId) {
+  assertPasskeyStoreReady()
+  await deleteAuthPasskeys(userId)
 }
 
 export { findAuthUserByEmail }
