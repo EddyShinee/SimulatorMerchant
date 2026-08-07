@@ -213,15 +213,16 @@ router.post('/vault/webauthn/register', requireVaultUnlock, async (req, res) => 
   try {
     await verifyAndSaveRegistration(req, userId(req), {
       response: req.body?.response,
-      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId || req.body?.challengeToken,
     })
     return res.json({ ok: true, biometricEnabled: true })
   } catch (err) {
-    if (err?.code === 'INVALID_CHALLENGE' || err?.name === 'JsonWebTokenError') {
-      return res.status(400).json({ error: 'INVALID_CHALLENGE', message: 'Biometric challenge expired. Try again.' })
+    console.error('[webauthn:register]', err?.code || err?.name, err?.message)
+    if (err?.code === 'BAD_REQUEST' || err?.code === 'INVALID_CHALLENGE') {
+      return res.status(400).json({ error: err.code, message: err.message })
     }
     if (err?.code === 'WEBAUTHN_FAILED') {
-      return res.status(401).json({ error: 'WEBAUTHN_FAILED', message: err.message })
+      return res.status(400).json({ error: 'WEBAUTHN_FAILED', message: err.message })
     }
     return handleStoreError(res, err, 'Failed to register biometric.')
   }
@@ -254,15 +255,16 @@ router.post('/vault/webauthn/unlock', async (req, res) => {
   try {
     await verifyAuthentication(req, userId(req), {
       response: req.body?.response,
-      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId || req.body?.challengeToken,
     })
     return res.json({ unlockToken: signVaultToken(userId(req)) })
   } catch (err) {
-    if (err?.code === 'INVALID_CHALLENGE' || err?.name === 'JsonWebTokenError') {
-      return res.status(400).json({ error: 'INVALID_CHALLENGE', message: 'Biometric challenge expired. Try again.' })
+    console.error('[webauthn:unlock]', err?.code || err?.name, err?.message)
+    if (err?.code === 'BAD_REQUEST' || err?.code === 'INVALID_CHALLENGE') {
+      return res.status(400).json({ error: err.code, message: err.message })
     }
     if (err?.code === 'NO_BIOMETRIC' || err?.code === 'UNKNOWN_CREDENTIAL' || err?.code === 'WEBAUTHN_FAILED') {
-      return res.status(401).json({ error: err.code, message: err.message })
+      return res.status(400).json({ error: err.code, message: err.message })
     }
     return handleStoreError(res, err, 'Failed to unlock with biometric.')
   }

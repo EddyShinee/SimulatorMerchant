@@ -203,11 +203,14 @@ export default function MerchantVaultPicker({
     setError('')
     setLoading(true)
     try {
-      const { data: opt } = await api.post('/api/merchants/vault/webauthn/auth/options')
+      const { data: opt } = await api.post('/api/merchants/vault/webauthn/auth/options', {})
+      if (!opt?.options || !opt?.challengeId) {
+        throw new Error('Invalid biometric options from server')
+      }
       const assertion = await startAuthentication(opt.options)
       const { data } = await api.post('/api/merchants/vault/webauthn/unlock', {
         response: assertion,
-        challengeToken: opt.challengeToken,
+        challengeId: opt.challengeId,
       })
       setVaultUnlockToken(data.unlockToken)
       setUnlocked(true)
@@ -228,13 +231,18 @@ export default function MerchantVaultPicker({
     setError('')
     setLoading(true)
     try {
-      const { data: opt } = await api.post('/api/merchants/vault/webauthn/register/options', null, {
-        headers: vaultHeaders(),
-      })
+      const { data: opt } = await api.post(
+        '/api/merchants/vault/webauthn/register/options',
+        {},
+        { headers: vaultHeaders() }
+      )
+      if (!opt?.options || !opt?.challengeId) {
+        throw new Error('Invalid biometric options from server')
+      }
       const attestation = await startRegistration(opt.options)
       await api.post(
         '/api/merchants/vault/webauthn/register',
-        { response: attestation, challengeToken: opt.challengeToken },
+        { response: attestation, challengeId: opt.challengeId },
         { headers: vaultHeaders() }
       )
       setBiometricEnabled(true)
