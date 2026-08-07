@@ -6,8 +6,10 @@ import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import PasteButton from '../components/PasteButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import MerchantVaultPicker from '../components/MerchantVaultPicker.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { proxyErrorMessage } from '../utils/proxyResponse.js'
+import { vaultEnvToPageEnv } from '../utils/merchantVault.js'
 import {
   PAYMENT_ACTION_ENVIRONMENTS,
   PAYMENT_ACTION_ENV_OPTIONS,
@@ -247,7 +249,7 @@ export default function PaymentAction() {
 
   // Request params
   const [version, setVersion] = useState('4.3')
-  const [mid, setMid] = useState('704704000000211')
+  const [mid, setMid] = useState(flow.merchantId || '704704000000211')
   const [invoiceNo, setInvoiceNo] = useState(flow.invoiceNo || '01a00a81-364c-48f4-8278-3aef4ec61399')
   const [amount, setAmount] = useState('5000')
   const [processType, setProcessType] = useState('I')
@@ -460,7 +462,19 @@ export default function PaymentAction() {
               </div>
               <div>
                 <label className="label">Merchant ID</label>
-                <input className="input" value={mid} onChange={(e) => setMid(e.target.value)} />
+                <div className="flex items-stretch gap-2">
+                  <input className="input min-w-0 flex-1" value={mid} onChange={(e) => setMid(e.target.value)} />
+                  <MerchantVaultPicker
+                    fillSecretKey={false}
+                    onSelect={({ mid: selectedMid, environment }) => {
+                      if (selectedMid) {
+                        setMid(selectedMid)
+                        updateFlow({ merchantId: selectedMid })
+                      }
+                      if (environment) handleEnv(vaultEnvToPageEnv(environment))
+                    }}
+                  />
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <div className="mb-1 flex items-center justify-between gap-2">

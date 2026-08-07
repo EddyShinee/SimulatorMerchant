@@ -5,9 +5,11 @@ import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import MerchantVaultPicker from '../components/MerchantVaultPicker.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { signJwtHS256 } from '../utils/jwt.js'
 import { parseProxyBody, proxyErrorMessage } from '../utils/proxyResponse.js'
+import { vaultEnvToPageEnv } from '../utils/merchantVault.js'
 import { DEFAULT_SECRET_KEY, generateIdempotencyId } from '../config/paymentTokenFields.js'
 import {
   PAYMENT_POS_ENVIRONMENTS as ENVIRONMENTS,
@@ -261,7 +263,24 @@ export default function PaymentPos() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">merchantID</label>
-                <input className="input" value={merchantId} onChange={(e) => setMerchantId(e.target.value)} />
+                <div className="flex items-stretch gap-2">
+                  <input
+                    className="input min-w-0 flex-1"
+                    value={merchantId}
+                    onChange={(e) => setMerchantId(e.target.value)}
+                  />
+                  <MerchantVaultPicker
+                    onSelect={({ mid, secretKey, environment }) => {
+                      if (mid) setMerchantId(mid)
+                      if (secretKey !== undefined) setSecretKey(secretKey)
+                      if (environment) handleEnv(vaultEnvToPageEnv(environment))
+                      updateFlow({
+                        merchantId: mid || merchantId,
+                        ...(secretKey !== undefined ? { secretKey } : {}),
+                      })
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <label className="label">idempotencyID</label>
