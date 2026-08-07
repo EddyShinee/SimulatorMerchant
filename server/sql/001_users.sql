@@ -1,0 +1,14 @@
+-- Optional: only needed if you store custom app tables in Postgres.
+-- Register/login already use Supabase Auth (auth.users) — no SQL required for that.
+--
+-- Project: https://xakmpzrpmawzojplvunm.supabase.co
+--
+-- Recommended Auth setting for this Simulator:
+--   Authentication → Providers → Email → Confirm email = OFF
+
+-- Example custom table (not required for Auth):
+-- CREATE TABLE IF NOT EXISTS public.app_profiles (
+--   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+--   email TEXT,
+--   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+-- );

@@ -8,8 +8,12 @@ dist-ssr
 .env.*
 !.env.example
 
-# CSV data store (contains user accounts)
+# CSV data store (legacy — migrated into SQLite on first boot)
 server/data/*.csv
+
+# SQLite user database
+server/data/*.db
+server/data/*.db-*
 
 # Private keys — never commit to a public repo
 *.pfx
