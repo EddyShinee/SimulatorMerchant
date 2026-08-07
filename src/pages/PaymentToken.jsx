@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import api from '../api/client.js'
+import api, { getInboxUrls } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
@@ -23,8 +23,6 @@ import {
   generateIdempotencyId,
   omitEmptyFields,
 } from '../config/paymentTokenFields.js'
-import { getInboxUrls } from '../api/client.js'
-import { useAuth } from '../context/AuthContext.jsx'
 
 // Build the initial raw-value map for every advanced field.
 function initialAdvancedValues(userId) {
