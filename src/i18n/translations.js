@@ -633,7 +633,8 @@ export const translations = {
     inbox: {
       title: 'Hộp thư yêu cầu',
       subtitle: 'Các yêu cầu GET/POST gửi đến điểm cuối webhook của bạn',
-      yourUrl: 'URL webhook của bạn',
+      yourUrl: 'URL webhook của bạn (đã lưu DB theo tài khoản)',
+      persistedHint: 'Callback được lưu trên database — không mất khi server restart / Vercel cold start.',
       refresh: 'Làm mới',
       autoRefresh: 'Tự động làm mới',
       clearAll: 'Xóa tất cả',
@@ -1326,7 +1327,8 @@ export const translations = {
     inbox: {
       title: 'Request Inbox',
       subtitle: 'GET/POST requests sent to your webhook endpoint',
-      yourUrl: 'Your webhook URL',
+      yourUrl: 'Your webhook URL (saved to DB for your account)',
+      persistedHint: 'Callbacks are stored in the database — they survive server restarts / Vercel cold starts.',
       refresh: 'Refresh',
       autoRefresh: 'Auto refresh',
       clearAll: 'Clear all',

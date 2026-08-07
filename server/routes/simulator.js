@@ -1,43 +1,41 @@
 import express from 'express'
-import crypto from 'crypto'
 import { requireAuth } from '../middleware/auth.js'
 
 import { parsePaymentResponse, encodeCallbackDisplayToken } from '../utils/paymentResponse.js'
 import { callbackDisplayUrl, resolveFrontendOrigin } from '../utils/frontendOrigin.js'
+import {
+  saveInboxRequest,
+  listInboxRequests,
+  clearInboxRequests,
+  extractInboxUserIdFromPath,
+} from '../utils/inboxStore.js'
 
 const router = express.Router()
 
-// In-memory ring buffer of captured inbound requests.
-const MAX_CAPTURED = 100
-const capturedRequests = []
-
-function captureRequest(req) {
-  const entry = {
-    id: crypto.randomUUID(),
-    receivedAt: new Date().toISOString(),
+async function captureRequest(req, userId = null) {
+  const uid = userId || extractInboxUserIdFromPath(req.path) || extractInboxUserIdFromPath(req.originalUrl)
+  return saveInboxRequest({
+    userId: uid,
     method: req.method,
     path: req.originalUrl,
     query: req.query,
     headers: req.headers,
     body: req.body,
     ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null,
-  }
-  capturedRequests.unshift(entry)
-  if (capturedRequests.length > MAX_CAPTURED) capturedRequests.length = MAX_CAPTURED
-  return entry
+  })
 }
 
 function redirectToCallbackPage(req, res, token) {
   res.redirect(302, callbackDisplayUrl(req, token))
 }
 
-function frontendCallbackRedirect(req, res) {
+async function frontendCallbackRedirect(req, res) {
   // Already has display token (e.g. user opened wrong API URL) → send to SPA
   if (req.query.d && typeof req.query.d === 'string') {
     return redirectToCallbackPage(req, res, req.query.d)
   }
 
-  const entry = captureRequest(req)
+  const entry = await captureRequest(req, req.params?.userId || null)
   const raw =
     req.body?.paymentResponse ??
     req.query?.paymentResponse ??
@@ -61,6 +59,9 @@ function frontendCallbackRedirect(req, res) {
 }
 
 // Frontend payment return — capture + redirect to React result page
+// Prefer user-scoped: /callback/frontend/u/:userId
+router.all('/callback/frontend/u/:userId', frontendCallbackRedirect)
+router.all('/hook/callback-frontend/u/:userId', frontendCallbackRedirect)
 router.all('/callback/frontend', frontendCallbackRedirect)
 router.all('/hook/callback-frontend', frontendCallbackRedirect)
 // Malformed paths (e.g. .../callback/null/callback/frontend?d=...) — still show result page
@@ -68,37 +69,73 @@ router.all(/^\/callback\/.*\/callback\/frontend\/?$/, frontendCallbackRedirect)
 
 // ---------------------------------------------------------------------------
 // PUBLIC: inbound request receiver ("đón request từ GET/POST")
-// Any GET/POST/PUT/PATCH/DELETE to /api/simulator/hook (and sub-paths) is
-// captured and echoed back. Useful as a webhook / request inspection target.
+// Prefer user-scoped URL: /api/simulator/hook/u/:userId[/…]
+// Legacy shared /hook still works (stored with user_id = null).
 // ---------------------------------------------------------------------------
-router.all(/^\/hook(\/.*)?$/, (req, res) => {
-  const entry = captureRequest(req)
-  res.json({
-    ok: true,
-    message: 'Request received and captured.',
-    received: {
-      id: entry.id,
-      receivedAt: entry.receivedAt,
-      method: entry.method,
-      path: entry.path,
-      query: entry.query,
-      body: entry.body,
-    },
-  })
+router.all(/^\/hook\/u\/[0-9a-f-]{36}(\/.*)?$/i, async (req, res) => {
+  try {
+    const entry = await captureRequest(req)
+    return res.json({
+      ok: true,
+      message: 'Request received and captured.',
+      received: {
+        id: entry.id,
+        receivedAt: entry.receivedAt,
+        method: entry.method,
+        path: entry.path,
+        query: entry.query,
+        body: entry.body,
+      },
+    })
+  } catch (err) {
+    console.error('[inbox:hook/u]', err)
+    return res.status(500).json({ ok: false, message: 'Failed to capture request.' })
+  }
+})
+
+router.all(/^\/hook(\/.*)?$/, async (req, res) => {
+  try {
+    const entry = await captureRequest(req)
+    return res.json({
+      ok: true,
+      message: 'Request received and captured.',
+      received: {
+        id: entry.id,
+        receivedAt: entry.receivedAt,
+        method: entry.method,
+        path: entry.path,
+        query: entry.query,
+        body: entry.body,
+      },
+    })
+  } catch (err) {
+    console.error('[inbox:hook]', err)
+    return res.status(500).json({ ok: false, message: 'Failed to capture request.' })
+  }
 })
 
 // ---------------------------------------------------------------------------
 // PROTECTED endpoints (auth per-route — do NOT use router.use(requireAuth))
 // ---------------------------------------------------------------------------
 
-router.get('/requests', requireAuth, (req, res) => {
-  res.json({ count: capturedRequests.length, requests: capturedRequests })
+router.get('/requests', requireAuth, async (req, res) => {
+  try {
+    const requests = await listInboxRequests(req.user.sub, { limit: 100 })
+    return res.json({ count: requests.length, requests })
+  } catch (err) {
+    console.error('[inbox:list]', err)
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to load inbox.' })
+  }
 })
 
-// Clear captured inbound requests
-router.delete('/requests', requireAuth, (req, res) => {
-  capturedRequests.length = 0
-  res.json({ ok: true, count: 0 })
+router.delete('/requests', requireAuth, async (req, res) => {
+  try {
+    await clearInboxRequests(req.user.sub)
+    return res.json({ ok: true, count: 0 })
+  } catch (err) {
+    console.error('[inbox:clear]', err)
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to clear inbox.' })
+  }
 })
 
 // Outbound API caller: server performs the request and returns the response.

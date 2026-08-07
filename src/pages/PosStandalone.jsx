@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import api, { getWebhookOrigin } from '../api/client.js'
+import api, { getInboxUrls } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
@@ -35,6 +36,7 @@ function ResultCard({ title, text }) {
 
 export default function PosStandalone() {
   const { t } = useLanguage()
+  const { user } = useAuth()
 
   const [operation, setOperation] = useState('notification')
   const [env, setEnv] = useState('custom')
@@ -169,12 +171,12 @@ export default function PosStandalone() {
 
   useEffect(() => {
     if (callbackPreset === 'simulator') {
-      setCallbackUrl(`${getWebhookOrigin()}/api/simulator/hook/pos-standalone`)
+      setCallbackUrl(`${getInboxUrls(user?.id).webhook}/pos-standalone`)
     } else {
       const preset = CALLBACK_URL_PRESETS.find((p) => p.id === callbackPreset)
       if (preset?.url) setCallbackUrl(preset.url)
     }
-  }, [callbackPreset])
+  }, [callbackPreset, user?.id])
 
   useEffect(() => {
     if (isNotification) {

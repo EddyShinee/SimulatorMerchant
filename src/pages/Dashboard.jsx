@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import api, { getApiOrigin } from '../api/client.js'
+import api, { getInboxUrls } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
@@ -54,16 +55,7 @@ export default function Dashboard() {
   const [inboxLoading, setInboxLoading] = useState(true)
   const [health, setHealth] = useState({ status: 'loading' })
 
-  const origin = getApiOrigin()
-  const urls = useMemo(
-    () => ({
-      webhook: `${origin}/api/simulator/hook`,
-      backendCallback: `${origin}/api/simulator/hook/callback-backend`,
-      frontendCallback: `${origin}/api/simulator/callback/frontend`,
-      frontendReturn: `${origin}/callback/frontend`,
-    }),
-    [origin]
-  )
+  const urls = useMemo(() => getInboxUrls(user?.id), [user?.id])
 
   const curlExample = `curl -X POST "${urls.webhook}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"event":"payment.success"}'`
 

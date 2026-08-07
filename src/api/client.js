@@ -44,4 +44,24 @@ export function getWebhookOrigin() {
   return window.location.origin
 }
 
+/** User-scoped inbox URLs so callbacks land in that account's Request Inbox. */
+export function getInboxUrls(userId) {
+  const origin = getApiOrigin()
+  const uid = userId ? String(userId).trim() : ''
+  if (uid) {
+    return {
+      webhook: `${origin}/api/simulator/hook/u/${uid}`,
+      backendCallback: `${origin}/api/simulator/hook/u/${uid}/callback-backend`,
+      frontendCallback: `${origin}/api/simulator/callback/frontend/u/${uid}`,
+      frontendReturn: `${origin}/callback/frontend`,
+    }
+  }
+  return {
+    webhook: `${origin}/api/simulator/hook`,
+    backendCallback: `${origin}/api/simulator/hook/callback-backend`,
+    frontendCallback: `${origin}/api/simulator/callback/frontend`,
+    frontendReturn: `${origin}/callback/frontend`,
+  }
+}
+
 export default api

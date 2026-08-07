@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import InvoiceCopyBar from '../components/InvoiceCopyBar.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
@@ -22,10 +23,11 @@ import {
   generateIdempotencyId,
   omitEmptyFields,
 } from '../config/paymentTokenFields.js'
-import { getApiOrigin } from '../api/client.js'
+import { getInboxUrls } from '../api/client.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 // Build the initial raw-value map for every advanced field.
-function initialAdvancedValues() {
+function initialAdvancedValues(userId) {
   const values = {}
   for (const cat of PARAM_CATEGORIES) {
     for (const f of cat.fields) {
@@ -33,11 +35,10 @@ function initialAdvancedValues() {
       values[f.name] = f.default ?? ''
     }
   }
-  // Default the return URLs to this project's own webhook receiver so the
-  // callbacks are captured in the Request Inbox.
-  const origin = getApiOrigin()
-  values.frontendReturnUrl = `${origin}/api/simulator/callback/frontend`
-  values.backendReturnUrl = `${origin}/api/simulator/hook/callback-backend`
+  // Default return URLs → this account's Request Inbox (user-scoped when logged in).
+  const urls = getInboxUrls(userId)
+  values.frontendReturnUrl = urls.frontendCallback
+  values.backendReturnUrl = urls.backendCallback
   return values
 }
 
@@ -212,6 +213,7 @@ function SubMerchants({ count, setCount, rows, setRows }) {
 export default function PaymentToken() {
   const { t } = useLanguage()
   const toast = useToast()
+  const { user } = useAuth()
   const { flow, updateFlow, recordStep } = usePaymentFlow()
   const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
@@ -233,9 +235,25 @@ export default function PaymentToken() {
   const [channelCustom, setChannelCustom] = useState('')
 
   // Advanced
-  const [advanced, setAdvanced] = useState(initialAdvancedValues)
+  const [advanced, setAdvanced] = useState(() => initialAdvancedValues(user?.id))
   const [activeTab, setActiveTab] = useState(PARAM_CATEGORIES[0].id)
   const [showAdvanced, setShowAdvanced] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+    const urls = getInboxUrls(user.id)
+    setAdvanced((prev) => {
+      const next = { ...prev }
+      // Only overwrite defaults / empty / legacy unscoped URLs
+      const isLegacy = (u) =>
+        !u ||
+        /\/api\/simulator\/callback\/frontend\/?$/.test(u) ||
+        /\/api\/simulator\/hook\/callback-backend\/?$/.test(u)
+      if (isLegacy(prev.frontendReturnUrl)) next.frontendReturnUrl = urls.frontendCallback
+      if (isLegacy(prev.backendReturnUrl)) next.backendReturnUrl = urls.backendCallback
+      return next
+    })
+  }, [user?.id])
 
   // Sub merchants
   const [subCount, setSubCount] = useState(0)

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import api, { getApiOrigin } from '../api/client.js'
+import api, { getInboxUrls } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import { isPaymentFlowRoute } from '../config/paymentFlowWizard.js'
 import {
@@ -153,6 +154,7 @@ function RequestCard({ request, lang, t }) {
 
 export default function RequestInbox() {
   const { t, lang } = useLanguage()
+  const { user } = useAuth()
   const location = useLocation()
   const embedded = isPaymentFlowRoute(location.pathname)
   const { recordStep } = usePaymentFlow()
@@ -162,7 +164,7 @@ export default function RequestInbox() {
   const [pathFilter, setPathFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
   const [jwtFilter, setJwtFilter] = useState('all')
-  const webhookUrl = `${getApiOrigin()}/api/simulator/hook`
+  const webhookUrl = getInboxUrls(user?.id).webhook
   const intervalRef = useRef(null)
   const recordedCallbackRef = useRef(false)
 
@@ -243,6 +245,7 @@ export default function RequestInbox() {
           </code>
           <CopyButton text={webhookUrl} />
         </div>
+        <p className="mt-2 text-[11px] text-slate-400">{t('inbox.persistedHint')}</p>
 
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('inbox.tryItTitle')}</p>
