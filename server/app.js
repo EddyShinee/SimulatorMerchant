@@ -1,13 +1,15 @@
+import './polyfills.js'
 import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { webcrypto } from 'crypto'
 import dotenv from 'dotenv'
-
-// Node 18 doesn't expose the Web Crypto API as a global by default,
-// which the `jose` library relies on. Polyfill it.
-if (!globalThis.crypto) globalThis.crypto = webcrypto
+import authRouter from './routes/auth.js'
+import simulatorRouter from './routes/simulator.js'
+import paymentActionRouter from './routes/paymentAction.js'
+import posStandaloneRouter from './routes/posStandalone.js'
+import merchantsRouter from './routes/merchants.js'
+import { requireAuth } from './middleware/auth.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -21,13 +23,6 @@ if (!process.env.JWT_SECRET) {
   console.warn('[warn] JWT_SECRET is not set — using an insecure default. Set it in your env!')
   process.env.JWT_SECRET = 'insecure-default-change-me-please'
 }
-
-import authRouter from './routes/auth.js'
-import simulatorRouter from './routes/simulator.js'
-import paymentActionRouter from './routes/paymentAction.js'
-import posStandaloneRouter from './routes/posStandalone.js'
-import merchantsRouter from './routes/merchants.js'
-import { requireAuth } from './middleware/auth.js'
 
 const app = express()
 

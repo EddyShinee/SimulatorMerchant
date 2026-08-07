@@ -203,7 +203,11 @@ router.post('/vault/webauthn/register/options', requireVaultUnlock, async (req, 
     const result = await buildRegistrationOptions(req, userId(req), req.user?.email)
     return res.json(result)
   } catch (err) {
-    return handleStoreError(res, err, 'Failed to start biometric registration.')
+    console.error('[webauthn:register/options]', err?.code || err?.name, err?.message, err)
+    return res.status(500).json({
+      error: 'WEBAUTHN_OPTIONS_FAILED',
+      message: err?.message || 'Failed to start biometric registration.',
+    })
   }
 })
 
@@ -213,7 +217,8 @@ router.post('/vault/webauthn/register', requireVaultUnlock, async (req, res) => 
   try {
     await verifyAndSaveRegistration(req, userId(req), {
       response: req.body?.response,
-      challengeId: req.body?.challengeId || req.body?.challengeToken,
+      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId,
     })
     return res.json({ ok: true, biometricEnabled: true })
   } catch (err) {
@@ -245,7 +250,11 @@ router.post('/vault/webauthn/auth/options', async (req, res) => {
         message: 'Touch ID is not set up yet. Unlock with password first, then enable Touch ID.',
       })
     }
-    return handleStoreError(res, err, 'Failed to start biometric unlock.')
+    console.error('[webauthn:auth/options]', err?.code || err?.name, err?.message, err)
+    return res.status(500).json({
+      error: 'WEBAUTHN_OPTIONS_FAILED',
+      message: err?.message || 'Failed to start biometric unlock.',
+    })
   }
 })
 
@@ -255,7 +264,8 @@ router.post('/vault/webauthn/unlock', async (req, res) => {
   try {
     await verifyAuthentication(req, userId(req), {
       response: req.body?.response,
-      challengeId: req.body?.challengeId || req.body?.challengeToken,
+      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId,
     })
     return res.json({ unlockToken: signVaultToken(userId(req)) })
   } catch (err) {

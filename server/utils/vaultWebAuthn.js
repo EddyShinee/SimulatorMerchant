@@ -1,3 +1,4 @@
+import '../polyfills.js'
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -5,7 +6,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
-import crypto from 'crypto'
+import jwt from 'jsonwebtoken'
 import {
   listWebAuthnCredentials,
   saveWebAuthnCredential,
@@ -13,39 +14,46 @@ import {
   deleteWebAuthnCredentials,
 } from './merchantStore.js'
 
-/** Short-lived challenges (works for single-process Express / local + most deploys). */
-const pendingChallenges = new Map()
+/**
+ * Challenge must survive across Vercel serverless invocations.
+ * Use a short-lived JWT (not in-memory Map).
+ */
+function signChallenge(uid, challenge, type) {
+  return jwt.sign(
+    {
+      sub: String(uid),
+      chal: String(challenge),
+      purpose: `webauthn-${type}`,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' }
+  )
+}
 
-function pruneChallenges() {
-  const now = Date.now()
-  for (const [id, row] of pendingChallenges) {
-    if (row.exp < now) pendingChallenges.delete(id)
+function readChallenge(uid, challengeToken, type) {
+  if (!challengeToken || typeof challengeToken !== 'string') {
+    const err = new Error('Missing biometric challenge token. Please try again.')
+    err.code = 'INVALID_CHALLENGE'
+    throw err
   }
-}
-
-function saveChallenge(uid, challenge, type) {
-  pruneChallenges()
-  const id = crypto.randomUUID()
-  pendingChallenges.set(id, {
-    uid: String(uid),
-    challenge: String(challenge),
-    type,
-    exp: Date.now() + 5 * 60 * 1000,
-  })
-  return id
-}
-
-function takeChallenge(uid, challengeId, type) {
-  pruneChallenges()
-  const id = String(challengeId || '')
-  const row = pendingChallenges.get(id)
-  pendingChallenges.delete(id)
-  if (!row || row.uid !== String(uid) || row.type !== type || row.exp < Date.now()) {
+  let payload
+  try {
+    payload = jwt.verify(challengeToken, process.env.JWT_SECRET)
+  } catch (e) {
     const err = new Error('Biometric challenge expired or invalid. Please try again.')
     err.code = 'INVALID_CHALLENGE'
     throw err
   }
-  return row.challenge
+  if (
+    payload.sub !== String(uid) ||
+    payload.purpose !== `webauthn-${type}` ||
+    !payload.chal
+  ) {
+    const err = new Error('Biometric challenge mismatch. Please try again.')
+    err.code = 'INVALID_CHALLENGE'
+    throw err
+  }
+  return String(payload.chal)
 }
 
 function getRpConfig(req) {
@@ -54,9 +62,10 @@ function getRpConfig(req) {
   try {
     if (originHeader) hostname = new URL(originHeader).hostname
   } catch {
-    /* keep localhost */
+    /* keep default */
   }
 
+  // Prefer explicit env; otherwise derive from the page origin (required on Vercel).
   const rpID = process.env.WEBAUTHN_RP_ID || hostname
   const rpName = process.env.WEBAUTHN_RP_NAME || 'Simulator Merchant'
 
@@ -65,13 +74,12 @@ function getRpConfig(req) {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  // Always trust the browser Origin when present (required for WebAuthn),
-  // and also allow explicitly configured origins + localhost variants.
   const expectedOrigin = Array.from(
     new Set(
       [
         originHeader,
         ...configured,
+        'https://simulator-merchant.vercel.app',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:4173',
@@ -91,7 +99,6 @@ export async function buildRegistrationOptions(req, uid, email) {
   const { rpID, rpName } = getRpConfig(req)
   const existing = await listWebAuthnCredentials(uid)
   const userIdBytes = new TextEncoder().encode(String(uid))
-  // WebAuthn user.id max 64 bytes
   const userID = userIdBytes.length <= 64 ? userIdBytes : userIdBytes.slice(0, 64)
 
   const options = await generateRegistrationOptions({
@@ -112,19 +119,21 @@ export async function buildRegistrationOptions(req, uid, email) {
     })),
   })
 
-  const challengeId = saveChallenge(uid, options.challenge, 'reg')
-  return { options, challengeId }
+  const challengeToken = signChallenge(uid, options.challenge, 'reg')
+  // challengeId kept as alias for older clients
+  return { options, challengeToken, challengeId: challengeToken }
 }
 
-export async function verifyAndSaveRegistration(req, uid, { response, challengeId }) {
-  if (!response || !challengeId) {
-    const err = new Error('Missing WebAuthn response or challengeId.')
+export async function verifyAndSaveRegistration(req, uid, { response, challengeToken, challengeId }) {
+  const token = challengeToken || challengeId
+  if (!response || !token) {
+    const err = new Error('Missing WebAuthn response or challenge token.')
     err.code = 'BAD_REQUEST'
     throw err
   }
 
   const { rpID, expectedOrigin } = getRpConfig(req)
-  const expectedChallenge = takeChallenge(uid, challengeId, 'reg')
+  const expectedChallenge = readChallenge(uid, token, 'reg')
 
   let verification
   try {
@@ -177,19 +186,20 @@ export async function buildAuthenticationOptions(req, uid) {
       transports: c.transports?.length ? c.transports : undefined,
     })),
   })
-  const challengeId = saveChallenge(uid, options.challenge, 'auth')
-  return { options, challengeId }
+  const challengeToken = signChallenge(uid, options.challenge, 'auth')
+  return { options, challengeToken, challengeId: challengeToken }
 }
 
-export async function verifyAuthentication(req, uid, { response, challengeId }) {
-  if (!response || !challengeId) {
-    const err = new Error('Missing WebAuthn response or challengeId.')
+export async function verifyAuthentication(req, uid, { response, challengeToken, challengeId }) {
+  const token = challengeToken || challengeId
+  if (!response || !token) {
+    const err = new Error('Missing WebAuthn response or challenge token.')
     err.code = 'BAD_REQUEST'
     throw err
   }
 
   const { rpID, expectedOrigin } = getRpConfig(req)
-  const expectedChallenge = takeChallenge(uid, challengeId, 'auth')
+  const expectedChallenge = readChallenge(uid, token, 'auth')
   const existing = await listWebAuthnCredentials(uid)
   const credId = response?.id || response?.rawId
   const matched = existing.find((c) => c.credentialId === credId)
