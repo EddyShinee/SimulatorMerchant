@@ -8,8 +8,9 @@ import CopyButton from '../components/CopyButton.jsx'
 import { isPaymentFlowRoute } from '../config/paymentFlowWizard.js'
 import {
   analyzeInboxRequest,
-  matchesInboxPathFilter,
 } from '../utils/inboxBody.js'
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50]
 
 function methodBadge(method) {
   const map = {
@@ -20,6 +21,21 @@ function methodBadge(method) {
     DELETE: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   }
   return map[method] || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+}
+
+function formatReceivedAt(iso, lang) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return String(iso)
+  return d.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
 }
 
 function Section({ title, data }) {
@@ -101,14 +117,15 @@ function HeadersSection({ headers, t }) {
 
 function RequestCard({ request, lang, t }) {
   const analysis = useMemo(() => analyzeInboxRequest(request), [request])
+  const invoiceNo = request.invoiceNo || analysis.invoiceNo
 
-  const inquiryUrl = analysis.invoiceNo
-    ? `/app/payment-flow/inquiry?invoiceNo=${encodeURIComponent(analysis.invoiceNo)}`
+  const inquiryUrl = invoiceNo
+    ? `/app/payment-flow/inquiry?invoiceNo=${encodeURIComponent(invoiceNo)}`
     : null
 
   return (
     <details className="card overflow-hidden" open={false}>
-      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 sm:gap-3">
         <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${methodBadge(request.method)}`}>
           {request.method}
         </span>
@@ -120,21 +137,41 @@ function RequestCard({ request, lang, t }) {
         <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700 dark:text-slate-200">
           {request.path}
         </span>
-        {analysis.invoiceNo && (
-          <span className="hidden truncate font-mono text-xs text-brand-600 dark:text-brand-400 md:block">
-            {analysis.invoiceNo}
+        {invoiceNo && (
+          <span
+            className="max-w-[10rem] truncate font-mono text-xs text-brand-600 dark:text-brand-400"
+            title={invoiceNo}
+          >
+            {invoiceNo}
           </span>
         )}
-        <span className="hidden text-xs text-slate-400 sm:block">
-          {new Date(request.receivedAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}
-        </span>
+        <time
+          className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400"
+          dateTime={request.receivedAt}
+          title={request.receivedAt}
+        >
+          {formatReceivedAt(request.receivedAt, lang)}
+        </time>
       </summary>
       <div className="space-y-3 border-t border-slate-100 px-4 py-4 dark:border-slate-800">
-        {(inquiryUrl || analysis.invoiceNo) && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            {t('inbox.receivedAt')}:{' '}
+            <time className="font-mono font-medium text-slate-700 dark:text-slate-200" dateTime={request.receivedAt}>
+              {formatReceivedAt(request.receivedAt, lang)}
+            </time>
+          </span>
+          {request.ip && (
+            <span>
+              IP: <code className="font-mono">{request.ip}</code>
+            </span>
+          )}
+        </div>
+        {(inquiryUrl || invoiceNo) && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-800 dark:bg-brand-950/30">
-            {analysis.invoiceNo && (
+            {invoiceNo && (
               <span className="text-xs text-slate-600 dark:text-slate-300">
-                Invoice: <code className="font-mono font-semibold">{analysis.invoiceNo}</code>
+                Invoice: <code className="font-mono font-semibold">{invoiceNo}</code>
               </span>
             )}
             {inquiryUrl && (
@@ -159,30 +196,55 @@ export default function RequestInbox() {
   const embedded = isPaymentFlowRoute(location.pathname)
   const { recordStep } = usePaymentFlow()
   const [requests, setRequests] = useState([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [loading, setLoading] = useState(false)
   const [pathFilter, setPathFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
   const [jwtFilter, setJwtFilter] = useState('all')
+  const [invoiceQuery, setInvoiceQuery] = useState('')
+  const [invoiceSearch, setInvoiceSearch] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const webhookUrl = getInboxUrls(user?.id).webhook
   const intervalRef = useRef(null)
   const recordedCallbackRef = useRef(false)
+  const searchDebounceRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/api/simulator/requests')
+      const { data } = await api.get('/api/simulator/requests', {
+        params: {
+          page,
+          pageSize,
+          invoiceNo: invoiceSearch || undefined,
+          from: fromDate || undefined,
+          to: toDate || undefined,
+          method: methodFilter !== 'all' ? methodFilter : undefined,
+          pathFilter: pathFilter !== 'all' ? pathFilter : undefined,
+        },
+      })
       setRequests(data.requests || [])
+      setTotal(Number(data.total) || 0)
+      setTotalPages(Number(data.totalPages) || 1)
     } catch {
       /* ignore transient errors */
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, pageSize, invoiceSearch, fromDate, toDate, methodFilter, pathFilter])
 
   const clearAll = async () => {
+    if (!window.confirm(t('inbox.confirmClear'))) return
     await api.delete('/api/simulator/requests')
     setRequests([])
+    setTotal(0)
+    setTotalPages(1)
+    setPage(1)
     recordedCallbackRef.current = false
   }
 
@@ -192,7 +254,7 @@ export default function RequestInbox() {
 
   useEffect(() => {
     if (autoRefresh) {
-      intervalRef.current = setInterval(load, 3000)
+      intervalRef.current = setInterval(load, 5000)
     }
     return () => clearInterval(intervalRef.current)
   }, [autoRefresh, load])
@@ -206,25 +268,45 @@ export default function RequestInbox() {
       const analysis = analyzeInboxRequest(callbackReq)
       recordStep('inbox', 'received', {
         path: callbackReq.path,
-        invoiceNo: analysis.invoiceNo || undefined,
+        invoiceNo: callbackReq.invoiceNo || analysis.invoiceNo || undefined,
       })
     }
   }, [requests, recordStep])
 
+  // JWT filter is client-side on current page (payload is already JWT-decoded in card)
   const filtered = useMemo(() => {
+    if (jwtFilter === 'all') return requests
     return requests.filter((r) => {
-      if (methodFilter !== 'all' && r.method !== methodFilter) return false
-      if (!matchesInboxPathFilter(r.path, pathFilter)) return false
-      if (jwtFilter !== 'all') {
-        const { hasJwt } = analyzeInboxRequest(r)
-        if (jwtFilter === 'jwt' && !hasJwt) return false
-        if (jwtFilter === 'no-jwt' && hasJwt) return false
-      }
+      const { hasJwt } = analyzeInboxRequest(r)
+      if (jwtFilter === 'jwt') return hasJwt
+      if (jwtFilter === 'no-jwt') return !hasJwt
       return true
     })
-  }, [requests, pathFilter, methodFilter, jwtFilter])
+  }, [requests, jwtFilter])
 
-  const curlExample = `curl -X POST "${webhookUrl}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"event":"payment.success","amount":1000}'`
+  const applyInvoiceSearch = () => {
+    setPage(1)
+    setInvoiceSearch(invoiceQuery.trim())
+  }
+
+  const onInvoiceInput = (value) => {
+    setInvoiceQuery(value)
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1)
+      setInvoiceSearch(value.trim())
+    }, 400)
+  }
+
+  const curlExample = `curl -X POST "${webhookUrl}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"event":"payment.success","amount":1000,"invoiceNo":"INV123"}'`
+
+  const rangeLabel =
+    total === 0
+      ? t('inbox.pageEmpty')
+      : t('inbox.pageRange')
+          .replace('{from}', String((page - 1) * pageSize + 1))
+          .replace('{to}', String(Math.min(page * pageSize, total)))
+          .replace('{total}', String(total))
 
   return (
     <div className={embedded ? 'space-y-5' : 'space-y-6'}>
@@ -259,32 +341,111 @@ export default function RequestInbox() {
         </div>
       </div>
 
-      <div className="card flex flex-wrap gap-3 p-4">
-        <div>
-          <label className="label !mb-1">{t('inbox.filterPath')}</label>
-          <select className="input !w-auto !py-2" value={pathFilter} onChange={(e) => setPathFilter(e.target.value)}>
-            <option value="all">{t('inbox.filterAll')}</option>
-            <option value="callback">{t('inbox.filterCallback')}</option>
-            <option value="pos">{t('inbox.filterPos')}</option>
-            <option value="hook">{t('inbox.filterHook')}</option>
-          </select>
+      <div className="card space-y-3 p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sm:col-span-2">
+            <label className="label !mb-1">{t('inbox.searchInvoice')}</label>
+            <div className="flex gap-2">
+              <input
+                className="input font-mono text-sm"
+                value={invoiceQuery}
+                onChange={(e) => onInvoiceInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyInvoiceSearch()}
+                placeholder={t('inbox.searchInvoicePlaceholder')}
+              />
+              <button type="button" className="btn-secondary shrink-0" onClick={applyInvoiceSearch}>
+                {t('inbox.search')}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="label !mb-1">{t('inbox.fromDate')}</label>
+            <input
+              type="date"
+              className="input"
+              value={fromDate}
+              onChange={(e) => {
+                setPage(1)
+                setFromDate(e.target.value)
+              }}
+            />
+          </div>
+          <div>
+            <label className="label !mb-1">{t('inbox.toDate')}</label>
+            <input
+              type="date"
+              className="input"
+              value={toDate}
+              onChange={(e) => {
+                setPage(1)
+                setToDate(e.target.value)
+              }}
+            />
+          </div>
         </div>
-        <div>
-          <label className="label !mb-1">{t('inbox.filterMethod')}</label>
-          <select className="input !w-auto !py-2" value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)}>
-            <option value="all">{t('inbox.filterAll')}</option>
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-          </select>
-        </div>
-        <div>
-          <label className="label !mb-1">{t('inbox.filterJwt')}</label>
-          <select className="input !w-auto !py-2" value={jwtFilter} onChange={(e) => setJwtFilter(e.target.value)}>
-            <option value="all">{t('inbox.filterAll')}</option>
-            <option value="jwt">{t('inbox.filterHasJwt')}</option>
-            <option value="no-jwt">{t('inbox.filterNoJwt')}</option>
-          </select>
+
+        <div className="flex flex-wrap gap-3">
+          <div>
+            <label className="label !mb-1">{t('inbox.filterPath')}</label>
+            <select
+              className="input !w-auto !py-2"
+              value={pathFilter}
+              onChange={(e) => {
+                setPage(1)
+                setPathFilter(e.target.value)
+              }}
+            >
+              <option value="all">{t('inbox.filterAll')}</option>
+              <option value="callback">{t('inbox.filterCallback')}</option>
+              <option value="pos">{t('inbox.filterPos')}</option>
+              <option value="hook">{t('inbox.filterHook')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="label !mb-1">{t('inbox.filterMethod')}</label>
+            <select
+              className="input !w-auto !py-2"
+              value={methodFilter}
+              onChange={(e) => {
+                setPage(1)
+                setMethodFilter(e.target.value)
+              }}
+            >
+              <option value="all">{t('inbox.filterAll')}</option>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+            </select>
+          </div>
+          <div>
+            <label className="label !mb-1">{t('inbox.filterJwt')}</label>
+            <select
+              className="input !w-auto !py-2"
+              value={jwtFilter}
+              onChange={(e) => setJwtFilter(e.target.value)}
+            >
+              <option value="all">{t('inbox.filterAll')}</option>
+              <option value="jwt">{t('inbox.filterHasJwt')}</option>
+              <option value="no-jwt">{t('inbox.filterNoJwt')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="label !mb-1">{t('inbox.pageSize')}</label>
+            <select
+              className="input !w-auto !py-2"
+              value={pageSize}
+              onChange={(e) => {
+                setPage(1)
+                setPageSize(Number(e.target.value))
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -301,15 +462,13 @@ export default function RequestInbox() {
           />
           {t('inbox.autoRefresh')}
         </label>
-        <span className="text-sm text-slate-400">
-          ({filtered.length}/{requests.length})
-        </span>
-        <button onClick={clearAll} className="btn-danger ml-auto" disabled={!requests.length}>
+        <span className="text-sm text-slate-500 dark:text-slate-400">{rangeLabel}</span>
+        <button onClick={clearAll} className="btn-danger ml-auto" disabled={!total}>
           {t('inbox.clearAll')}
         </button>
       </div>
 
-      {requests.length === 0 ? (
+      {total === 0 && !loading ? (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <p className="text-sm text-slate-400">{t('inbox.empty')}</p>
           <button type="button" onClick={load} className="btn-secondary mt-4">
@@ -323,6 +482,30 @@ export default function RequestInbox() {
           {filtered.map((r) => (
             <RequestCard key={r.id} request={r} lang={lang} t={t} />
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            className="btn-secondary !px-3 !py-1.5 text-xs"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            {t('inbox.prevPage')}
+          </button>
+          <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300">
+            {t('inbox.pageOf').replace('{page}', String(page)).replace('{pages}', String(totalPages))}
+          </span>
+          <button
+            type="button"
+            className="btn-secondary !px-3 !py-1.5 text-xs"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            {t('inbox.nextPage')}
+          </button>
         </div>
       )}
     </div>

@@ -15,15 +15,11 @@ export function useInboxUnread(pollIntervalMs = 10000) {
 
   const refresh = useCallback(async () => {
     try {
-      const { data } = await api.get('/api/simulator/requests')
-      const reqs = data.requests || []
       const lastSeen = localStorage.getItem(LAST_SEEN_KEY)
-      if (!lastSeen) {
-        setUnread(reqs.length)
-        return
-      }
-      const since = new Date(lastSeen).getTime()
-      setUnread(reqs.filter((r) => new Date(r.receivedAt).getTime() > since).length)
+      const { data } = await api.get('/api/simulator/requests/unread-count', {
+        params: lastSeen ? { since: lastSeen } : {},
+      })
+      setUnread(Number(data.count) || 0)
     } catch {
       /* ignore */
     }

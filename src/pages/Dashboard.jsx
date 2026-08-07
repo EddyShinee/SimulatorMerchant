@@ -69,8 +69,10 @@ export default function Dashboard() {
   const loadInbox = useCallback(async () => {
     setInboxLoading(true)
     try {
-      const { data } = await api.get('/api/simulator/requests')
-      setRequests((data.requests || []).slice(0, 5))
+      const { data } = await api.get('/api/simulator/requests', {
+        params: { page: 1, pageSize: 5 },
+      })
+      setRequests(data.requests || [])
     } catch {
       setRequests([])
     } finally {

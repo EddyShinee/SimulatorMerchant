@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.inbox_requests (
   headers JSONB NULL,
   body JSONB NULL,
   ip TEXT NULL,
+  invoice_no TEXT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -20,6 +21,13 @@ CREATE INDEX IF NOT EXISTS idx_inbox_requests_user_received
 
 CREATE INDEX IF NOT EXISTS idx_inbox_requests_received
   ON public.inbox_requests (received_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_inbox_requests_user_invoice
+  ON public.inbox_requests (user_id, invoice_no)
+  WHERE invoice_no IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_inbox_requests_invoice_no
+  ON public.inbox_requests (invoice_no);
 
 ALTER TABLE public.inbox_requests ENABLE ROW LEVEL SECURITY;
 

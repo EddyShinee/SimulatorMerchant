@@ -7,6 +7,7 @@ import {
   saveInboxRequest,
   listInboxRequests,
   clearInboxRequests,
+  countInboxSince,
   extractInboxUserIdFromPath,
 } from '../utils/inboxStore.js'
 
@@ -120,11 +121,30 @@ router.all(/^\/hook(\/.*)?$/, async (req, res) => {
 
 router.get('/requests', requireAuth, async (req, res) => {
   try {
-    const requests = await listInboxRequests(req.user.sub, { limit: 100 })
-    return res.json({ count: requests.length, requests })
+    const result = await listInboxRequests(req.user.sub, {
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+      invoiceNo: req.query.invoiceNo || req.query.invoice || '',
+      from: req.query.from || '',
+      to: req.query.to || '',
+      method: req.query.method || 'all',
+      pathFilter: req.query.pathFilter || req.query.path || 'all',
+    })
+    return res.json(result)
   } catch (err) {
     console.error('[inbox:list]', err)
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to load inbox.' })
+  }
+})
+
+router.get('/requests/unread-count', requireAuth, async (req, res) => {
+  try {
+    const since = req.query.since || null
+    const count = await countInboxSince(req.user.sub, since)
+    return res.json({ count })
+  } catch (err) {
+    console.error('[inbox:unread]', err)
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to count inbox.' })
   }
 })
 
