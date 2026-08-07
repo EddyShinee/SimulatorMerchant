@@ -466,6 +466,8 @@ export default function PaymentAction() {
                   <input className="input min-w-0 flex-1" value={mid} onChange={(e) => setMid(e.target.value)} />
                   <MerchantVaultPicker
                     fillSecretKey={false}
+                    currentMid={mid}
+                    currentPageEnv={env}
                     onSelect={({ mid: selectedMid, environment }) => {
                       if (selectedMid) {
                         setMid(selectedMid)

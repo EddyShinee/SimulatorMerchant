@@ -25,3 +25,8 @@ export function clearVaultUnlockToken() {
 export function vaultEnvToPageEnv(environment) {
   return environment === 'production' ? 'production' : 'sandbox'
 }
+
+/** Map page env → vault env (uat|production). */
+export function pageEnvToVaultEnv(pageEnv) {
+  return pageEnv === 'production' ? 'production' : 'uat'
+}

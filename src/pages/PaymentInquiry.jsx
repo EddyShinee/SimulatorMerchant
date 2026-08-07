@@ -203,13 +203,16 @@ export default function PaymentInquiry() {
                   onChange={(e) => setMerchantId(e.target.value)}
                 />
                 <MerchantVaultPicker
-                  onSelect={({ mid, secretKey, environment }) => {
+                  currentMid={merchantId}
+                  currentSecretKey={secretKey}
+                  currentPageEnv={env}
+                  onSelect={({ mid, secretKey: key, environment }) => {
                     if (mid) setMerchantId(mid)
-                    if (secretKey !== undefined) setSecretKey(secretKey)
+                    if (key !== undefined) setSecretKey(key)
                     if (environment) handleEnv(vaultEnvToPageEnv(environment))
                     updateFlow({
                       merchantId: mid || merchantId,
-                      ...(secretKey !== undefined ? { secretKey } : {}),
+                      ...(key !== undefined ? { secretKey: key } : {}),
                     })
                   }}
                 />

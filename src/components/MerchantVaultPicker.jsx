@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
   clearVaultUnlockToken,
   getVaultUnlockToken,
+  pageEnvToVaultEnv,
   setVaultUnlockToken,
 } from '../utils/merchantVault.js'
 
@@ -19,10 +20,20 @@ function emptyForm() {
 }
 
 /**
- * Password-gated merchant credentials picker, placed next to Merchant ID.
- * onSelect({ merchantName, mid, secretKey, environment })
+ * Password-gated merchant credentials picker next to Merchant ID.
+ *
+ * Props:
+ * - onSelect({ merchantName, mid, secretKey, environment })
+ * - currentMid / currentSecretKey / currentPageEnv — dùng để đề xuất lưu MID mới
+ * - fillSecretKey — false trên Payment Action (không có SHA key)
  */
-export default function MerchantVaultPicker({ onSelect, fillSecretKey = true }) {
+export default function MerchantVaultPicker({
+  onSelect,
+  fillSecretKey = true,
+  currentMid = '',
+  currentSecretKey = '',
+  currentPageEnv = 'sandbox',
+}) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [configured, setConfigured] = useState(null)
@@ -36,6 +47,8 @@ export default function MerchantVaultPicker({ onSelect, fillSecretKey = true }) 
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [showForm, setShowForm] = useState(false)
+  const [query, setQuery] = useState('')
+  const [envFilter, setEnvFilter] = useState('all') // all | uat | production
 
   const vaultHeaders = useCallback(() => {
     const token = getVaultUnlockToken()
@@ -87,6 +100,36 @@ export default function MerchantVaultPicker({ onSelect, fillSecretKey = true }) 
     })
   }, [open, refreshStatus, loadItems])
 
+  // Keep items fresh while unlocked even when panel is closed (for suggest badge).
+  useEffect(() => {
+    if (!getVaultUnlockToken()) return undefined
+    loadItems()
+    return undefined
+  }, [loadItems])
+
+  const trimmedMid = String(currentMid || '').trim()
+  const midKnown = useMemo(() => {
+    if (!trimmedMid || !items.length) return false
+    return items.some((item) => String(item.mid || '').trim() === trimmedMid)
+  }, [items, trimmedMid])
+
+  const suggestNew =
+    unlocked && configured && trimmedMid.length > 0 && !midKnown && !loading
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return items.filter((item) => {
+      if (envFilter !== 'all') {
+        const env = item.environment === 'production' ? 'production' : 'uat'
+        if (env !== envFilter) return false
+      }
+      if (!q) return true
+      const name = String(item.merchantName || '').toLowerCase()
+      const mid = String(item.mid || '').toLowerCase()
+      return name.includes(q) || mid.includes(q)
+    })
+  }, [items, query, envFilter])
+
   const handleCreateVault = async (e) => {
     e.preventDefault()
     setError('')
@@ -133,12 +176,33 @@ export default function MerchantVaultPicker({ onSelect, fillSecretKey = true }) 
     setItems([])
     setShowForm(false)
     setEditingId(null)
+    setQuery('')
+    setEnvFilter('all')
   }
 
-  const startAdd = () => {
+  const startAdd = (prefill = null) => {
     setEditingId(null)
-    setForm(emptyForm())
+    if (prefill) {
+      setForm({
+        merchantName: prefill.merchantName || '',
+        mid: prefill.mid || '',
+        secretKey: prefill.secretKey || '',
+        environment: prefill.environment === 'production' ? 'production' : 'uat',
+      })
+    } else {
+      setForm(emptyForm())
+    }
     setShowForm(true)
+    setOpen(true)
+  }
+
+  const startSuggestSave = () => {
+    startAdd({
+      merchantName: '',
+      mid: trimmedMid,
+      secretKey: fillSecretKey ? currentSecretKey || '' : '',
+      environment: pageEnvToVaultEnv(currentPageEnv),
+    })
   }
 
   const startEdit = (item) => {
@@ -203,248 +267,335 @@ export default function MerchantVaultPicker({ onSelect, fillSecretKey = true }) 
     setOpen(false)
   }
 
+  const envBadge = (environment) =>
+    environment === 'production' ? (
+      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+        {t('merchantVault.envProduction')}
+      </span>
+    ) : (
+      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
+        {t('merchantVault.envUat')}
+      </span>
+    )
+
   return (
     <div className="relative shrink-0">
-      <button
-        type="button"
-        className="btn-secondary whitespace-nowrap px-3 py-2 text-sm"
-        onClick={() => setOpen((v) => !v)}
-        title={t('merchantVault.open')}
-      >
-        {t('merchantVault.open')}
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="btn-secondary relative whitespace-nowrap px-3 py-2 text-sm"
+          onClick={() => setOpen((v) => !v)}
+          title={t('merchantVault.open')}
+        >
+          {t('merchantVault.open')}
+          {suggestNew && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+          )}
+        </button>
+        {suggestNew && (
+          <button
+            type="button"
+            className="hidden whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 sm:inline-flex dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+            onClick={startSuggestSave}
+          >
+            {t('merchantVault.suggestSaveShort')}
+          </button>
+        )}
+      </div>
 
       {open && (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 cursor-default bg-slate-900/20"
+            className="fixed inset-0 z-40 cursor-default bg-slate-900/30"
             aria-label="Close"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:w-96">
-            <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="absolute right-0 z-50 mt-2 flex max-h-[min(85vh,36rem)] w-[min(100vw-1.5rem,26rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
               <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {t('merchantVault.title')}
               </h4>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                onClick={() => setOpen(false)}
-              >
-                {t('common.cancel')}
-              </button>
+              <div className="flex items-center gap-2">
+                {configured && unlocked && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    onClick={handleLock}
+                  >
+                    {t('merchantVault.lock')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="rounded px-1.5 text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  onClick={() => setOpen(false)}
+                  aria-label={t('common.cancel')}
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
-            {error && (
-              <p className="mb-2 rounded-md bg-rose-50 px-2 py-1.5 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                {error}
-              </p>
-            )}
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+              {error && (
+                <p className="rounded-md bg-rose-50 px-2 py-1.5 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                  {error}
+                </p>
+              )}
 
-            {configured === null && (
-              <p className="text-xs text-slate-500">{t('common.loading')}</p>
-            )}
+              {configured === null && (
+                <p className="text-xs text-slate-500">{t('common.loading')}</p>
+              )}
 
-            {configured === false && (
-              <form onSubmit={handleCreateVault} className="space-y-2">
-                <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.createHint')}</p>
-                <div>
-                  <label className="label">{t('merchantVault.password')}</label>
-                  <input
-                    type="password"
-                    className="input"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    minLength={6}
-                    required
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('merchantVault.confirmPassword')}</label>
-                  <input
-                    type="password"
-                    className="input"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    minLength={6}
-                    required
-                  />
-                </div>
-                <button type="submit" className="btn-primary w-full text-sm" disabled={loading}>
-                  {t('merchantVault.create')}
-                </button>
-              </form>
-            )}
-
-            {configured && !unlocked && (
-              <form onSubmit={handleUnlock} className="space-y-2">
-                <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.unlockHint')}</p>
-                <div>
-                  <label className="label">{t('merchantVault.password')}</label>
-                  <input
-                    type="password"
-                    className="input"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                </div>
-                <button type="submit" className="btn-primary w-full text-sm" disabled={loading}>
-                  {t('merchantVault.unlock')}
-                </button>
-              </form>
-            )}
-
-            {configured && unlocked && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400">{t('merchantVault.unlocked')}</p>
-                  <div className="flex gap-2">
-                    <button type="button" className="text-xs text-indigo-600 hover:underline" onClick={startAdd}>
-                      {t('merchantVault.add')}
-                    </button>
-                    <button type="button" className="text-xs text-slate-500 hover:underline" onClick={handleLock}>
-                      {t('merchantVault.lock')}
-                    </button>
+              {configured === false && (
+                <form onSubmit={handleCreateVault} className="space-y-2">
+                  <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.createHint')}</p>
+                  <div>
+                    <label className="label">{t('merchantVault.password')}</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      minLength={6}
+                      required
+                      autoFocus
+                    />
                   </div>
-                </div>
+                  <div>
+                    <label className="label">{t('merchantVault.confirmPassword')}</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary w-full text-sm" disabled={loading}>
+                    {t('merchantVault.create')}
+                  </button>
+                </form>
+              )}
 
-                {showForm && (
-                  <form onSubmit={handleSave} className="space-y-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-                    <div>
-                      <label className="label">{t('merchantVault.merchantName')}</label>
-                      <input
-                        className="input"
-                        value={form.merchantName}
-                        onChange={(e) => setForm((f) => ({ ...f, merchantName: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('merchantVault.mid')}</label>
-                      <input
-                        className="input font-mono text-xs"
-                        value={form.mid}
-                        onChange={(e) => setForm((f) => ({ ...f, mid: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('merchantVault.environment')}</label>
-                      <select
-                        className="input"
-                        value={form.environment}
-                        onChange={(e) => setForm((f) => ({ ...f, environment: e.target.value }))}
-                      >
-                        <option value="uat">{t('merchantVault.envUat')}</option>
-                        <option value="production">{t('merchantVault.envProduction')}</option>
-                      </select>
-                    </div>
-                    {fillSecretKey && (
-                      <div>
-                        <label className="label">{t('merchantVault.secretKey')}</label>
-                        <input
-                          className="input font-mono text-xs"
-                          value={form.secretKey}
-                          onChange={(e) => setForm((f) => ({ ...f, secretKey: e.target.value }))}
-                        />
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <button type="submit" className="btn-primary flex-1 text-sm" disabled={loading}>
-                        {t('common.save')}
-                      </button>
+              {configured && !unlocked && (
+                <form onSubmit={handleUnlock} className="space-y-2">
+                  <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.unlockHint')}</p>
+                  <div>
+                    <label className="label">{t('merchantVault.password')}</label>
+                    <input
+                      type="password"
+                      className="input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary w-full text-sm" disabled={loading}>
+                    {t('merchantVault.unlock')}
+                  </button>
+                </form>
+              )}
+
+              {configured && unlocked && (
+                <div className="space-y-3">
+                  {suggestNew && !showForm && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+                      <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                        {t('merchantVault.suggestTitle')}
+                      </p>
+                      <p className="mt-0.5 break-all font-mono text-[11px] text-amber-800/90 dark:text-amber-200/90">
+                        {trimmedMid}
+                      </p>
                       <button
                         type="button"
-                        className="btn-secondary text-sm"
-                        onClick={() => {
-                          setShowForm(false)
-                          setEditingId(null)
-                        }}
+                        className="btn-primary mt-2 w-full text-sm"
+                        onClick={startSuggestSave}
                       >
-                        {t('common.cancel')}
+                        {t('merchantVault.suggestSave')}
                       </button>
                     </div>
-                  </form>
-                )}
+                  )}
 
-                {loading && !items.length ? (
-                  <p className="text-xs text-slate-500">{t('common.loading')}</p>
-                ) : items.length === 0 ? (
-                  <p className="text-xs text-slate-500">{t('merchantVault.empty')}</p>
-                ) : (
-                  <ul className="max-h-64 space-y-1.5 overflow-y-auto">
-                    {items.map((item) => (
-                      <li
-                        key={item.id}
-                        className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800/60"
+                  <div className="flex gap-2">
+                    <input
+                      className="input min-w-0 flex-1 text-sm"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={t('merchantVault.searchPlaceholder')}
+                    />
+                    <button type="button" className="btn-primary shrink-0 px-3 text-sm" onClick={() => startAdd()}>
+                      {t('merchantVault.add')}
+                    </button>
+                  </div>
+
+                  <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800">
+                    {[
+                      { value: 'all', label: t('merchantVault.filterAll') },
+                      { value: 'uat', label: t('merchantVault.envUat') },
+                      { value: 'production', label: t('merchantVault.envProductionShort') },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                          envFilter === opt.value
+                            ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                        }`}
+                        onClick={() => setEnvFilter(opt.value)}
                       >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {showForm && (
+                    <form
+                      onSubmit={handleSave}
+                      className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50/40 p-2.5 dark:border-indigo-900 dark:bg-indigo-950/20"
+                    >
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        {editingId ? t('merchantVault.edit') : t('merchantVault.add')}
+                      </p>
+                      <div>
+                        <label className="label">{t('merchantVault.merchantName')}</label>
+                        <input
+                          className="input"
+                          value={form.merchantName}
+                          onChange={(e) => setForm((f) => ({ ...f, merchantName: e.target.value }))}
+                          required
+                          autoFocus
+                        />
+                      </div>
+                      <div>
+                        <label className="label">{t('merchantVault.mid')}</label>
+                        <input
+                          className="input font-mono text-xs"
+                          value={form.mid}
+                          onChange={(e) => setForm((f) => ({ ...f, mid: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="label">{t('merchantVault.environment')}</label>
+                        <select
+                          className="input"
+                          value={form.environment}
+                          onChange={(e) => setForm((f) => ({ ...f, environment: e.target.value }))}
+                        >
+                          <option value="uat">{t('merchantVault.envUat')}</option>
+                          <option value="production">{t('merchantVault.envProduction')}</option>
+                        </select>
+                      </div>
+                      {fillSecretKey && (
+                        <div>
+                          <label className="label">{t('merchantVault.secretKey')}</label>
+                          <input
+                            className="input font-mono text-xs"
+                            value={form.secretKey}
+                            onChange={(e) => setForm((f) => ({ ...f, secretKey: e.target.value }))}
+                          />
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn-primary flex-1 text-sm" disabled={loading}>
+                          {t('common.save')}
+                        </button>
                         <button
                           type="button"
-                          className="w-full text-left"
-                          onClick={() => handleSelect(item)}
+                          className="btn-secondary text-sm"
+                          onClick={() => {
+                            setShowForm(false)
+                            setEditingId(null)
+                          }}
                         >
-                          <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                            {item.merchantName}
-                          </div>
-                          <div className="mt-0.5 text-xs text-slate-500">
-                            {item.environment === 'production'
-                              ? t('merchantVault.envProduction')
-                              : t('merchantVault.envUat')}
-                          </div>
-                          <div className="mt-0.5 font-mono text-xs text-slate-600 dark:text-slate-300">
-                            MID: {item.mid}
-                          </div>
-                          {fillSecretKey && (
-                            <div className="mt-0.5 font-mono text-xs text-slate-500">
-                              Key:{' '}
-                              {showKeys[item.id] ? item.secretKey || '—' : maskKey(item.secretKey)}
-                            </div>
-                          )}
+                          {t('common.cancel')}
                         </button>
-                        <div className="mt-1.5 flex flex-wrap gap-2 border-t border-slate-200 pt-1.5 dark:border-slate-700">
-                          <button
-                            type="button"
-                            className="text-xs text-indigo-600 hover:underline"
-                            onClick={() => handleSelect(item)}
-                          >
-                            {t('merchantVault.use')}
-                          </button>
-                          {fillSecretKey && (
+                      </div>
+                    </form>
+                  )}
+
+                  {loading && !items.length ? (
+                    <p className="text-xs text-slate-500">{t('common.loading')}</p>
+                  ) : items.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t('merchantVault.empty')}</p>
+                  ) : filteredItems.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t('merchantVault.noResults')}</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {filteredItems.map((item) => (
+                        <li
+                          key={item.id}
+                          className="rounded-lg border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/50"
+                        >
+                          <div className="flex items-start justify-between gap-2">
                             <button
                               type="button"
-                              className="text-xs text-slate-500 hover:underline"
-                              onClick={() =>
-                                setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
-                              }
+                              className="min-w-0 flex-1 text-left"
+                              onClick={() => handleSelect(item)}
                             >
-                              {showKeys[item.id] ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                  {item.merchantName}
+                                </span>
+                                {envBadge(item.environment)}
+                              </div>
+                              <div className="mt-0.5 break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                                {item.mid}
+                              </div>
+                              {fillSecretKey && (
+                                <div className="mt-0.5 font-mono text-[11px] text-slate-500">
+                                  Key:{' '}
+                                  {showKeys[item.id] ? item.secretKey || '—' : maskKey(item.secretKey)}
+                                </div>
+                              )}
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            className="text-xs text-slate-500 hover:underline"
-                            onClick={() => startEdit(item)}
-                          >
-                            {t('merchantVault.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            className="text-xs text-rose-600 hover:underline"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            {t('merchantVault.delete')}
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+                            <button
+                              type="button"
+                              className="btn-primary shrink-0 px-2.5 py-1 text-xs"
+                              onClick={() => handleSelect(item)}
+                            >
+                              {t('merchantVault.use')}
+                            </button>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-200/80 pt-1.5 dark:border-slate-700">
+                            {fillSecretKey && (
+                              <button
+                                type="button"
+                                className="text-[11px] text-slate-500 hover:underline"
+                                onClick={() =>
+                                  setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
+                                }
+                              >
+                                {showKeys[item.id] ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="text-[11px] text-slate-500 hover:underline"
+                              onClick={() => startEdit(item)}
+                            >
+                              {t('merchantVault.edit')}
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] text-rose-600 hover:underline"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              {t('merchantVault.delete')}
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
