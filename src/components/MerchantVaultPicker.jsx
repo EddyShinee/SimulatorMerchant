@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { startAuthentication, startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
@@ -50,6 +51,28 @@ export default function MerchantVaultPicker({
   const [query, setQuery] = useState('')
   const [envFilter, setEnvFilter] = useState('all') // all | uat | production
   const [copiedKey, setCopiedKey] = useState('')
+  const [biometricEnabled, setBiometricEnabled] = useState(false)
+  const [platformAuth, setPlatformAuth] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function checkPlatform() {
+      if (!browserSupportsWebAuthn()) {
+        if (active) setPlatformAuth(false)
+        return
+      }
+      try {
+        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (active) setPlatformAuth(Boolean(ok))
+      } catch {
+        if (active) setPlatformAuth(false)
+      }
+    }
+    checkPlatform()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const vaultHeaders = useCallback(() => {
     const token = getVaultUnlockToken()
@@ -60,9 +83,13 @@ export default function MerchantVaultPicker({
     try {
       const { data } = await api.get('/api/merchants/vault')
       setConfigured(Boolean(data.configured))
+      setBiometricEnabled(Boolean(data.biometricEnabled))
+      return data
     } catch (err) {
       setConfigured(false)
+      setBiometricEnabled(false)
       setError(err.response?.data?.message || t('merchantVault.loadError'))
+      return null
     }
   }, [t])
 
@@ -164,8 +191,73 @@ export default function MerchantVaultPicker({
       setUnlocked(true)
       setPassword('')
       await loadItems()
+      await refreshStatus()
     } catch (err) {
       setError(err.response?.data?.message || t('merchantVault.unlockError'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUnlockBiometric = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const { data: opt } = await api.post('/api/merchants/vault/webauthn/auth/options')
+      const assertion = await startAuthentication(opt.options)
+      const { data } = await api.post('/api/merchants/vault/webauthn/unlock', {
+        response: assertion,
+        challengeToken: opt.challengeToken,
+      })
+      setVaultUnlockToken(data.unlockToken)
+      setUnlocked(true)
+      await loadItems()
+      await refreshStatus()
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        setError(t('merchantVault.biometricCancelled'))
+      } else {
+        setError(err.response?.data?.message || err.message || t('merchantVault.biometricError'))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEnableBiometric = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const { data: opt } = await api.post('/api/merchants/vault/webauthn/register/options', null, {
+        headers: vaultHeaders(),
+      })
+      const attestation = await startRegistration(opt.options)
+      await api.post(
+        '/api/merchants/vault/webauthn/register',
+        { response: attestation, challengeToken: opt.challengeToken },
+        { headers: vaultHeaders() }
+      )
+      setBiometricEnabled(true)
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        setError(t('merchantVault.biometricCancelled'))
+      } else {
+        setError(err.response?.data?.message || err.message || t('merchantVault.biometricRegisterError'))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRemoveBiometric = async () => {
+    if (!window.confirm(t('merchantVault.confirmRemoveBiometric'))) return
+    setLoading(true)
+    setError('')
+    try {
+      await api.delete('/api/merchants/vault/webauthn', { headers: vaultHeaders() })
+      setBiometricEnabled(false)
+    } catch (err) {
+      setError(err.response?.data?.message || t('merchantVault.biometricRemoveError'))
     } finally {
       setLoading(false)
     }
@@ -401,27 +493,81 @@ export default function MerchantVaultPicker({
               )}
 
               {configured && !unlocked && (
-                <form onSubmit={handleUnlock} className="space-y-2">
-                  <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.unlockHint')}</p>
-                  <div>
-                    <label className="label">{t('merchantVault.password')}</label>
-                    <input
-                      type="password"
-                      className="input"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                  <button type="submit" className="btn-primary w-full text-sm" disabled={loading}>
-                    {t('merchantVault.unlock')}
-                  </button>
-                </form>
+                <div className="space-y-3">
+                  {platformAuth && biometricEnabled && (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        className="btn-primary w-full text-sm"
+                        disabled={loading}
+                        onClick={handleUnlockBiometric}
+                      >
+                        {t('merchantVault.unlockTouchId')}
+                      </button>
+                      <p className="text-center text-[11px] text-slate-400">{t('merchantVault.orPassword')}</p>
+                    </div>
+                  )}
+                  <form onSubmit={handleUnlock} className="space-y-2">
+                    {!(platformAuth && biometricEnabled) && (
+                      <p className="text-xs text-slate-600 dark:text-slate-300">{t('merchantVault.unlockHint')}</p>
+                    )}
+                    <div>
+                      <label className="label">{t('merchantVault.password')}</label>
+                      <input
+                        type="password"
+                        className="input"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoFocus={!(platformAuth && biometricEnabled)}
+                      />
+                    </div>
+                    <button type="submit" className="btn-secondary w-full text-sm" disabled={loading}>
+                      {t('merchantVault.unlock')}
+                    </button>
+                  </form>
+                  {platformAuth && !biometricEnabled && (
+                    <p className="text-[11px] text-slate-500">{t('merchantVault.biometricSetupHint')}</p>
+                  )}
+                </div>
               )}
 
               {configured && unlocked && (
                 <div className="space-y-3">
+                  {platformAuth && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/40">
+                      {biometricEnabled ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                            {t('merchantVault.biometricOn')}
+                          </p>
+                          <button
+                            type="button"
+                            className="text-[11px] text-rose-600 hover:underline"
+                            onClick={handleRemoveBiometric}
+                            disabled={loading}
+                          >
+                            {t('merchantVault.removeTouchId')}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-slate-600 dark:text-slate-300">
+                            {t('merchantVault.enableTouchIdHint')}
+                          </p>
+                          <button
+                            type="button"
+                            className="btn-secondary w-full text-sm"
+                            onClick={handleEnableBiometric}
+                            disabled={loading}
+                          >
+                            {t('merchantVault.enableTouchId')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {suggestNew && !showForm && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
                       <p className="text-xs font-medium text-amber-900 dark:text-amber-100">

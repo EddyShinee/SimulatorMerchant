@@ -11,7 +11,15 @@ import {
   createCredential,
   updateCredential,
   deleteCredential,
+  countWebAuthnCredentials,
 } from '../utils/merchantStore.js'
+import {
+  buildRegistrationOptions,
+  verifyAndSaveRegistration,
+  buildAuthenticationOptions,
+  verifyAuthentication,
+  deleteWebAuthnCredentials,
+} from '../utils/vaultWebAuthn.js'
 
 const router = express.Router()
 
@@ -75,7 +83,12 @@ router.get('/vault', async (req, res) => {
   if (!isMerchantStoreConfigured()) return storeNotReady(res)
   try {
     const row = await getVaultRow(userId(req))
-    return res.json({ configured: Boolean(row) })
+    const biometricCount = row ? await countWebAuthnCredentials(userId(req)) : 0
+    return res.json({
+      configured: Boolean(row),
+      biometricEnabled: biometricCount > 0,
+      biometricCount,
+    })
   } catch (err) {
     return handleStoreError(res, err, 'Failed to read vault status.')
   }
@@ -174,6 +187,95 @@ router.post('/vault/unlock', async (req, res) => {
     return res.json({ unlockToken: signVaultToken(userId(req)) })
   } catch (err) {
     return handleStoreError(res, err, 'Failed to unlock vault.')
+  }
+})
+
+// --- WebAuthn / Touch ID ---
+
+// POST /api/merchants/vault/webauthn/register/options (requires unlocked vault)
+router.post('/vault/webauthn/register/options', requireVaultUnlock, async (req, res) => {
+  if (!isMerchantStoreConfigured()) return storeNotReady(res)
+  try {
+    const vault = await getVaultRow(userId(req))
+    if (!vault) {
+      return res.status(404).json({ error: 'VAULT_NOT_FOUND', message: 'Vault is not configured yet.' })
+    }
+    const result = await buildRegistrationOptions(req, userId(req), req.user?.email)
+    return res.json(result)
+  } catch (err) {
+    return handleStoreError(res, err, 'Failed to start biometric registration.')
+  }
+})
+
+// POST /api/merchants/vault/webauthn/register (requires unlocked vault)
+router.post('/vault/webauthn/register', requireVaultUnlock, async (req, res) => {
+  if (!isMerchantStoreConfigured()) return storeNotReady(res)
+  try {
+    await verifyAndSaveRegistration(req, userId(req), {
+      response: req.body?.response,
+      challengeToken: req.body?.challengeToken,
+    })
+    return res.json({ ok: true, biometricEnabled: true })
+  } catch (err) {
+    if (err?.code === 'INVALID_CHALLENGE' || err?.name === 'JsonWebTokenError') {
+      return res.status(400).json({ error: 'INVALID_CHALLENGE', message: 'Biometric challenge expired. Try again.' })
+    }
+    if (err?.code === 'WEBAUTHN_FAILED') {
+      return res.status(401).json({ error: 'WEBAUTHN_FAILED', message: err.message })
+    }
+    return handleStoreError(res, err, 'Failed to register biometric.')
+  }
+})
+
+// POST /api/merchants/vault/webauthn/auth/options
+router.post('/vault/webauthn/auth/options', async (req, res) => {
+  if (!isMerchantStoreConfigured()) return storeNotReady(res)
+  try {
+    const vault = await getVaultRow(userId(req))
+    if (!vault) {
+      return res.status(404).json({ error: 'VAULT_NOT_FOUND', message: 'Vault is not configured yet.' })
+    }
+    const result = await buildAuthenticationOptions(req, userId(req))
+    return res.json(result)
+  } catch (err) {
+    if (err?.code === 'NO_BIOMETRIC') {
+      return res.status(404).json({
+        error: 'NO_BIOMETRIC',
+        message: 'Touch ID is not set up yet. Unlock with password first, then enable Touch ID.',
+      })
+    }
+    return handleStoreError(res, err, 'Failed to start biometric unlock.')
+  }
+})
+
+// POST /api/merchants/vault/webauthn/unlock
+router.post('/vault/webauthn/unlock', async (req, res) => {
+  if (!isMerchantStoreConfigured()) return storeNotReady(res)
+  try {
+    await verifyAuthentication(req, userId(req), {
+      response: req.body?.response,
+      challengeToken: req.body?.challengeToken,
+    })
+    return res.json({ unlockToken: signVaultToken(userId(req)) })
+  } catch (err) {
+    if (err?.code === 'INVALID_CHALLENGE' || err?.name === 'JsonWebTokenError') {
+      return res.status(400).json({ error: 'INVALID_CHALLENGE', message: 'Biometric challenge expired. Try again.' })
+    }
+    if (err?.code === 'NO_BIOMETRIC' || err?.code === 'UNKNOWN_CREDENTIAL' || err?.code === 'WEBAUTHN_FAILED') {
+      return res.status(401).json({ error: err.code, message: err.message })
+    }
+    return handleStoreError(res, err, 'Failed to unlock with biometric.')
+  }
+})
+
+// DELETE /api/merchants/vault/webauthn — remove all Touch ID credentials
+router.delete('/vault/webauthn', requireVaultUnlock, async (req, res) => {
+  if (!isMerchantStoreConfigured()) return storeNotReady(res)
+  try {
+    await deleteWebAuthnCredentials(userId(req))
+    return res.json({ ok: true, biometricEnabled: false })
+  } catch (err) {
+    return handleStoreError(res, err, 'Failed to remove biometric.')
   }
 })
 
