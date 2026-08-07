@@ -1,7 +1,7 @@
 {
   "name": "simulator-merchant",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Simulator Merchant - full-stack app with auth (SQLite/Postgres), payment API simulator",
   "scripts": {

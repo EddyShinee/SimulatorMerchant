@@ -1,14 +1,54 @@
--- Optional: only needed if you store custom app tables in Postgres.
--- Register/login already use Supabase Auth (auth.users) — no SQL required for that.
+-- Simulator Merchant — fresh schema for project:
+-- https://xakmpzrpmawzojplvunm.supabase.co
 --
--- Project: https://xakmpzrpmawzojplvunm.supabase.co
+-- Register/login use Supabase Auth (auth.users).
+-- Recommended: Authentication → Providers → Email → Confirm email = OFF
 --
--- Recommended Auth setting for this Simulator:
---   Authentication → Providers → Email → Confirm email = OFF
+-- Applied via migration: reset_public_schema_for_simulator
 
--- Example custom table (not required for Auth):
--- CREATE TABLE IF NOT EXISTS public.app_profiles (
---   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
---   email TEXT,
---   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
--- );
+CREATE TABLE IF NOT EXISTS public.app_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.app_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own profile"
+  ON public.app_profiles
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile"
+  ON public.app_profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+  ON public.app_profiles
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.app_profiles (id, email)
+  VALUES (NEW.id, NEW.email)
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
