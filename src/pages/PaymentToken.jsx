@@ -404,12 +404,27 @@ export default function PaymentToken() {
       const respBody = data?.body
       const { decodedResponse } = parseProxyBody(respBody)
       const paymentTokenValue = decodedResponse?.paymentToken
+      const webPaymentUrl = decodedResponse?.webPaymentUrl || ''
+
+      const customerTokens = Array.isArray(optional.customerToken) ? optional.customerToken : []
+      const firstCustomerToken = customerTokens[0] ? String(customerTokens[0]).trim() : ''
+      const uiUser = optional.uiParams?.userInfo || {}
+      const walletChannel =
+        channel.find((c) => c && String(c).toUpperCase() !== 'ALL') || ''
 
       updateFlow({
         merchantId,
         secretKey,
         invoiceNo: finalInvoice,
         ...(paymentTokenValue ? { paymentToken: paymentTokenValue } : {}),
+        ...(webPaymentUrl ? { webPaymentUrl } : {}),
+        paymentChannels: channel,
+        ...(walletChannel ? { channelCode: String(walletChannel).toUpperCase() } : {}),
+        ...(firstCustomerToken ? { customerToken: firstCustomerToken } : {}),
+        ...(uiUser.name ? { paymentCustomerName: String(uiUser.name) } : {}),
+        ...(uiUser.email ? { paymentCustomerEmail: String(uiUser.email) } : {}),
+        customerTokenOnly: optional.customerTokenOnly === true,
+        tokenizeOnly: optional.tokenizeOnly === true,
       })
 
       setResult({

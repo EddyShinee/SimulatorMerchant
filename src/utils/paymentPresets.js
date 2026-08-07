@@ -22,6 +22,15 @@ const DEFAULTS = {
   channelGroups: [],
   optionCategories: [],
   payoutRequestId: '',
+  // Tokenize / wallet (ZaloPay, MoMo, …) — filled from Payment Token
+  customerToken: '',
+  paymentCustomerName: '',
+  paymentCustomerEmail: '',
+  paymentChannels: [],
+  webPaymentUrl: '',
+  accountNo: '',
+  customerTokenOnly: false,
+  tokenizeOnly: false,
 }
 
 export function loadPaymentPresets() {

@@ -295,6 +295,19 @@ export const translations = {
       autoFetchApplied: 'Đã áp dụng kênh {name}.',
       autoFetchPickChannel: 'Chọn kênh bên dưới (đã gợi ý VISA / kênh đầu tiên).',
       flowChannelBadge: 'Kênh từ Payment Flow',
+      responseReturnUrl: 'responseReturnUrl',
+      responseReturnUrlHint: 'Thường lấy từ webPaymentUrl của Payment Token (hoặc tự tạo URL PGW UI).',
+      walletMode: 'Thanh toán ví / Tokenize (ZaloPay, MoMo…)',
+      walletModeHint:
+        'Bật khi pay bằng customerToken đã lưu. Tự bật nếu channel là ZALOPAY/MOMO hoặc đã có customerToken từ Payment Token.',
+      walletTokenize: 'Wallet Tokenize',
+      walletTokenizeHint:
+        'Gửi customerToken + cardDetails.token (cùng token). Tự điền từ Payment Token nếu đã generate trước.',
+      customerToken: 'customerToken',
+      customerTokenRequired: 'customerToken là bắt buộc khi thanh toán ví / tokenize.',
+      accountNo: 'accountNo (masked)',
+      tokenCardName: 'cardDetails.name',
+      tokenCardExpiry: 'cardDetails.expiry',
     },
     paymentAction: {
       title: 'Payment Action',
@@ -970,6 +983,19 @@ export const translations = {
       autoFetchApplied: 'Applied channel {name}.',
       autoFetchPickChannel: 'Pick a channel below (VISA / first channel pre-selected).',
       flowChannelBadge: 'Channel from Payment Flow',
+      responseReturnUrl: 'responseReturnUrl',
+      responseReturnUrlHint: 'Usually from Payment Token webPaymentUrl (or auto-built PGW UI URL).',
+      walletMode: 'Wallet / Tokenize payment (ZaloPay, MoMo…)',
+      walletModeHint:
+        'Enable when paying with a stored customerToken. Auto-on for ZALOPAY/MOMO channels or when customerToken was saved from Payment Token.',
+      walletTokenize: 'Wallet Tokenize',
+      walletTokenizeHint:
+        'Sends customerToken + cardDetails.token (same token). Prefills from Payment Token when available.',
+      customerToken: 'customerToken',
+      customerTokenRequired: 'customerToken is required for wallet / tokenize payment.',
+      accountNo: 'accountNo (masked)',
+      tokenCardName: 'cardDetails.name',
+      tokenCardExpiry: 'cardDetails.expiry',
     },
     paymentAction: {
       title: 'Payment Action',

@@ -17,6 +17,8 @@ import {
   INTEREST_TYPE_OPTIONS,
   INSTALLMENT_PERIOD_OPTIONS,
   MY2C2P_SDK_URL,
+  isWalletChannel,
+  buildResponseReturnUrl,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
 import { fetchPaymentOptions, fetchAllPaymentOptionDetails, resolveDetailsUrl } from '../utils/paymentChannelApi.js'
@@ -212,15 +214,30 @@ export default function DoPayment() {
   const [activeContext, setActiveContext] = useState(null)
 
   // Payment information
-  const [customerName, setCustomerName] = useState('NGUYEN VAN A')
-  const [customerEmail, setCustomerEmail] = useState('eddy.vu@2c2p.com')
+  const [customerName, setCustomerName] = useState(flow.paymentCustomerName || 'NGUYEN VAN A')
+  const [customerEmail, setCustomerEmail] = useState(flow.paymentCustomerEmail || 'eddy.vu@2c2p.com')
   const [mobileNo, setMobileNo] = useState('1')
   const [mobileNoPrefix, setMobileNoPrefix] = useState('1')
-  const [cardEmail, setCardEmail] = useState('eddy.vu@2c2p.com')
+  const [cardEmail, setCardEmail] = useState(flow.paymentCustomerEmail || 'eddy.vu@2c2p.com')
   const [isIppChosen, setIsIppChosen] = useState(true)
   const [installmentPeriod, setInstallmentPeriod] = useState('3')
   const [interestType, setInterestType] = useState('M')
   const [qrType, setQrType] = useState('')
+
+  // Wallet / tokenize (ZaloPay, MoMo, …)
+  const [walletMode, setWalletMode] = useState(
+    () => Boolean(flow.customerToken) || isWalletChannel(flow.channelCode)
+  )
+  const [responseReturnUrl, setResponseReturnUrl] = useState(
+    () => flow.webPaymentUrl || buildResponseReturnUrl(flow.paymentToken, 'sandbox')
+  )
+  const [customerToken, setCustomerToken] = useState(flow.customerToken || '')
+  const [accountNo, setAccountNo] = useState(flow.accountNo || '')
+  const [tokenCardName, setTokenCardName] = useState(flow.paymentCustomerName || '')
+  const [tokenCardExpiry, setTokenCardExpiry] = useState('XX/XX')
+  const [tokenCardBrand, setTokenCardBrand] = useState('')
+  const [tokenCardStatus, setTokenCardStatus] = useState('A')
+  const [tokenSubChannelCode, setTokenSubChannelCode] = useState(flow.channelCode || '')
 
   // Card details
   const [cardNumber, setCardNumber] = useState('4111 1111 1111 1111')
@@ -232,11 +249,20 @@ export default function DoPayment() {
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
+  const isWallet = walletMode || isWalletChannel(channelCode)
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
+    const wallet = walletMode || isWalletChannel(code)
     const isCc = code === 'CC'
     const isIpp = code === 'IPP'
+    if (wallet) {
+      setSendCardDetails(false)
+      setSendSecurePayToken(false)
+      setQrType((prev) => prev || 'URL')
+      setTokenSubChannelCode((prev) => prev || code)
+      return
+    }
     if (flow.selectedChannelName) {
       setSendCardDetails(Boolean(flow.requiresCard))
     } else {
@@ -250,13 +276,51 @@ export default function DoPayment() {
     } else if (!isCc) {
       setSendSecurePayToken(false)
     }
-  }, [channelCode, flow.requiresCard, flow.selectedChannelName])
+  }, [channelCode, flow.requiresCard, flow.selectedChannelName, walletMode])
 
   useEffect(() => {
     if (flow.channelCode) setChannelCode(flow.channelCode)
     if (flow.agentCode != null) setAgentCode(flow.agentCode)
     if (flow.agentChannelCode != null) setAgentChannelCode(flow.agentChannelCode)
   }, [flow.channelCode, flow.agentCode, flow.agentChannelCode])
+
+  useEffect(() => {
+    if (flow.paymentToken) setPaymentToken(flow.paymentToken)
+  }, [flow.paymentToken])
+
+  useEffect(() => {
+    if (flow.customerToken) {
+      setCustomerToken(flow.customerToken)
+      setWalletMode(true)
+    }
+    if (flow.paymentCustomerName) {
+      setCustomerName(flow.paymentCustomerName)
+      setTokenCardName((prev) => prev || flow.paymentCustomerName)
+    }
+    if (flow.paymentCustomerEmail) {
+      setCustomerEmail(flow.paymentCustomerEmail)
+      setCardEmail(flow.paymentCustomerEmail)
+    }
+    if (flow.accountNo) setAccountNo(flow.accountNo)
+    if (flow.webPaymentUrl) {
+      setResponseReturnUrl(flow.webPaymentUrl)
+    } else if (flow.paymentToken) {
+      setResponseReturnUrl((prev) => prev || buildResponseReturnUrl(flow.paymentToken, env))
+    }
+    if (isWalletChannel(flow.channelCode)) {
+      setWalletMode(true)
+      setTokenSubChannelCode(flow.channelCode)
+    }
+  }, [
+    flow.customerToken,
+    flow.paymentCustomerName,
+    flow.paymentCustomerEmail,
+    flow.accountNo,
+    flow.webPaymentUrl,
+    flow.paymentToken,
+    flow.channelCode,
+    env,
+  ])
 
   useEffect(() => {
     if (flow.channelGroups?.length) setChannelGroups(flow.channelGroups)
@@ -422,13 +486,38 @@ export default function DoPayment() {
 
   const buildPaymentData = () => {
     const optional = {}
-    if (isIppChannel) {
+    if (isIppChannel && !isWallet) {
       optional.isIppChosen = isIppChosen
       if (interestType) optional.interestType = interestType
       const period = Number.parseInt(String(installmentPeriod).trim(), 10)
       if (Number.isInteger(period) && period > 0) optional.installmentPeriod = period
     }
     if (qrType) optional.qrType = qrType
+
+    if (isWallet) {
+      const token = customerToken.trim()
+      const ch = channelCode.trim().toUpperCase() || 'ZALOPAY'
+      return omitEmptyFields({
+        name: customerName,
+        email: customerEmail,
+        mobileNo,
+        mobileNoPrefix,
+        loyaltyPoints: [],
+        accountNo: accountNo.trim() || undefined,
+        customerToken: token || undefined,
+        cardDetails: omitEmptyFields({
+          token: token || undefined,
+          name: (tokenCardName || customerName).trim() || undefined,
+          expiry: tokenCardExpiry.trim() || 'XX/XX',
+          channelCode: ch,
+          subChannelCode: (tokenSubChannelCode || ch).trim().toUpperCase() || ch,
+          cardBrand: tokenCardBrand,
+          status: tokenCardStatus.trim() || 'A',
+        }),
+        ...optional,
+      })
+    }
+
     return omitEmptyFields({
       name: customerName,
       cardDetails: { email: cardEmail },
@@ -456,12 +545,17 @@ export default function DoPayment() {
       toast.warning(t('doPayment.clientIdRequired'))
       return
     }
+    if (isWallet && !customerToken.trim()) {
+      setWarning(t('doPayment.customerTokenRequired'))
+      toast.warning(t('doPayment.customerTokenRequired'))
+      return
+    }
 
     const paymentBody = { ...paymentData }
-    if (sendSecurePayToken && securePayToken.trim()) {
+    if (!isWallet && sendSecurePayToken && securePayToken.trim()) {
       paymentBody.securePayToken = securePayToken.trim()
     }
-    if (sendCardDetails) {
+    if (!isWallet && sendCardDetails) {
       Object.assign(
         paymentBody,
         omitEmptyFields({
@@ -478,6 +572,7 @@ export default function DoPayment() {
       clientID: clientId.trim(),
       clientIP: clientIp,
       locale,
+      responseReturnUrl: responseReturnUrl.trim() || undefined,
       payment: {
         code: codeJson,
         data: omitEmptyFields(paymentBody),
@@ -513,6 +608,11 @@ export default function DoPayment() {
         channelCode: channelCode.trim(),
         agentCode: agentCode.trim(),
         agentChannelCode: agentChannelCode.trim(),
+        customerToken: customerToken.trim(),
+        paymentCustomerName: customerName.trim(),
+        paymentCustomerEmail: customerEmail.trim(),
+        accountNo: accountNo.trim(),
+        webPaymentUrl: responseReturnUrl.trim() || flow.webPaymentUrl || '',
       })
 
       setResult({
@@ -601,7 +701,37 @@ export default function DoPayment() {
                 <label className="label">🌐 Locale</label>
                 <input className="input" value={locale} onChange={(e) => setLocale(e.target.value)} />
               </div>
+              <div className="sm:col-span-2">
+                <label className="label">{t('doPayment.responseReturnUrl')}</label>
+                <input
+                  className="input font-mono text-xs"
+                  value={responseReturnUrl}
+                  onChange={(e) => setResponseReturnUrl(e.target.value)}
+                  placeholder="https://sandbox-pgw-ui.2c2p.com/payment/4.3/#/info/…"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">{t('doPayment.responseReturnUrlHint')}</p>
+              </div>
             </div>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-800/80">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={isWallet}
+                onChange={(e) => {
+                  setWalletMode(e.target.checked)
+                  if (e.target.checked) {
+                    setQrType((prev) => prev || 'URL')
+                    if (!responseReturnUrl.trim() && paymentToken.trim()) {
+                      setResponseReturnUrl(buildResponseReturnUrl(paymentToken, env))
+                    }
+                  }
+                }}
+              />
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                {t('doPayment.walletMode')}
+              </span>
+            </label>
+            <p className="text-[11px] text-slate-400">{t('doPayment.walletModeHint')}</p>
           </div>
 
           {/* Channel code */}
@@ -681,10 +811,12 @@ export default function DoPayment() {
                 <label className="label">Mobile No Prefix</label>
                 <input className="input" value={mobileNoPrefix} onChange={(e) => setMobileNoPrefix(e.target.value)} />
               </div>
-              <div>
-                <label className="label">Card Email</label>
-                <input className="input" value={cardEmail} onChange={(e) => setCardEmail(e.target.value)} />
-              </div>
+              {!isWallet && (
+                <div>
+                  <label className="label">Card Email</label>
+                  <input className="input" value={cardEmail} onChange={(e) => setCardEmail(e.target.value)} />
+                </div>
+              )}
               <div>
                 <label className="label">QR Type</label>
                 <select className="input" value={qrType} onChange={(e) => setQrType(e.target.value)}>
@@ -697,7 +829,7 @@ export default function DoPayment() {
                 </select>
               </div>
             </div>
-            {isIppChannel && (
+            {isIppChannel && !isWallet && (
               <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -752,12 +884,91 @@ export default function DoPayment() {
                 </div>
               </div>
             )}
+
+            {isWallet && (
+              <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/20">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {t('doPayment.walletTokenize')}
+                  </h4>
+                  <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-900 dark:text-violet-200">
+                    ZaloPay / MoMo / …
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.walletTokenizeHint')}</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="label">{t('doPayment.customerToken')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={customerToken}
+                      onChange={(e) => setCustomerToken(e.target.value)}
+                      placeholder="07082614230839581994"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.accountNo')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={accountNo}
+                      onChange={(e) => setAccountNo(e.target.value)}
+                      placeholder="XXXX0980"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.tokenCardName')}</label>
+                    <input
+                      className="input"
+                      value={tokenCardName}
+                      onChange={(e) => setTokenCardName(e.target.value)}
+                      placeholder={customerName}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.tokenCardExpiry')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={tokenCardExpiry}
+                      onChange={(e) => setTokenCardExpiry(e.target.value)}
+                      placeholder="XX/XX"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">subChannelCode</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={tokenSubChannelCode}
+                      onChange={(e) => setTokenSubChannelCode(e.target.value)}
+                      placeholder={channelCode || 'ZALOPAY'}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">cardBrand</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={tokenCardBrand}
+                      onChange={(e) => setTokenCardBrand(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">status</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={tokenCardStatus}
+                      onChange={(e) => setTokenCardStatus(e.target.value)}
+                      placeholder="A"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
               {JSON.stringify(paymentData, null, 2)}
             </pre>
           </div>
 
           {/* Card details — raw PAN / expiry / CVV */}
+          {!isWallet && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
@@ -797,8 +1008,10 @@ export default function DoPayment() {
               </div>
             </div>
           </div>
+          )}
 
           {/* 2C2P encryption → securePayToken (independent from raw card fields) */}
+          {!isWallet && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
@@ -840,6 +1053,7 @@ export default function DoPayment() {
               <p className="text-xs text-slate-400">{t('doPayment.encryptNeedsCard')}</p>
             )}
           </div>
+          )}
 
           {warning && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">

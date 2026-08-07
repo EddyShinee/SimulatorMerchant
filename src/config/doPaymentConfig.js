@@ -20,6 +20,37 @@ export const INTEREST_TYPE_OPTIONS = ['M', 'C', 'A']
 /** IPP installment periods (months) */
 export const INSTALLMENT_PERIOD_OPTIONS = [3, 6, 9, 12]
 
+/** Wallet / e-wallet channel codes that use customerToken + cardDetails.token */
+export const WALLET_CHANNEL_CODES = [
+  'ZALOPAY',
+  'MOMO',
+  'MOMOPAY',
+  'VNPAY',
+  'SHOPEEPAY',
+  'VIETTELPAY',
+  'APPOTA',
+  'FOX',
+  'TRUEMONEY',
+  'ZALO',
+]
+
+export function isWalletChannel(code) {
+  return WALLET_CHANNEL_CODES.includes(String(code || '').trim().toUpperCase())
+}
+
+/** Build PGW UI info URL when Payment Token response has no webPaymentUrl. */
+export function buildResponseReturnUrl(paymentToken, env = 'sandbox') {
+  const token = String(paymentToken || '').trim()
+  if (!token) return ''
+  const base =
+    env === 'production'
+      ? 'https://pgw-ui.2c2p.com/payment/4.3'
+      : env === 'mpay'
+        ? 'https://pgw-ui.m-pay.vn/payment/4.1'
+        : 'https://sandbox-pgw-ui.2c2p.com/payment/4.3'
+  return `${base}/#/info/${token}`
+}
+
 // 2C2P client-side card encryption SDK.
 export const MY2C2P_SDK_URL =
   'https://demo2.2c2p.com/2C2PFrontEnd/SecurePayment/api/my2c2p.1.7.6.min.js'
