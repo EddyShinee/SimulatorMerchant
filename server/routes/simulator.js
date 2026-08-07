@@ -128,7 +128,7 @@ router.get('/requests', requireAuth, async (req, res) => {
       from: req.query.from || '',
       to: req.query.to || '',
       method: req.query.method || 'all',
-      pathFilter: req.query.pathFilter || req.query.path || 'all',
+      pathFilter: req.query.pathFilter || 'all',
     })
     return res.json(result)
   } catch (err) {

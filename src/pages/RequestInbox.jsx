@@ -12,6 +12,19 @@ import {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
 
+function sameRequestPage(a, b) {
+  if (a === b) return true
+  if (!a || !b || a.length !== b.length) return false
+  return a.every(
+    (row, i) =>
+      row.id === b[i].id &&
+      row.receivedAt === b[i].receivedAt &&
+      row.invoiceNo === b[i].invoiceNo &&
+      row.method === b[i].method &&
+      row.path === b[i].path
+  )
+}
+
 function methodBadge(method) {
   const map = {
     GET: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
@@ -201,7 +214,9 @@ export default function RequestInbox() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [pathFilter, setPathFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
   const [jwtFilter, setJwtFilter] = useState('all')
@@ -213,9 +228,16 @@ export default function RequestInbox() {
   const intervalRef = useRef(null)
   const recordedCallbackRef = useRef(false)
   const searchDebounceRef = useRef(null)
+  const loadSeqRef = useRef(0)
+  const hasLoadedRef = useRef(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async ({ silent = false } = {}) => {
+    const seq = ++loadSeqRef.current
+    if (silent && hasLoadedRef.current) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
     try {
       const { data } = await api.get('/api/simulator/requests', {
         params: {
@@ -228,13 +250,20 @@ export default function RequestInbox() {
           pathFilter: pathFilter !== 'all' ? pathFilter : undefined,
         },
       })
-      setRequests(data.requests || [])
+      if (seq !== loadSeqRef.current) return
+      const next = data.requests || []
+      setRequests((prev) => (sameRequestPage(prev, next) ? prev : next))
       setTotal(Number(data.total) || 0)
       setTotalPages(Number(data.totalPages) || 1)
+      hasLoadedRef.current = true
+      setHasLoaded(true)
     } catch {
-      /* ignore transient errors */
+      /* keep previous rows on transient errors — avoids empty flicker */
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [page, pageSize, invoiceSearch, fromDate, toDate, methodFilter, pathFilter])
 
@@ -249,13 +278,14 @@ export default function RequestInbox() {
   }
 
   useEffect(() => {
-    load()
+    void load({ silent: false })
   }, [load])
 
   useEffect(() => {
-    if (autoRefresh) {
-      intervalRef.current = setInterval(load, 5000)
-    }
+    if (!autoRefresh) return undefined
+    intervalRef.current = setInterval(() => {
+      void load({ silent: true })
+    }, 5000)
     return () => clearInterval(intervalRef.current)
   }, [autoRefresh, load])
 
@@ -450,7 +480,12 @@ export default function RequestInbox() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={load} className="btn-secondary" disabled={loading}>
+        <button
+          type="button"
+          onClick={() => void load({ silent: false })}
+          className="btn-secondary"
+          disabled={loading}
+        >
           {loading ? t('common.loading') : t('inbox.refresh')}
         </button>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
@@ -461,17 +496,28 @@ export default function RequestInbox() {
             onChange={(e) => setAutoRefresh(e.target.checked)}
           />
           {t('inbox.autoRefresh')}
+          {refreshing && (
+            <span className="text-xs text-slate-400" aria-hidden>
+              …
+            </span>
+          )}
         </label>
         <span className="text-sm text-slate-500 dark:text-slate-400">{rangeLabel}</span>
-        <button onClick={clearAll} className="btn-danger ml-auto" disabled={!total}>
+        <button onClick={clearAll} className="btn-danger ml-auto" disabled={!total || loading}>
           {t('inbox.clearAll')}
         </button>
       </div>
 
-      {total === 0 && !loading ? (
+      {loading && !hasLoaded ? (
+        <div className="card py-12 text-center text-sm text-slate-400">{t('common.loading')}</div>
+      ) : total === 0 ? (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <p className="text-sm text-slate-400">{t('inbox.empty')}</p>
-          <button type="button" onClick={load} className="btn-secondary mt-4">
+          <button
+            type="button"
+            onClick={() => void load({ silent: false })}
+            className="btn-secondary mt-4"
+          >
             {t('inbox.refresh')}
           </button>
         </div>
@@ -480,7 +526,7 @@ export default function RequestInbox() {
       ) : (
         <div className="space-y-3">
           {filtered.map((r) => (
-            <RequestCard key={r.id} request={r} lang={lang} t={t} />
+            <RequestCard key={r.id || `${r.receivedAt}-${r.path}`} request={r} lang={lang} t={t} />
           ))}
         </div>
       )}
