@@ -94,6 +94,29 @@ export function AuthProvider({ children }) {
     return data.user
   }, [])
 
+  const getTouchIdStatus = useCallback(async () => {
+    const { data } = await api.get('/api/auth/webauthn/status')
+    return data
+  }, [])
+
+  const enableTouchId = useCallback(async () => {
+    if (!browserSupportsWebAuthn()) {
+      throw new Error('Touch ID / passkeys are not supported in this browser.')
+    }
+    const { data: opt } = await api.post('/api/auth/webauthn/enroll/options', {})
+    const challengeToken = opt?.challengeToken || opt?.challengeId
+    if (!opt?.options || !challengeToken) {
+      throw new Error(opt?.message || 'Invalid Touch ID options from server.')
+    }
+    const attestation = await startRegistration(opt.options)
+    const { data } = await api.post('/api/auth/webauthn/enroll', {
+      response: attestation,
+      challengeToken,
+      challengeId: challengeToken,
+    })
+    return data
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
@@ -108,9 +131,21 @@ export function AuthProvider({ children }) {
       register,
       loginWithTouchId,
       registerWithTouchId,
+      getTouchIdStatus,
+      enableTouchId,
       logout,
     }),
-    [user, initializing, login, register, loginWithTouchId, registerWithTouchId, logout]
+    [
+      user,
+      initializing,
+      login,
+      register,
+      loginWithTouchId,
+      registerWithTouchId,
+      getTouchIdStatus,
+      enableTouchId,
+      logout,
+    ]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -9,7 +9,11 @@ import {
   finishAuthRegister,
   buildAuthLoginOptions,
   finishAuthLogin,
+  buildAuthEnrollOptions,
+  finishAuthEnroll,
+  getAuthPasskeyStatus,
 } from '../utils/authWebAuthn.js'
+import { requireAuth } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -222,6 +226,40 @@ router.post('/webauthn/login', async (req, res) => {
     return res.json({ token, user: authUserPayload(user) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to sign in with Touch ID.')
+  }
+})
+
+// Enable Touch ID on an existing logged-in account
+router.get('/webauthn/status', requireAuth, async (req, res) => {
+  try {
+    const status = await getAuthPasskeyStatus(req.user.sub)
+    return res.json(status)
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to read Touch ID status.')
+  }
+})
+
+router.post('/webauthn/enroll/options', requireAuth, async (req, res) => {
+  try {
+    const result = await buildAuthEnrollOptions(req, req.user.sub, req.user.email)
+    return res.json(result)
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to start Touch ID enrollment.')
+  }
+})
+
+router.post('/webauthn/enroll', requireAuth, async (req, res) => {
+  try {
+    const user = await finishAuthEnroll(req, {
+      userId: req.user.sub,
+      email: req.user.email,
+      response: req.body?.response,
+      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId,
+    })
+    return res.json({ ok: true, user: authUserPayload(user) })
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to enable Touch ID.')
   }
 })
 

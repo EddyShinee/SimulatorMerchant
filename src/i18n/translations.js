@@ -93,6 +93,9 @@ export const translations = {
       registerTouchIdSuccess: 'Đăng ký Touch ID thành công! Đang chuyển hướng...',
       emailRequiredForTouchId: 'Vui lòng nhập email trước khi dùng Touch ID.',
       touchIdCancelled: 'Đã hủy xác thực Touch ID.',
+      enableTouchId: 'Bật Touch ID',
+      enableTouchIdSuccess: 'Đã gắn Touch ID vào tài khoản.',
+      touchIdEnabled: 'Touch ID đã bật',
     },
     nav: {
       dashboard: 'Tổng quan',
@@ -761,6 +764,9 @@ export const translations = {
       registerTouchIdSuccess: 'Touch ID account created! Redirecting...',
       emailRequiredForTouchId: 'Please enter your email before using Touch ID.',
       touchIdCancelled: 'Touch ID authentication was cancelled.',
+      enableTouchId: 'Enable Touch ID',
+      enableTouchIdSuccess: 'Touch ID linked to your account.',
+      touchIdEnabled: 'Touch ID enabled',
     },
     nav: {
       dashboard: 'Dashboard',

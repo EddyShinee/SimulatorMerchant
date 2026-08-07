@@ -326,4 +326,102 @@ export async function finishAuthLogin(req, { response, challengeToken, challenge
   return { id: matched.userId, email: matched.email }
 }
 
+/** Logged-in user enables Touch ID on existing account */
+export async function buildAuthEnrollOptions(req, userId, email) {
+  assertPasskeyStoreReady()
+  const uid = String(userId)
+  const normalized = String(email || '').trim().toLowerCase()
+  if (!normalized) {
+    const err = new Error('Email is required to enable Touch ID.')
+    err.code = 'BAD_REQUEST'
+    throw err
+  }
+
+  const { rpID, rpName } = getWebAuthnRpConfig(req)
+  const existing = await listAuthPasskeysByUserId(uid)
+  const userIdBytes = new TextEncoder().encode(uid)
+  const userID = userIdBytes.length <= 64 ? userIdBytes : userIdBytes.slice(0, 64)
+
+  const options = await generateRegistrationOptions({
+    rpName,
+    rpID,
+    userID,
+    userName: normalized,
+    userDisplayName: normalized,
+    attestationType: 'none',
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      userVerification: 'preferred',
+      residentKey: 'required',
+      requireResidentKey: true,
+    },
+    excludeCredentials: existing.map((c) => ({
+      id: c.credentialId,
+      transports: c.transports?.length ? c.transports : undefined,
+    })),
+  })
+
+  const challengeToken = signWebAuthnChallenge(uid, options.challenge, 'auth-enroll')
+  return {
+    options,
+    challengeToken,
+    challengeId: challengeToken,
+    alreadyEnabled: existing.length > 0,
+  }
+}
+
+export async function finishAuthEnroll(req, { userId, email, response, challengeToken, challengeId }) {
+  assertPasskeyStoreReady()
+  const uid = String(userId || '')
+  const token = challengeToken || challengeId
+  const normalized = String(email || '').trim().toLowerCase()
+  if (!response || !token || !uid || !normalized) {
+    const err = new Error('Missing Touch ID enroll data.')
+    err.code = 'BAD_REQUEST'
+    throw err
+  }
+
+  const { rpID, expectedOrigin } = getWebAuthnRpConfig(req)
+  const expectedChallenge = readWebAuthnChallenge(uid, token, 'auth-enroll')
+
+  let verification
+  try {
+    verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      requireUserVerification: false,
+    })
+  } catch (err) {
+    const wrapped = new Error(err?.message || 'Failed to enable Touch ID')
+    wrapped.code = 'WEBAUTHN_FAILED'
+    throw wrapped
+  }
+
+  if (!verification.verified || !verification.registrationInfo) {
+    const err = new Error('Failed to enable Touch ID')
+    err.code = 'WEBAUTHN_FAILED'
+    throw err
+  }
+
+  const info = verification.registrationInfo
+  await saveAuthPasskey({
+    userId: uid,
+    email: normalized,
+    credentialId: info.credentialID,
+    publicKey: isoBase64URL.fromBuffer(info.credentialPublicKey),
+    counter: info.counter ?? 0,
+    transports: response?.response?.transports || [],
+  })
+
+  return { id: uid, email: normalized }
+}
+
+export async function getAuthPasskeyStatus(userId) {
+  assertPasskeyStoreReady()
+  const list = await listAuthPasskeysByUserId(userId)
+  return { enabled: list.length > 0, count: list.length }
+}
+
 export { findAuthUserByEmail }

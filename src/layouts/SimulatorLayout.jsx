@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
@@ -92,17 +93,79 @@ function usePageTitle(pathname, t) {
 }
 
 export default function SimulatorLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, enableTouchId, getTouchIdStatus } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unread: inboxUnread } = useInboxUnread()
   const pageTitle = usePageTitle(location.pathname, t)
+  const [touchIdAvailable, setTouchIdAvailable] = useState(false)
+  const [touchIdEnabled, setTouchIdEnabled] = useState(null)
+  const [touchIdBusy, setTouchIdBusy] = useState(false)
+  const [touchIdMsg, setTouchIdMsg] = useState('')
+
+  useEffect(() => {
+    let active = true
+    async function checkPlatform() {
+      if (!browserSupportsWebAuthn()) {
+        if (active) setTouchIdAvailable(false)
+        return
+      }
+      try {
+        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (active) setTouchIdAvailable(Boolean(ok))
+      } catch {
+        if (active) setTouchIdAvailable(false)
+      }
+    }
+    checkPlatform()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    async function loadStatus() {
+      if (!user) {
+        setTouchIdEnabled(null)
+        return
+      }
+      try {
+        const status = await getTouchIdStatus()
+        if (active) setTouchIdEnabled(Boolean(status?.enabled))
+      } catch {
+        if (active) setTouchIdEnabled(false)
+      }
+    }
+    loadStatus()
+    return () => {
+      active = false
+    }
+  }, [user, getTouchIdStatus])
 
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
+  }
+
+  const handleEnableTouchId = async () => {
+    setTouchIdMsg('')
+    setTouchIdBusy(true)
+    try {
+      await enableTouchId()
+      setTouchIdEnabled(true)
+      setTouchIdMsg(t('auth.enableTouchIdSuccess'))
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        setTouchIdMsg(t('auth.touchIdCancelled'))
+      } else {
+        setTouchIdMsg(err.response?.data?.message || err.message || t('errors.network'))
+      }
+    } finally {
+      setTouchIdBusy(false)
+    }
   }
 
   const closeMobile = () => setMobileOpen(false)
@@ -187,6 +250,27 @@ export default function SimulatorLayout() {
         >
           {user?.email}
         </div>
+        {touchIdAvailable && (
+          <div className="mb-2 space-y-1.5 px-1">
+            {touchIdEnabled ? (
+              <p className="px-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+                {t('auth.touchIdEnabled')}
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary w-full text-xs"
+                disabled={touchIdBusy}
+                onClick={handleEnableTouchId}
+              >
+                {touchIdBusy ? t('common.loading') : t('auth.enableTouchId')}
+              </button>
+            )}
+            {touchIdMsg && (
+              <p className="px-2 text-[11px] text-slate-500 dark:text-slate-400">{touchIdMsg}</p>
+            )}
+          </div>
+        )}
         <button onClick={handleLogout} className="btn-secondary w-full">
           <IconLogout className="h-4 w-4" />
           {t('common.logout')}
