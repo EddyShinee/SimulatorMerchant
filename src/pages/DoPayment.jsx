@@ -254,27 +254,26 @@ export default function DoPayment() {
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
-  const isWallet = tokenPayMode === 'wallet' || isWalletChannel(channelCode)
+  // Mutually exclusive — only the selected token pay mode is shown
+  const isWallet = tokenPayMode === 'wallet'
   const isCardToken = tokenPayMode === 'card'
   const isTokenPay = isWallet || isCardToken
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
-    const wallet = tokenPayMode === 'wallet' || isWalletChannel(code)
-    const cardTok = tokenPayMode === 'card'
     const isCc = code === 'CC'
     const isIpp = code === 'IPP'
-    if (wallet) {
+    if (tokenPayMode === 'wallet') {
       setSendCardDetails(false)
       setSendSecurePayToken(false)
       setQrType((prev) => prev || 'URL')
       setTokenSubChannelCode((prev) => prev || code)
       return
     }
-    if (cardTok) {
+    if (tokenPayMode === 'card') {
       setSendCardDetails(false)
       setSendSecurePayToken(false)
-      if (!code || code === 'CC') setChannelCode('CC')
+      if (!code || isWalletChannel(code)) setChannelCode('CC')
       return
     }
     if (flow.selectedChannelName) {
@@ -747,7 +746,7 @@ export default function DoPayment() {
               <label className="label">{t('doPayment.tokenPayMode')}</label>
               <select
                 className="input"
-                value={isWallet ? 'wallet' : isCardToken ? 'card' : 'none'}
+                value={tokenPayMode}
                 onChange={(e) => {
                   const mode = e.target.value
                   setTokenPayMode(mode)
@@ -756,9 +755,12 @@ export default function DoPayment() {
                     if (!responseReturnUrl.trim() && paymentToken.trim()) {
                       setResponseReturnUrl(buildResponseReturnUrl(paymentToken, env))
                     }
+                    if (flow.channelCode && isWalletChannel(flow.channelCode)) {
+                      setChannelCode(flow.channelCode)
+                    }
                   }
                   if (mode === 'card') {
-                    setChannelCode((prev) => (prev && prev !== 'CC' && !isWalletChannel(prev) ? prev : 'CC'))
+                    setChannelCode((prev) => (isWalletChannel(prev) || !prev ? 'CC' : prev))
                   }
                 }}
               >
