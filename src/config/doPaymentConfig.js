@@ -20,6 +20,11 @@ export const INTEREST_TYPE_OPTIONS = ['M', 'C', 'A']
 /** IPP installment periods (months) */
 export const INSTALLMENT_PERIOD_OPTIONS = [3, 6, 9, 12]
 
+/** CC / LCC channels — may use securePayToken + accountTokenization */
+export function isCardChannel(code) {
+  return ['CC', 'LCC'].includes(String(code || '').trim().toUpperCase())
+}
+
 /** Wallet / e-wallet channel codes that use customerToken + cardDetails.token */
 export const WALLET_CHANNEL_CODES = [
   'ZALOPAY',

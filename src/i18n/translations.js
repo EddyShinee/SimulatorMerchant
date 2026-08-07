@@ -299,23 +299,16 @@ export const translations = {
       responseReturnUrlHint: 'Thường lấy từ webPaymentUrl của Payment Token (hoặc tự tạo URL PGW UI).',
       tokenPayMode: 'Kiểu thanh toán token',
       tokenPayNone: 'Thường (PAN / QR / …)',
-      tokenPayNoneHint: 'Thanh toán bằng thẻ mới, QR, v.v. — không dùng customerToken đã lưu.',
-      tokenPayWallet: 'Wallet token (ZaloPay, MoMo…)',
-      tokenPayCard: 'Card token (CC / LCC)',
-      walletMode: 'Thanh toán ví / Tokenize (ZaloPay, MoMo…)',
-      walletModeHint:
-        'Pay bằng token ví đã lưu: gửi customerToken + cardDetails.token, channel ZALOPAY/MOMO…',
-      cardTokenHint:
-        'Pay bằng thẻ đã tokenize: channel CC, gửi customerToken (+ CVV). Không gửi số thẻ đầy đủ.',
-      walletTokenize: 'Wallet Tokenize',
-      walletTokenizeHint:
-        'Gửi customerToken + cardDetails.token (cùng token). Tự điền từ Payment Token nếu đã generate trước.',
-      cardTokenize: 'Card Token (CC)',
-      cardTokenizeHint:
-        'Theo 2C2P Direct API: payment.data.customerToken + securityCode (CVV). Có thể thêm securePayToken bên dưới nếu merchant yêu cầu.',
-      sendTokenCvv: 'Gửi securityCode (CVV)',
+      tokenPayNoneHint: 'Thanh toán bằng thẻ mới, QR, v.v. — không dùng customerToken.',
+      tokenPayUnified: 'Token / Tokenize (Wallet hoặc CC)',
+      tokenPayUnifiedHint:
+        'Cùng cấu trúc: customerToken + cardDetails.token. CC thêm securePayToken + accountTokenization; ví thêm qrType / accountNo.',
+      storedTokenPay: 'Thanh toán bằng token đã lưu',
+      storedTokenPayHint:
+        'Wallet (ZALOPAY/MOMO) hoặc Card (CC): điền customerToken và cardDetails. CC: mã hóa thẻ → securePayToken bên dưới.',
       customerToken: 'customerToken',
-      customerTokenRequired: 'customerToken là bắt buộc khi thanh toán bằng token đã lưu.',
+      customerTokenRequired: 'customerToken là bắt buộc khi thanh toán ví bằng token.',
+      tokenOrSecurePayRequired: 'CC tokenize: cần customerToken hoặc securePayToken (mã hóa thẻ).',
       accountNo: 'accountNo (masked)',
       tokenCardName: 'cardDetails.name',
       tokenCardExpiry: 'cardDetails.expiry',
@@ -999,22 +992,15 @@ export const translations = {
       tokenPayMode: 'Token payment type',
       tokenPayNone: 'Normal (PAN / QR / …)',
       tokenPayNoneHint: 'Pay with a new card, QR, etc. — no stored customerToken.',
-      tokenPayWallet: 'Wallet token (ZaloPay, MoMo…)',
-      tokenPayCard: 'Card token (CC / LCC)',
-      walletMode: 'Wallet / Tokenize payment (ZaloPay, MoMo…)',
-      walletModeHint:
-        'Pay with a stored wallet token: customerToken + cardDetails.token, channel ZALOPAY/MOMO…',
-      cardTokenHint:
-        'Pay with a stored card token: channel CC, customerToken (+ CVV). Do not send full PAN.',
-      walletTokenize: 'Wallet Tokenize',
-      walletTokenizeHint:
-        'Sends customerToken + cardDetails.token (same token). Prefills from Payment Token when available.',
-      cardTokenize: 'Card Token (CC)',
-      cardTokenizeHint:
-        'Per 2C2P Direct API: payment.data.customerToken + securityCode (CVV). Optionally add securePayToken below if required.',
-      sendTokenCvv: 'Send securityCode (CVV)',
+      tokenPayUnified: 'Token / Tokenize (Wallet or CC)',
+      tokenPayUnifiedHint:
+        'Same shape: customerToken + cardDetails.token. CC adds securePayToken + accountTokenization; wallets add qrType / accountNo.',
+      storedTokenPay: 'Pay with stored token',
+      storedTokenPayHint:
+        'Wallet (ZALOPAY/MOMO) or Card (CC): fill customerToken and cardDetails. CC: encrypt card → securePayToken below.',
       customerToken: 'customerToken',
-      customerTokenRequired: 'customerToken is required when paying with a stored token.',
+      customerTokenRequired: 'customerToken is required for wallet token payment.',
+      tokenOrSecurePayRequired: 'CC tokenize: customerToken or securePayToken (encrypted card) is required.',
       accountNo: 'accountNo (masked)',
       tokenCardName: 'cardDetails.name',
       tokenCardExpiry: 'cardDetails.expiry',
