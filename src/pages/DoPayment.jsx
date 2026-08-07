@@ -224,10 +224,14 @@ export default function DoPayment() {
   const [interestType, setInterestType] = useState('M')
   const [qrType, setQrType] = useState('')
 
-  // Wallet / tokenize (ZaloPay, MoMo, …)
-  const [walletMode, setWalletMode] = useState(
-    () => Boolean(flow.customerToken) || isWalletChannel(flow.channelCode)
-  )
+  // Token pay mode: none | wallet (Zalo/MoMo) | card (CC customerToken)
+  const [tokenPayMode, setTokenPayMode] = useState(() => {
+    if (isWalletChannel(flow.channelCode)) return 'wallet'
+    if (flow.customerToken && ['CC', 'LCC'].includes(String(flow.channelCode || '').toUpperCase())) {
+      return 'card'
+    }
+    return 'none'
+  })
   const [responseReturnUrl, setResponseReturnUrl] = useState(
     () => flow.webPaymentUrl || buildResponseReturnUrl(flow.paymentToken, 'sandbox')
   )
@@ -238,6 +242,7 @@ export default function DoPayment() {
   const [tokenCardBrand, setTokenCardBrand] = useState('')
   const [tokenCardStatus, setTokenCardStatus] = useState('A')
   const [tokenSubChannelCode, setTokenSubChannelCode] = useState(flow.channelCode || '')
+  const [sendTokenCvv, setSendTokenCvv] = useState(true)
 
   // Card details
   const [cardNumber, setCardNumber] = useState('4111 1111 1111 1111')
@@ -249,11 +254,14 @@ export default function DoPayment() {
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
-  const isWallet = walletMode || isWalletChannel(channelCode)
+  const isWallet = tokenPayMode === 'wallet' || isWalletChannel(channelCode)
+  const isCardToken = tokenPayMode === 'card'
+  const isTokenPay = isWallet || isCardToken
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
-    const wallet = walletMode || isWalletChannel(code)
+    const wallet = tokenPayMode === 'wallet' || isWalletChannel(code)
+    const cardTok = tokenPayMode === 'card'
     const isCc = code === 'CC'
     const isIpp = code === 'IPP'
     if (wallet) {
@@ -261,6 +269,12 @@ export default function DoPayment() {
       setSendSecurePayToken(false)
       setQrType((prev) => prev || 'URL')
       setTokenSubChannelCode((prev) => prev || code)
+      return
+    }
+    if (cardTok) {
+      setSendCardDetails(false)
+      setSendSecurePayToken(false)
+      if (!code || code === 'CC') setChannelCode('CC')
       return
     }
     if (flow.selectedChannelName) {
@@ -276,7 +290,7 @@ export default function DoPayment() {
     } else if (!isCc) {
       setSendSecurePayToken(false)
     }
-  }, [channelCode, flow.requiresCard, flow.selectedChannelName, walletMode])
+  }, [channelCode, flow.requiresCard, flow.selectedChannelName, tokenPayMode])
 
   useEffect(() => {
     if (flow.channelCode) setChannelCode(flow.channelCode)
@@ -289,10 +303,7 @@ export default function DoPayment() {
   }, [flow.paymentToken])
 
   useEffect(() => {
-    if (flow.customerToken) {
-      setCustomerToken(flow.customerToken)
-      setWalletMode(true)
-    }
+    if (flow.customerToken) setCustomerToken(flow.customerToken)
     if (flow.paymentCustomerName) {
       setCustomerName(flow.paymentCustomerName)
       setTokenCardName((prev) => prev || flow.paymentCustomerName)
@@ -307,9 +318,13 @@ export default function DoPayment() {
     } else if (flow.paymentToken) {
       setResponseReturnUrl((prev) => prev || buildResponseReturnUrl(flow.paymentToken, env))
     }
-    if (isWalletChannel(flow.channelCode)) {
-      setWalletMode(true)
-      setTokenSubChannelCode(flow.channelCode)
+
+    const code = String(flow.channelCode || '').toUpperCase()
+    if (isWalletChannel(code)) {
+      setTokenPayMode('wallet')
+      setTokenSubChannelCode(code)
+    } else if (flow.customerToken && (code === 'CC' || code === 'LCC')) {
+      setTokenPayMode('card')
     }
   }, [
     flow.customerToken,
@@ -486,7 +501,7 @@ export default function DoPayment() {
 
   const buildPaymentData = () => {
     const optional = {}
-    if (isIppChannel && !isWallet) {
+    if (isIppChannel && !isTokenPay) {
       optional.isIppChosen = isIppChosen
       if (interestType) optional.interestType = interestType
       const period = Number.parseInt(String(installmentPeriod).trim(), 10)
@@ -494,6 +509,7 @@ export default function DoPayment() {
     }
     if (qrType) optional.qrType = qrType
 
+    // Wallet token (ZaloPay / MoMo / …): customerToken + cardDetails.token
     if (isWallet) {
       const token = customerToken.trim()
       const ch = channelCode.trim().toUpperCase() || 'ZALOPAY'
@@ -514,6 +530,21 @@ export default function DoPayment() {
           cardBrand: tokenCardBrand,
           status: tokenCardStatus.trim() || 'A',
         }),
+        ...optional,
+      })
+    }
+
+    // Card token (CC/LCC): customerToken + optional CVV / securePayToken (no PAN)
+    if (isCardToken) {
+      return omitEmptyFields({
+        name: customerName,
+        email: customerEmail,
+        mobileNo,
+        mobileNoPrefix,
+        loyaltyPoints: [],
+        customerToken: customerToken.trim() || undefined,
+        ...(sendTokenCvv && cvv.trim() ? { securityCode: cvv.trim() } : {}),
+        cardDetails: omitEmptyFields({ email: cardEmail }),
         ...optional,
       })
     }
@@ -545,7 +576,7 @@ export default function DoPayment() {
       toast.warning(t('doPayment.clientIdRequired'))
       return
     }
-    if (isWallet && !customerToken.trim()) {
+    if (isTokenPay && !customerToken.trim()) {
       setWarning(t('doPayment.customerTokenRequired'))
       toast.warning(t('doPayment.customerTokenRequired'))
       return
@@ -555,7 +586,7 @@ export default function DoPayment() {
     if (!isWallet && sendSecurePayToken && securePayToken.trim()) {
       paymentBody.securePayToken = securePayToken.trim()
     }
-    if (!isWallet && sendCardDetails) {
+    if (!isTokenPay && sendCardDetails) {
       Object.assign(
         paymentBody,
         omitEmptyFields({
@@ -712,26 +743,37 @@ export default function DoPayment() {
                 <p className="mt-1 text-[11px] text-slate-400">{t('doPayment.responseReturnUrlHint')}</p>
               </div>
             </div>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-800/80">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                checked={isWallet}
+            <div>
+              <label className="label">{t('doPayment.tokenPayMode')}</label>
+              <select
+                className="input"
+                value={isWallet ? 'wallet' : isCardToken ? 'card' : 'none'}
                 onChange={(e) => {
-                  setWalletMode(e.target.checked)
-                  if (e.target.checked) {
+                  const mode = e.target.value
+                  setTokenPayMode(mode)
+                  if (mode === 'wallet') {
                     setQrType((prev) => prev || 'URL')
                     if (!responseReturnUrl.trim() && paymentToken.trim()) {
                       setResponseReturnUrl(buildResponseReturnUrl(paymentToken, env))
                     }
                   }
+                  if (mode === 'card') {
+                    setChannelCode((prev) => (prev && prev !== 'CC' && !isWalletChannel(prev) ? prev : 'CC'))
+                  }
                 }}
-              />
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                {t('doPayment.walletMode')}
-              </span>
-            </label>
-            <p className="text-[11px] text-slate-400">{t('doPayment.walletModeHint')}</p>
+              >
+                <option value="none">{t('doPayment.tokenPayNone')}</option>
+                <option value="wallet">{t('doPayment.tokenPayWallet')}</option>
+                <option value="card">{t('doPayment.tokenPayCard')}</option>
+              </select>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {isWallet
+                  ? t('doPayment.walletModeHint')
+                  : isCardToken
+                    ? t('doPayment.cardTokenHint')
+                    : t('doPayment.tokenPayNoneHint')}
+              </p>
+            </div>
           </div>
 
           {/* Channel code */}
@@ -829,7 +871,7 @@ export default function DoPayment() {
                 </select>
               </div>
             </div>
-            {isIppChannel && !isWallet && (
+            {isIppChannel && !isTokenPay && (
               <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -962,13 +1004,63 @@ export default function DoPayment() {
                 </div>
               </div>
             )}
+
+            {isCardToken && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-800 dark:bg-sky-950/20">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {t('doPayment.cardTokenize')}
+                  </h4>
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-900 dark:text-sky-200">
+                    channelCode=CC
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.cardTokenizeHint')}</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="label">{t('doPayment.customerToken')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={customerToken}
+                      onChange={(e) => setCustomerToken(e.target.value)}
+                      placeholder="28052010234224845229"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600"
+                        checked={sendTokenCvv}
+                        onChange={(e) => setSendTokenCvv(e.target.checked)}
+                      />
+                      <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                        {t('doPayment.sendTokenCvv')}
+                      </span>
+                    </label>
+                  </div>
+                  {sendTokenCvv && (
+                    <div>
+                      <label className="label">securityCode (CVV)</label>
+                      <input
+                        className="input"
+                        type="password"
+                        maxLength={4}
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
               {JSON.stringify(paymentData, null, 2)}
             </pre>
           </div>
 
           {/* Card details — raw PAN / expiry / CVV */}
-          {!isWallet && (
+          {!isTokenPay && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
