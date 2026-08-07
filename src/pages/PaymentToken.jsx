@@ -44,9 +44,15 @@ function initialAdvancedValues() {
 // ---------------------------------------------------------------------------
 // Single advanced field renderer
 // ---------------------------------------------------------------------------
+function formatPaymentExpiryPlus20Min() {
+  const d = new Date(Date.now() + 20 * 60 * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 function ParamField({ field, value, onChange }) {
   const { t } = useLanguage()
-  const { label, kind, options, help } = field
+  const { label, kind, options, help, name } = field
 
   if (kind === 'select') {
     return (
@@ -100,6 +106,8 @@ function ParamField({ field, value, onChange }) {
       ? '3, 6, 12'
       : kind === 'int' || kind === 'float'
       ? '123'
+      : name === 'paymentExpiry'
+      ? 'yyyy-MM-dd HH:mm:ss'
       : ''
 
   return (
@@ -110,6 +118,11 @@ function ParamField({ field, value, onChange }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        onFocus={() => {
+          if (name === 'paymentExpiry') {
+            onChange(formatPaymentExpiryPlus20Min())
+          }
+        }}
       />
       {help && <p className="mt-1 text-xs text-slate-400">{help}</p>}
     </div>
