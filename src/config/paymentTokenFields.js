@@ -12,6 +12,7 @@ export const PAYMENT_CHANNEL_OPTIONS = [
   'MOMO',
   'ZALOPAY',
   'SHOPEEPAY',
+  'MOMOQR',
 ]
 
 export const DEFAULT_MERCHANT_ID = '704704000000000'
