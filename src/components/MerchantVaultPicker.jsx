@@ -49,6 +49,7 @@ export default function MerchantVaultPicker({
   const [showForm, setShowForm] = useState(false)
   const [query, setQuery] = useState('')
   const [envFilter, setEnvFilter] = useState('all') // all | uat | production
+  const [copiedKey, setCopiedKey] = useState('')
 
   const vaultHeaders = useCallback(() => {
     const token = getVaultUnlockToken()
@@ -267,51 +268,70 @@ export default function MerchantVaultPicker({
     setOpen(false)
   }
 
+  const copyText = async (text, key) => {
+    const value = String(text || '')
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = value
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setCopiedKey(key)
+    setTimeout(() => setCopiedKey(''), 1200)
+  }
+
   const envBadge = (environment) =>
     environment === 'production' ? (
-      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+      <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
         {t('merchantVault.envProduction')}
       </span>
     ) : (
-      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
+      <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
         {t('merchantVault.envUat')}
       </span>
     )
 
   return (
-    <div className="relative shrink-0">
-      <div className="flex items-center gap-1.5">
+    <div className="relative flex h-full shrink-0 items-stretch gap-1.5 self-stretch">
+      <button
+        type="button"
+        className="btn-secondary relative h-full min-h-[2.625rem] whitespace-nowrap px-3 text-sm"
+        onClick={() => setOpen((v) => !v)}
+        title={t('merchantVault.open')}
+      >
+        {t('merchantVault.open')}
+        {suggestNew && (
+          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+        )}
+      </button>
+      {suggestNew && (
         <button
           type="button"
-          className="btn-secondary relative whitespace-nowrap px-3 py-2 text-sm"
-          onClick={() => setOpen((v) => !v)}
-          title={t('merchantVault.open')}
+          className="hidden h-full min-h-[2.625rem] whitespace-nowrap rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-medium text-amber-900 hover:bg-amber-100 sm:inline-flex sm:items-center dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+          onClick={startSuggestSave}
         >
-          {t('merchantVault.open')}
-          {suggestNew && (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
-          )}
+          {t('merchantVault.suggestSaveShort')}
         </button>
-        {suggestNew && (
-          <button
-            type="button"
-            className="hidden whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 sm:inline-flex dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
-            onClick={startSuggestSave}
-          >
-            {t('merchantVault.suggestSaveShort')}
-          </button>
-        )}
-      </div>
+      )}
 
       {open && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
-            className="fixed inset-0 z-40 cursor-default bg-slate-900/30"
+            className="absolute inset-0 cursor-default bg-slate-900/40"
             aria-label="Close"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-50 mt-2 flex max-h-[min(85vh,36rem)] w-[min(100vw-1.5rem,26rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative z-10 flex max-h-[min(85vh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+          >
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
               <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {t('merchantVault.title')}
@@ -527,77 +547,98 @@ export default function MerchantVaultPicker({
                     <p className="text-xs text-slate-500">{t('merchantVault.noResults')}</p>
                   ) : (
                     <ul className="space-y-1.5">
-                      {filteredItems.map((item) => (
-                        <li
-                          key={item.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/50"
-                        >
-                          <div className="flex items-start justify-between gap-2">
+                      {filteredItems.map((item) => {
+                        const midCopyId = `mid-${item.id}`
+                        const keyCopyId = `key-${item.id}`
+                        const keyVisible = Boolean(showKeys[item.id])
+                        return (
+                          <li
+                            key={item.id}
+                            className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/50"
+                          >
                             <button
                               type="button"
-                              className="min-w-0 flex-1 text-left"
+                              className="w-full min-w-0 text-left"
                               onClick={() => handleSelect(item)}
                             >
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                                   {item.merchantName}
                                 </span>
                                 {envBadge(item.environment)}
                               </div>
-                              <div className="mt-0.5 break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                                {item.mid}
-                              </div>
-                              {fillSecretKey && (
-                                <div className="mt-0.5 font-mono text-[11px] text-slate-500">
-                                  Key:{' '}
-                                  {showKeys[item.id] ? item.secretKey || '—' : maskKey(item.secretKey)}
-                                </div>
-                              )}
                             </button>
+
                             <button
                               type="button"
-                              className="btn-primary shrink-0 px-2.5 py-1 text-xs"
-                              onClick={() => handleSelect(item)}
+                              className="mt-1 block w-full min-w-0 truncate text-left font-mono text-[11px] text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300"
+                              title={t('merchantVault.clickToCopy')}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyText(item.mid, midCopyId)
+                              }}
                             >
-                              {t('merchantVault.use')}
+                              {copiedKey === midCopyId ? t('common.copied') : item.mid}
                             </button>
-                          </div>
-                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-200/80 pt-1.5 dark:border-slate-700">
+
                             {fillSecretKey && (
                               <button
                                 type="button"
-                                className="text-[11px] text-slate-500 hover:underline"
-                                onClick={() =>
-                                  setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
-                                }
+                                className="mt-0.5 block w-full min-w-0 overflow-hidden text-left font-mono text-[11px] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300"
+                                title={t('merchantVault.clickToCopy')}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  copyText(item.secretKey, keyCopyId)
+                                }}
                               >
-                                {showKeys[item.id] ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
+                                <span className="text-slate-400">Key: </span>
+                                {copiedKey === keyCopyId ? (
+                                  t('common.copied')
+                                ) : keyVisible ? (
+                                  <span className="inline-block max-w-full break-all">{item.secretKey || '—'}</span>
+                                ) : (
+                                  maskKey(item.secretKey)
+                                )}
                               </button>
                             )}
-                            <button
-                              type="button"
-                              className="text-[11px] text-slate-500 hover:underline"
-                              onClick={() => startEdit(item)}
-                            >
-                              {t('merchantVault.edit')}
-                            </button>
-                            <button
-                              type="button"
-                              className="text-[11px] text-rose-600 hover:underline"
-                              onClick={() => handleDelete(item.id)}
-                            >
-                              {t('merchantVault.delete')}
-                            </button>
-                          </div>
-                        </li>
-                      ))}
+
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-200/80 pt-1.5 dark:border-slate-700">
+                              {fillSecretKey && (
+                                <button
+                                  type="button"
+                                  className="text-[11px] text-slate-500 hover:underline"
+                                  onClick={() =>
+                                    setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
+                                  }
+                                >
+                                  {keyVisible ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="text-[11px] text-slate-500 hover:underline"
+                                onClick={() => startEdit(item)}
+                              >
+                                {t('merchantVault.edit')}
+                              </button>
+                              <button
+                                type="button"
+                                className="text-[11px] text-rose-600 hover:underline"
+                                onClick={() => handleDelete(item.id)}
+                              >
+                                {t('merchantVault.delete')}
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
                     </ul>
                   )}
                 </div>
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
