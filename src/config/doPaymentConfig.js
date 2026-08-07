@@ -29,7 +29,7 @@ export function isCardChannel(code) {
 export const WALLET_CHANNEL_CODES = [
   'ZALOPAY',
   'MOMO',
-  'MOMOPAY',
+  'MOMOQR',
   'VNPAY',
   'SHOPEEPAY',
   'VIETTELPAY',

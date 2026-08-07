@@ -7,9 +7,10 @@ export const PAYMENT_CHANNEL_OPTIONS = [
   'IPP',
   'APM',
   'QR',
+  'VNQR',
   'VNPAY',
   'MOMO',
-  'MOMOPAY',
+  'MOMOQR',
   'ZALOPAY',
   'SHOPEEPAY',
 ]
