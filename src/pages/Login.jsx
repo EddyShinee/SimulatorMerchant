@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
@@ -7,7 +8,7 @@ import ThemeToggle from '../components/ThemeToggle.jsx'
 import { AppBrandCentered } from '../components/AppBrand.jsx'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, loginWithTouchId } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -17,6 +18,27 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [touchIdAvailable, setTouchIdAvailable] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function check() {
+      if (!browserSupportsWebAuthn()) {
+        if (active) setTouchIdAvailable(false)
+        return
+      }
+      try {
+        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (active) setTouchIdAvailable(Boolean(ok))
+      } catch {
+        if (active) setTouchIdAvailable(false)
+      }
+    }
+    check()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,6 +49,23 @@ export default function Login() {
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || t('errors.network'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTouchId = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await loginWithTouchId(email)
+      navigate(from, { replace: true })
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        setError(t('auth.touchIdCancelled'))
+      } else {
+        setError(err.response?.data?.message || err.message || t('errors.network'))
+      }
     } finally {
       setLoading(false)
     }
@@ -60,7 +99,7 @@ export default function Login() {
                 <input
                   id="email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="username webauthn"
                   className="input"
                   placeholder={t('auth.emailPlaceholder')}
                   value={email}
@@ -87,6 +126,25 @@ export default function Login() {
                 {loading ? t('common.loading') : t('auth.loginButton')}
               </button>
             </form>
+
+            {touchIdAvailable && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-xs text-slate-400">{t('auth.or')}</span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary w-full"
+                  disabled={loading}
+                  onClick={handleTouchId}
+                >
+                  {t('auth.loginTouchId')}
+                </button>
+                <p className="text-center text-[11px] text-slate-400">{t('auth.loginTouchIdHint')}</p>
+              </div>
+            )}
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">

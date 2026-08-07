@@ -372,3 +372,141 @@ export async function deleteWebAuthnCredentials(userId) {
   if (!db) throw storeUnavailableError()
   await db.query('DELETE FROM merchant_vault_webauthn WHERE user_id = $1', [userId])
 }
+
+// --- Auth passkeys (login / register Touch ID) ---
+
+function mapAuthPasskeyRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    credentialId: row.credential_id,
+    publicKey: row.public_key,
+    counter: Number(row.counter) || 0,
+    transports: row.transports || [],
+    createdAt: row.created_at,
+  }
+}
+
+export async function listAuthPasskeysByEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase()
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    const { data, error } = await admin
+      .from('auth_webauthn_credentials')
+      .select('id, user_id, email, credential_id, public_key, counter, transports, created_at')
+      .ilike('email', normalized)
+    if (error) throw error
+    return (data || []).map(mapAuthPasskeyRow)
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  const { rows } = await db.query(
+    `SELECT id, user_id, email, credential_id, public_key, counter, transports, created_at
+     FROM auth_webauthn_credentials WHERE lower(email) = lower($1)`,
+    [normalized]
+  )
+  return rows.map(mapAuthPasskeyRow)
+}
+
+export async function listAuthPasskeysByUserId(userId) {
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    const { data, error } = await admin
+      .from('auth_webauthn_credentials')
+      .select('id, user_id, email, credential_id, public_key, counter, transports, created_at')
+      .eq('user_id', String(userId))
+    if (error) throw error
+    return (data || []).map(mapAuthPasskeyRow)
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  const { rows } = await db.query(
+    `SELECT id, user_id, email, credential_id, public_key, counter, transports, created_at
+     FROM auth_webauthn_credentials WHERE user_id = $1`,
+    [String(userId)]
+  )
+  return rows.map(mapAuthPasskeyRow)
+}
+
+export async function findAuthPasskeyByCredentialId(credentialId) {
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    const { data, error } = await admin
+      .from('auth_webauthn_credentials')
+      .select('id, user_id, email, credential_id, public_key, counter, transports, created_at')
+      .eq('credential_id', credentialId)
+      .maybeSingle()
+    if (error) throw error
+    return mapAuthPasskeyRow(data)
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  const { rows } = await db.query(
+    `SELECT id, user_id, email, credential_id, public_key, counter, transports, created_at
+     FROM auth_webauthn_credentials WHERE credential_id = $1`,
+    [credentialId]
+  )
+  return mapAuthPasskeyRow(rows[0] || null)
+}
+
+export async function saveAuthPasskey({ userId, email, credentialId, publicKey, counter, transports }) {
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    const { data, error } = await admin
+      .from('auth_webauthn_credentials')
+      .insert({
+        user_id: String(userId),
+        email: String(email).trim().toLowerCase(),
+        credential_id: credentialId,
+        public_key: publicKey,
+        counter: counter ?? 0,
+        transports: transports || null,
+      })
+      .select('id, user_id, email, credential_id, public_key, counter, transports, created_at')
+      .single()
+    if (error) throw error
+    return mapAuthPasskeyRow(data)
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  const { rows } = await db.query(
+    `INSERT INTO auth_webauthn_credentials
+       (user_id, email, credential_id, public_key, counter, transports)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, user_id, email, credential_id, public_key, counter, transports, created_at`,
+    [
+      String(userId),
+      String(email).trim().toLowerCase(),
+      credentialId,
+      publicKey,
+      counter ?? 0,
+      transports || null,
+    ]
+  )
+  return mapAuthPasskeyRow(rows[0])
+}
+
+export async function updateAuthPasskeyCounter(credentialId, counter) {
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    const { error } = await admin
+      .from('auth_webauthn_credentials')
+      .update({ counter })
+      .eq('credential_id', credentialId)
+    if (error) throw error
+    return
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  await db.query('UPDATE auth_webauthn_credentials SET counter = $2 WHERE credential_id = $1', [
+    credentialId,
+    counter,
+  ])
+}

@@ -4,6 +4,12 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { createUser, findUserByEmail, initUsersDb } from '../utils/usersDb.js'
 import { getSupabase, isSupabaseConfigured } from '../utils/supabaseClient.js'
+import {
+  buildAuthRegisterOptions,
+  finishAuthRegister,
+  buildAuthLoginOptions,
+  finishAuthLogin,
+} from '../utils/authWebAuthn.js'
 
 const router = express.Router()
 
@@ -17,6 +23,28 @@ function signToken(user) {
 
 function authUserPayload(user) {
   return { id: user.id, email: user.email }
+}
+
+function webauthnError(res, err, fallback) {
+  const code = err?.code || 'SERVER_ERROR'
+  const status =
+    code === 'EMAIL_TAKEN'
+      ? 409
+      : code === 'BAD_REQUEST' ||
+          code === 'INVALID_CHALLENGE' ||
+          code === 'WEBAUTHN_FAILED' ||
+          code === 'NO_PASSKEY' ||
+          code === 'UNKNOWN_CREDENTIAL' ||
+          code === 'REGISTER_FAILED'
+        ? 400
+        : code === 'STORE_UNAVAILABLE'
+          ? 503
+          : 500
+  console.error('[auth:webauthn]', code, err?.message)
+  return res.status(status).json({
+    error: code,
+    message: err?.message || fallback,
+  })
 }
 
 // Warm local DB only when Supabase is not configured.
@@ -61,8 +89,6 @@ router.post('/register', async (req, res) => {
         })
       }
 
-      // App uses its own JWT. User is stored in Supabase Auth even if email
-      // confirmation is still pending (disable Confirm email in Supabase for seamless login).
       const user = { id: data.user.id, email: data.user.email || email }
       const token = signToken(user)
       return res.status(201).json({
@@ -72,7 +98,6 @@ router.post('/register', async (req, res) => {
       })
     }
 
-    // Fallback: local SQLite / Postgres DATABASE_URL
     await initUsersDb()
     if (await findUserByEmail(email)) {
       return res
@@ -145,7 +170,61 @@ router.post('/login', async (req, res) => {
   }
 })
 
-// GET /api/auth/me  (protected — see index.js wiring)
+// --- Touch ID / Passkey auth ---
+
+router.post('/webauthn/register/options', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'INVALID_EMAIL', message: 'A valid email is required.' })
+    }
+    const result = await buildAuthRegisterOptions(req, email)
+    return res.json(result)
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to start Touch ID registration.')
+  }
+})
+
+router.post('/webauthn/register', async (req, res) => {
+  try {
+    const user = await finishAuthRegister(req, {
+      response: req.body?.response,
+      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId,
+      userId: req.body?.userId,
+      email: req.body?.email,
+    })
+    const token = signToken(user)
+    return res.status(201).json({ token, user: authUserPayload(user) })
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to register with Touch ID.')
+  }
+})
+
+router.post('/webauthn/login/options', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    const result = await buildAuthLoginOptions(req, email)
+    return res.json(result)
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to start Touch ID sign-in.')
+  }
+})
+
+router.post('/webauthn/login', async (req, res) => {
+  try {
+    const user = await finishAuthLogin(req, {
+      response: req.body?.response,
+      challengeToken: req.body?.challengeToken,
+      challengeId: req.body?.challengeId,
+    })
+    const token = signToken(user)
+    return res.json({ token, user: authUserPayload(user) })
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to sign in with Touch ID.')
+  }
+})
+
 router.get('/me', (req, res) => {
   return res.json({ user: { id: req.user.sub, email: req.user.email } })
 })

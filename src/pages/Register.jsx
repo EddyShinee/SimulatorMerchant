@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
@@ -7,7 +8,7 @@ import ThemeToggle from '../components/ThemeToggle.jsx'
 import { AppBrandCentered } from '../components/AppBrand.jsx'
 
 export default function Register() {
-  const { register } = useAuth()
+  const { register, registerWithTouchId } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
 
@@ -17,6 +18,27 @@ export default function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [touchIdAvailable, setTouchIdAvailable] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    async function check() {
+      if (!browserSupportsWebAuthn()) {
+        if (active) setTouchIdAvailable(false)
+        return
+      }
+      try {
+        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (active) setTouchIdAvailable(Boolean(ok))
+      } catch {
+        if (active) setTouchIdAvailable(false)
+      }
+    }
+    check()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -36,6 +58,29 @@ export default function Register() {
       setTimeout(() => navigate('/app', { replace: true }), 600)
     } catch (err) {
       setError(err.response?.data?.message || t('errors.network'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTouchId = async () => {
+    setError('')
+    setSuccess('')
+    if (!email.trim()) {
+      setError(t('auth.emailRequiredForTouchId'))
+      return
+    }
+    setLoading(true)
+    try {
+      await registerWithTouchId(email)
+      setSuccess(t('auth.registerTouchIdSuccess'))
+      setTimeout(() => navigate('/app', { replace: true }), 600)
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        setError(t('auth.touchIdCancelled'))
+      } else {
+        setError(err.response?.data?.message || err.message || t('errors.network'))
+      }
     } finally {
       setLoading(false)
     }
@@ -74,7 +119,7 @@ export default function Register() {
                 <input
                   id="email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="username webauthn"
                   className="input"
                   placeholder={t('auth.emailPlaceholder')}
                   value={email}
@@ -116,6 +161,25 @@ export default function Register() {
                 {loading ? t('common.loading') : t('auth.registerButton')}
               </button>
             </form>
+
+            {touchIdAvailable && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-xs text-slate-400">{t('auth.or')}</span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary w-full"
+                  disabled={loading}
+                  onClick={handleTouchId}
+                >
+                  {t('auth.registerTouchId')}
+                </button>
+                <p className="text-center text-[11px] text-slate-400">{t('auth.registerTouchIdHint')}</p>
+              </div>
+            )}
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
