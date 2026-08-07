@@ -10,7 +10,6 @@ export const PAYMENT_CHANNEL_OPTIONS = [
   'VNQR',
   'VNPAY',
   'MOMO',
-  'MOMOQR',
   'ZALOPAY',
   'SHOPEEPAY',
 ]

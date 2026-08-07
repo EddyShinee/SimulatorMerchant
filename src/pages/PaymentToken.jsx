@@ -273,9 +273,16 @@ export default function PaymentToken() {
   }
 
   const toggleChannel = (ch) => {
-    setChannelSelected((prev) =>
-      prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch]
-    )
+    setChannelSelected((prev) => {
+      if (ch === 'ALL') return ['ALL']
+
+      const withoutAll = prev.filter((c) => c !== 'ALL')
+      if (withoutAll.includes(ch)) {
+        const next = withoutAll.filter((c) => c !== ch)
+        return next.length === 0 ? ['ALL'] : next
+      }
+      return [...withoutAll, ch]
+    })
   }
 
   // Convert advanced raw values into typed optional fields.
