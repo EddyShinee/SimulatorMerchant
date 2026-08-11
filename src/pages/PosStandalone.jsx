@@ -254,6 +254,7 @@ export default function PosStandalone() {
 
     let notificationBody = null
     let signingPrivateKeyPem = privateKeyPem
+    let signingPrivateKeyFile = privateKeyFile
     if (isNotification) {
       try {
         notificationBody =
@@ -268,9 +269,10 @@ export default function PosStandalone() {
 
     setLoading(true)
     try {
-      if (isNotification) {
+      if (isNotification && !privateKeyPem.trim() && !privateKeyFile?.base64) {
         const keys = await regenerateEcKeyPair()
         signingPrivateKeyPem = keys.privateKeyPem
+        signingPrivateKeyFile = null
       }
 
       const { data } = await api.post('/api/simulator/pos-standalone/send', {
@@ -280,7 +282,7 @@ export default function PosStandalone() {
         body: parsedBody,
         signWebhookJwt: isNotification,
         privateKeyPem: isNotification ? signingPrivateKeyPem : undefined,
-        privateKeyFile: undefined,
+        privateKeyFile: isNotification ? signingPrivateKeyFile : undefined,
         privateKeyPassword: isNotification ? privateKeyPassword || undefined : undefined,
         notificationBody: isNotification ? notificationBody : undefined,
       })
