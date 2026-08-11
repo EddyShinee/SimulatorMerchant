@@ -1,3 +1,5 @@
+import { DEFAULT_AES_KEY } from '../config/posStandaloneConfig.js'
+
 const PRIVATE_KEY = 'simulator.posStandalone.privateKeyPem'
 const PUBLIC_CERT = 'simulator.posStandalone.publicCertPem'
 const AES_KEY = 'simulator.posStandalone.aesKey'
@@ -42,7 +44,7 @@ export function clearStoredKeyPair() {
 }
 
 export function loadStoredAesKey() {
-  return read(AES_KEY)
+  return read(AES_KEY) || DEFAULT_AES_KEY
 }
 
 export function saveStoredAesKey(key) {
