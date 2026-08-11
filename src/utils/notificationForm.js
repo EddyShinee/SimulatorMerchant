@@ -1,6 +1,16 @@
-import { NOTIFICATION_TEMPLATES } from '../config/posStandaloneConfig.js'
+import { NOTIFICATION_TEMPLATES, generateTranId } from '../config/posStandaloneConfig.js'
 
 export const DEFAULT_NOTIFICATION_FORM = templateToForm(NOTIFICATION_TEMPLATES.sale)
+
+export function withFreshTranIds(form) {
+  const id = generateTranId()
+  return { ...form, tranId: id, linkedTranId: id }
+}
+
+export function withFreshTranIdsBody(body) {
+  const id = generateTranId()
+  return { ...body, tranId: id, linkedTranId: id }
+}
 
 export function templateToForm(template = {}) {
   return {

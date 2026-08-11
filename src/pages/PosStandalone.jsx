@@ -12,15 +12,23 @@ import {
   CALLBACK_URL_PRESETS,
   buildOperationUrl,
   defaultRequestBody,
+  generateTranId,
 } from '../config/posStandaloneConfig.js'
 import {
   DEFAULT_NOTIFICATION_FORM,
   templateToForm,
   formToNotificationBody,
   parseNotificationFormFromJson,
-  notificationBodyJson,
+  withFreshTranIds,
+  withFreshTranIdsBody,
 } from '../utils/notificationForm.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
+import {
+  loadStoredPrivateKeyPem,
+  loadStoredPublicCertPem,
+  saveStoredPrivateKeyPem,
+  saveStoredPublicCertPem,
+} from '../utils/posStandaloneKeyStore.js'
 
 function ResultCard({ title, text }) {
   return (
@@ -41,18 +49,18 @@ export default function PosStandalone() {
   const [operation, setOperation] = useState('notification')
   const [env, setEnv] = useState('custom')
   const [baseUrl, setBaseUrl] = useState('')
-  const [transactionId, setTransactionId] = useState('M2067524593572634625')
+  const [transactionId, setTransactionId] = useState(() => generateTranId())
   const [bearerToken, setBearerToken] = useState('')
   const [callbackUrl, setCallbackUrl] = useState('')
   const [callbackPreset, setCallbackPreset] = useState('simulator')
   const [bodyJson, setBodyJson] = useState('')
   const [notificationForm, setNotificationForm] = useState(DEFAULT_NOTIFICATION_FORM)
   const [notificationEditMode, setNotificationEditMode] = useState('form')
-  const [privateKeyPem, setPrivateKeyPem] = useState('')
+  const [privateKeyPem, setPrivateKeyPem] = useState(loadStoredPrivateKeyPem)
   const [privateKeyFile, setPrivateKeyFile] = useState(null)
   const [privateKeyPassword, setPrivateKeyPassword] = useState('')
   const [privateKeyFileName, setPrivateKeyFileName] = useState('')
-  const [publicCertPem, setPublicCertPem] = useState('')
+  const [publicCertPem, setPublicCertPem] = useState(loadStoredPublicCertPem)
   const [publicCertFileName, setPublicCertFileName] = useState('')
   const [verifyResult, setVerifyResult] = useState(null)
 
@@ -84,7 +92,9 @@ export default function PosStandalone() {
 
     const reader = new FileReader()
     reader.onload = () => {
-      setPrivateKeyPem(String(reader.result || ''))
+      const pem = String(reader.result || '')
+      setPrivateKeyPem(pem)
+      saveStoredPrivateKeyPem(pem)
       setPrivateKeyFile(null)
       setPrivateKeyFileName(file.name)
     }
@@ -97,6 +107,7 @@ export default function PosStandalone() {
       const text = await navigator.clipboard.readText()
       if (text?.trim()) {
         setPrivateKeyPem(text.trim())
+        saveStoredPrivateKeyPem(text.trim())
         setPrivateKeyFile(null)
         setPrivateKeyFileName('')
       }
@@ -111,6 +122,8 @@ export default function PosStandalone() {
     const cert = data.publicCertPem || ''
     setPrivateKeyPem(privateKey)
     setPublicCertPem(cert)
+    saveStoredPrivateKeyPem(privateKey)
+    saveStoredPublicCertPem(cert)
     setPrivateKeyFile(null)
     setPrivateKeyFileName('')
     setPublicCertFileName('')
@@ -132,7 +145,9 @@ export default function PosStandalone() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      setPublicCertPem(String(reader.result || ''))
+      const pem = String(reader.result || '')
+      setPublicCertPem(pem)
+      saveStoredPublicCertPem(pem)
       setPublicCertFileName(file.name)
       setVerifyResult(null)
     }
@@ -180,7 +195,7 @@ export default function PosStandalone() {
 
   useEffect(() => {
     if (isNotification) {
-      const form = templateToForm(NOTIFICATION_TEMPLATES.sale)
+      const form = withFreshTranIds(templateToForm(NOTIFICATION_TEMPLATES.sale))
       setNotificationForm(form)
       setBodyJson(JSON.stringify(formToNotificationBody(form), null, 2))
       setNotificationEditMode('form')
@@ -199,11 +214,18 @@ export default function PosStandalone() {
 
   const applyTemplate = (key) => {
     if (NOTIFICATION_TEMPLATES[key]) {
-      const form = templateToForm(NOTIFICATION_TEMPLATES[key])
+      const form = withFreshTranIds(templateToForm(NOTIFICATION_TEMPLATES[key]))
       setNotificationForm(form)
       setBodyJson(JSON.stringify(formToNotificationBody(form), null, 2))
       setNotificationEditMode('form')
     }
+  }
+
+  const syncNotificationTranIds = (body) => {
+    const next = withFreshTranIdsBody(body)
+    setNotificationForm((prev) => ({ ...prev, tranId: next.tranId, linkedTranId: next.linkedTranId }))
+    setBodyJson(JSON.stringify(next, null, 2))
+    return next
   }
 
   const switchNotificationMode = (mode) => {
@@ -261,20 +283,20 @@ export default function PosStandalone() {
           notificationEditMode === 'form'
             ? formToNotificationBody(notificationForm)
             : JSON.parse(bodyJson)
+        notificationBody = syncNotificationTranIds(notificationBody)
       } catch {
         setError(t('posStandalone.invalidJson'))
+        return
+      }
+
+      if (!privateKeyPem.trim() && !privateKeyFile?.base64) {
+        setError(t('posStandalone.keyRequired'))
         return
       }
     }
 
     setLoading(true)
     try {
-      if (isNotification && !privateKeyPem.trim() && !privateKeyFile?.base64) {
-        const keys = await regenerateEcKeyPair()
-        signingPrivateKeyPem = keys.privateKeyPem
-        signingPrivateKeyFile = null
-      }
-
       const { data } = await api.post('/api/simulator/pos-standalone/send', {
         method: isNotification ? 'POST' : opMeta.method,
         url: targetUrl,
@@ -437,6 +459,7 @@ export default function PosStandalone() {
               </div>
               <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
                 <p className="label mb-3">webhook-jwt (ES256)</p>
+                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{t('posStandalone.keyPersistHint')}</p>
                 <p className="label mb-1">{t('posStandalone.acquirerPrivateKey')}</p>
                 <div className="mb-2 flex flex-wrap gap-2">
                   <button type="button" onClick={handleGenerateTestKey} className="btn-secondary whitespace-nowrap">
@@ -473,7 +496,9 @@ export default function PosStandalone() {
                   className="input mb-4 min-h-[100px] font-mono text-xs"
                   value={privateKeyPem}
                   onChange={(e) => {
-                    setPrivateKeyPem(e.target.value)
+                    const pem = e.target.value
+                    setPrivateKeyPem(pem)
+                    saveStoredPrivateKeyPem(pem)
                     setPrivateKeyFile(null)
                     setPrivateKeyFileName('')
                   }}
@@ -496,7 +521,9 @@ export default function PosStandalone() {
                   className="input min-h-[80px] font-mono text-xs"
                   value={publicCertPem}
                   onChange={(e) => {
-                    setPublicCertPem(e.target.value)
+                    const pem = e.target.value
+                    setPublicCertPem(pem)
+                    saveStoredPublicCertPem(pem)
                     setPublicCertFileName('')
                     setVerifyResult(null)
                   }}

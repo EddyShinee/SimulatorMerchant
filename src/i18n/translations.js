@@ -581,6 +581,8 @@ export const translations = {
       urlRequired: 'URL đích là bắt buộc.',
       bearerRequired: 'Bearer token là bắt buộc cho API này.',
       keyRequired: 'EC Private Key (PEM) là bắt buộc để ký webhook-jwt.',
+      keyPersistHint:
+        'Private/Public key được lưu trên trình duyệt — cố định cho mọi lần gửi. Chỉ đổi khi bấm Generate, paste hoặc upload key mới.',
       invalidJson: 'JSON body không hợp lệ.',
       pasteKey: 'Dán key',
       uploadKey: 'Chọn file (.pem / .key)',
@@ -1287,6 +1289,8 @@ export const translations = {
       urlRequired: 'Target URL is required.',
       bearerRequired: 'Bearer token is required for this API.',
       keyRequired: 'EC Private Key (PEM) is required to sign webhook-jwt.',
+      keyPersistHint:
+        'Private/public keys are saved in your browser and reused on every send. Change them only via Generate, paste, or upload.',
       invalidJson: 'Request body must be valid JSON.',
       pasteKey: 'Paste key',
       uploadKey: 'Choose file (.pem / .key)',

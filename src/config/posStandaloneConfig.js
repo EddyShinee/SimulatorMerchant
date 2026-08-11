@@ -140,3 +140,19 @@ export function defaultRequestBody(operation) {
       return null
   }
 }
+
+/** M + yyMMddHHmmss + random suffix — same pattern as Payment Token invoiceNo. */
+export function generateTranId() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  const ts =
+    String(d.getFullYear()).slice(2) +
+    p(d.getMonth() + 1) +
+    p(d.getDate()) +
+    p(d.getHours()) +
+    p(d.getMinutes()) +
+    p(d.getSeconds())
+  const rand = Math.random().toString(16).slice(2, 6)
+  const tail = String(Math.floor(Math.random() * 100)).padStart(2, '0')
+  return `M${ts}${rand}${tail}`
+}
