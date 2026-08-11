@@ -28,6 +28,10 @@ import {
   loadStoredPublicCertPem,
   saveStoredPrivateKeyPem,
   saveStoredPublicCertPem,
+  loadStoredAesKey,
+  saveStoredAesKey,
+  loadStoredPlainPan,
+  saveStoredPlainPan,
 } from '../utils/posStandaloneKeyStore.js'
 
 function ResultCard({ title, text }) {
@@ -62,6 +66,9 @@ export default function PosStandalone() {
   const [privateKeyFileName, setPrivateKeyFileName] = useState('')
   const [publicCertPem, setPublicCertPem] = useState(loadStoredPublicCertPem)
   const [publicCertFileName, setPublicCertFileName] = useState('')
+  const [plainPan, setPlainPan] = useState(loadStoredPlainPan)
+  const [aesKey, setAesKey] = useState(loadStoredAesKey)
+  const [encryptingCardPan, setEncryptingCardPan] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)
 
   const BINARY_KEY_EXT = /\.(pfx|p12|der)$/i
@@ -247,6 +254,23 @@ export default function PosStandalone() {
     setNotificationForm(nextForm)
     if (notificationEditMode === 'form') {
       setBodyJson(JSON.stringify(formToNotificationBody(nextForm), null, 2))
+    }
+  }
+
+  const handleEncryptCardPan = async () => {
+    setError('')
+    setEncryptingCardPan(true)
+    try {
+      const { data } = await api.post('/api/simulator/pos-standalone/encrypt-card-pan', {
+        plainPan: plainPan.trim(),
+        aesKey: aesKey.trim(),
+      })
+      const nextForm = { ...notificationForm, cardPan: data.cardPan }
+      handleNotificationFormChange(nextForm)
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || t('posStandalone.encryptCardPanFailed'))
+    } finally {
+      setEncryptingCardPan(false)
     }
   }
 
@@ -584,7 +608,23 @@ export default function PosStandalone() {
               </div>
 
               {isNotification && notificationEditMode === 'form' ? (
-                <NotificationBodyForm form={notificationForm} onChange={handleNotificationFormChange} t={t} />
+                <NotificationBodyForm
+                  form={notificationForm}
+                  onChange={handleNotificationFormChange}
+                  t={t}
+                  plainPan={plainPan}
+                  aesKey={aesKey}
+                  onPlainPanChange={(value) => {
+                    setPlainPan(value)
+                    saveStoredPlainPan(value)
+                  }}
+                  onAesKeyChange={(value) => {
+                    setAesKey(value)
+                    saveStoredAesKey(value)
+                  }}
+                  onEncryptCardPan={handleEncryptCardPan}
+                  encrypting={encryptingCardPan}
+                />
               ) : (
                 <textarea
                   className="input min-h-[220px] font-mono text-xs"

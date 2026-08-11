@@ -7,6 +7,7 @@ import {
   assertEs256PrivateKey,
 } from '../utils/privateKey.js'
 import { loadPublicKeyFromPem } from '../utils/publicKey.js'
+import { encryptCardPan } from '../utils/cardPanEncrypt.js'
 
 const router = express.Router()
 router.use(requireAuth)
@@ -73,6 +74,17 @@ router.post('/pos-standalone/verify-jwt', async (req, res) => {
     res.json({ valid: true, payload })
   } catch (e) {
     res.status(400).json({ valid: false, message: e.message })
+  }
+})
+
+// POST /api/simulator/pos-standalone/encrypt-card-pan
+router.post('/pos-standalone/encrypt-card-pan', (req, res) => {
+  try {
+    const { plainPan, aesKey } = req.body || {}
+    const cardPan = encryptCardPan(plainPan, aesKey)
+    return res.json({ cardPan })
+  } catch (e) {
+    return res.status(400).json({ error: 'ENCRYPT_FAILED', message: e.message })
   }
 })
 

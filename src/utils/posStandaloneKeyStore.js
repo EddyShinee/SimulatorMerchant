@@ -1,5 +1,7 @@
 const PRIVATE_KEY = 'simulator.posStandalone.privateKeyPem'
 const PUBLIC_CERT = 'simulator.posStandalone.publicCertPem'
+const AES_KEY = 'simulator.posStandalone.aesKey'
+const PLAIN_PAN = 'simulator.posStandalone.plainPan'
 
 function read(key) {
   try {
@@ -37,4 +39,20 @@ export function saveStoredPublicCertPem(pem) {
 export function clearStoredKeyPair() {
   write(PRIVATE_KEY, '')
   write(PUBLIC_CERT, '')
+}
+
+export function loadStoredAesKey() {
+  return read(AES_KEY)
+}
+
+export function saveStoredAesKey(key) {
+  write(AES_KEY, key)
+}
+
+export function loadStoredPlainPan() {
+  return read(PLAIN_PAN)
+}
+
+export function saveStoredPlainPan(pan) {
+  write(PLAIN_PAN, pan)
 }

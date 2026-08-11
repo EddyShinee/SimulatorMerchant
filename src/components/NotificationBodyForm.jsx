@@ -14,7 +14,17 @@ function Field({ label, children, className = '' }) {
   )
 }
 
-export default function NotificationBodyForm({ form, onChange, t }) {
+export default function NotificationBodyForm({
+  form,
+  onChange,
+  t,
+  plainPan = '',
+  aesKey = '',
+  onPlainPanChange,
+  onAesKeyChange,
+  onEncryptCardPan,
+  encrypting = false,
+}) {
   const set = (key, value) => onChange({ ...form, [key]: value })
 
   return (
@@ -135,6 +145,43 @@ export default function NotificationBodyForm({ form, onChange, t }) {
               onChange={(e) => set('deviceAlias', e.target.value)}
             />
           </Field>
+
+          <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-800/40">
+            <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {t('posStandalone.cardEncryptTitle')}
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{t('posStandalone.cardEncryptHint')}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t('posStandalone.plainPan')}>
+                <input
+                  className="input font-mono text-xs"
+                  value={plainPan}
+                  onChange={(e) => onPlainPanChange?.(e.target.value)}
+                  placeholder={t('posStandalone.plainPanHint')}
+                  autoComplete="off"
+                />
+              </Field>
+              <Field label={t('posStandalone.aesKey')}>
+                <input
+                  className="input font-mono text-xs"
+                  type="password"
+                  value={aesKey}
+                  onChange={(e) => onAesKeyChange?.(e.target.value)}
+                  placeholder={t('posStandalone.aesKeyHint')}
+                  autoComplete="off"
+                />
+              </Field>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary mt-3 text-xs"
+              disabled={encrypting || !plainPan.trim() || !aesKey.trim()}
+              onClick={onEncryptCardPan}
+            >
+              {encrypting ? t('posStandalone.encryptingCardPan') : t('posStandalone.encryptCardPan')}
+            </button>
+          </div>
+
           <Field label="cardPan" className="sm:col-span-2">
             <input
               className="input font-mono text-xs"
