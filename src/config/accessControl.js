@@ -90,6 +90,7 @@ export function isAdminRole(role) {
 /** Feature required to open this app path. `null` = always allowed (e.g. /app). */
 export function featureKeyForPath(pathname) {
   const p = String(pathname || '')
+  if (p.startsWith('/app/settings')) return null
   if (p.startsWith('/app/access')) return '__admin__'
   if (p.startsWith('/app/payment-flow')) return 'payment-flow'
   if (p.startsWith('/app/payout/create')) return 'payout-create'

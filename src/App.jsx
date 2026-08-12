@@ -24,7 +24,7 @@ import PaymentFlowHub from './pages/PaymentFlowHub.jsx'
 import PaymentCallbackFrontend from './pages/PaymentCallbackFrontend.jsx'
 import CreatePayout from './pages/CreatePayout.jsx'
 import PayoutInquiry from './pages/PayoutInquiry.jsx'
-import AccessControl from './pages/AccessControl.jsx'
+import Settings from './pages/Settings.jsx'
 
 function GatedApiConsole() {
   const { apiId } = useParams()
@@ -72,14 +72,8 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route
-          path="access"
-          element={
-            <FeatureRoute adminOnly>
-              <AccessControl />
-            </FeatureRoute>
-          }
-        />
+        <Route path="settings" element={<Settings />} />
+        <Route path="access" element={<Navigate to="/app/settings" replace />} />
         <Route
           path="payment-flow"
           element={

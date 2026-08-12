@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { ROLES, normalizeFeatureEntry } from '../config/accessControl.js'
 
-export default function AccessControl() {
+export default function AccessControl({ embedded = false }) {
   const { t } = useLanguage()
   const { user } = useAuth()
   const { catalog, features, setFeatures, refresh } = useAccess()
@@ -72,10 +72,12 @@ export default function AccessControl() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('access.title')}</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('access.subtitle')}</p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('access.title')}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('access.subtitle')}</p>
+        </div>
+      )}
 
       <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
         {[

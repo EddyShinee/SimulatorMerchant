@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -17,7 +16,7 @@ import {
   IconMenu,
   IconClose,
   IconPayout,
-  IconShield,
+  IconSettings,
 } from '../components/icons.jsx'
 import { AppBrandSidebar } from '../components/AppBrand.jsx'
 import { PaymentFlowProvider } from '../context/PaymentFlowContext.jsx'
@@ -81,7 +80,7 @@ function ApiRadioItem({ to, label, onClick }) {
 
 function usePageTitle(pathname, t) {
   if (pathname === '/app' || pathname === '/app/') return t('nav.dashboard')
-  if (pathname.includes('/access')) return t('nav.accessControl')
+  if (pathname.includes('/settings') || pathname.includes('/access')) return t('nav.settings')
   if (isPaymentFlowRoute(pathname)) return t('nav.paymentFlow')
   if (pathname.includes('/inbox')) return t('nav.requestInbox')
   if (pathname.includes('/pos-standalone')) return t('nav.posStandalone')
@@ -96,7 +95,7 @@ function usePageTitle(pathname, t) {
 }
 
 export default function SimulatorLayout() {
-  const { user, logout, enableTouchId, updateTouchId, disableTouchId, getTouchIdStatus } = useAuth()
+  const { user, logout } = useAuth()
   const { isAdmin, canAccess } = useAccess()
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -104,85 +103,10 @@ export default function SimulatorLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unread: inboxUnread } = useInboxUnread(canAccess('inbox') ? 10000 : 0)
   const pageTitle = usePageTitle(location.pathname, t)
-  const [touchIdAvailable, setTouchIdAvailable] = useState(false)
-  const [touchIdEnabled, setTouchIdEnabled] = useState(null)
-  const [touchIdBusy, setTouchIdBusy] = useState(false)
-  const [touchIdMsg, setTouchIdMsg] = useState('')
-
-  useEffect(() => {
-    let active = true
-    async function checkPlatform() {
-      if (!browserSupportsWebAuthn()) {
-        if (active) setTouchIdAvailable(false)
-        return
-      }
-      try {
-        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        if (active) setTouchIdAvailable(Boolean(ok))
-      } catch {
-        if (active) setTouchIdAvailable(false)
-      }
-    }
-    checkPlatform()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    let active = true
-    async function loadStatus() {
-      if (!user) {
-        setTouchIdEnabled(null)
-        return
-      }
-      try {
-        const status = await getTouchIdStatus()
-        if (active) setTouchIdEnabled(Boolean(status?.enabled))
-      } catch {
-        if (active) setTouchIdEnabled(false)
-      }
-    }
-    loadStatus()
-    return () => {
-      active = false
-    }
-  }, [user, getTouchIdStatus])
 
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
-  }
-
-  const runTouchIdAction = async (action, successKey) => {
-    setTouchIdMsg('')
-    setTouchIdBusy(true)
-    try {
-      await action()
-      const status = await getTouchIdStatus()
-      setTouchIdEnabled(Boolean(status?.enabled))
-      setTouchIdMsg(t(successKey))
-    } catch (err) {
-      if (err?.name === 'NotAllowedError') {
-        setTouchIdMsg(t('auth.touchIdCancelled'))
-      } else {
-        setTouchIdMsg(err.response?.data?.message || err.message || t('errors.network'))
-      }
-    } finally {
-      setTouchIdBusy(false)
-    }
-  }
-
-  const handleEnableTouchId = () => runTouchIdAction(() => enableTouchId(), 'auth.enableTouchIdSuccess')
-
-  const handleUpdateTouchId = () => {
-    if (!window.confirm(t('auth.confirmUpdateTouchId'))) return
-    void runTouchIdAction(() => updateTouchId(), 'auth.updateTouchIdSuccess')
-  }
-
-  const handleDisableTouchId = () => {
-    if (!window.confirm(t('auth.confirmRemoveTouchId'))) return
-    void runTouchIdAction(() => disableTouchId(), 'auth.removeTouchIdSuccess')
   }
 
   const closeMobile = () => setMobileOpen(false)
@@ -196,14 +120,6 @@ export default function SimulatorLayout() {
           {t('nav.sectionMain')}
         </p>
         <NavItem to="/app" icon={IconDashboard} label={t('nav.dashboard')} onClick={closeMobile} />
-        {isAdmin && (
-          <NavItem
-            to="/app/access"
-            icon={IconShield}
-            label={t('nav.accessControl')}
-            onClick={closeMobile}
-          />
-        )}
 
         {canAccess('payment-flow') && (
           <>
@@ -290,6 +206,17 @@ export default function SimulatorLayout() {
             />
           </>
         )}
+
+        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {t('nav.sectionAccount')}
+        </p>
+        <NavItem
+          to="/app/settings"
+          icon={IconSettings}
+          label={t('nav.settings')}
+          onClick={closeMobile}
+          end={false}
+        />
       </nav>
 
       <div className="border-t border-slate-200 p-3 dark:border-slate-800">
@@ -301,50 +228,6 @@ export default function SimulatorLayout() {
             {isAdmin ? t('access.roleAdmin') : t('access.roleMember')}
           </p>
         </div>
-        {touchIdAvailable && (
-          <div className="mb-2 space-y-1.5 px-1">
-            <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              {t('auth.touchIdManage')}
-            </p>
-            {touchIdEnabled ? (
-              <>
-                <p className="px-2 text-[11px] text-emerald-600 dark:text-emerald-400">
-                  {t('auth.touchIdEnabled')}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    className="btn-secondary w-full text-xs"
-                    disabled={touchIdBusy}
-                    onClick={handleUpdateTouchId}
-                  >
-                    {touchIdBusy ? t('common.loading') : t('auth.updateTouchId')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary w-full text-xs text-red-600 hover:text-red-700 dark:text-red-400"
-                    disabled={touchIdBusy}
-                    onClick={handleDisableTouchId}
-                  >
-                    {t('auth.removeTouchId')}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn-secondary w-full text-xs"
-                disabled={touchIdBusy}
-                onClick={handleEnableTouchId}
-              >
-                {touchIdBusy ? t('common.loading') : t('auth.enableTouchId')}
-              </button>
-            )}
-            {touchIdMsg && (
-              <p className="px-2 text-[11px] text-slate-500 dark:text-slate-400">{touchIdMsg}</p>
-            )}
-          </div>
-        )}
         <button onClick={handleLogout} className="btn-secondary w-full">
           <IconLogout className="h-4 w-4" />
           {t('common.logout')}

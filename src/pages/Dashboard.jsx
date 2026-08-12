@@ -260,7 +260,7 @@ export default function Dashboard() {
             {canAccess('pos-standalone') && (
               <QuickAction to="/app/pos-standalone">{t('nav.posStandalone')}</QuickAction>
             )}
-            {isAdmin && <QuickAction to="/app/access">{t('nav.accessControl')}</QuickAction>}
+            {isAdmin && <QuickAction to="/app/settings">{t('nav.settings')}</QuickAction>}
           </div>
         </div>
 

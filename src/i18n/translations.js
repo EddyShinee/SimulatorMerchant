@@ -123,6 +123,16 @@ export const translations = {
       payoutInquiry: 'Payout Inquiry',
       accessControl: 'Phân quyền',
       sectionAdmin: 'Quản trị',
+      sectionAccount: 'Tài khoản',
+      settings: 'Cài đặt',
+    },
+    settings: {
+      title: 'Cài đặt',
+      subtitle: 'Quản lý tài khoản, sinh trắc học và phân quyền.',
+      account: 'Tài khoản',
+      biometric: '{biometric}',
+      biometricHint: 'Dùng chung để đăng nhập và mở khóa Merchants vault.',
+      biometricUnavailable: 'Thiết bị hoặc trình duyệt này không hỗ trợ sinh trắc học.',
     },
     apis: {
       choose: 'Chọn API',
@@ -878,6 +888,16 @@ export const translations = {
       payoutInquiry: 'Payout Inquiry',
       accessControl: 'Access control',
       sectionAdmin: 'Admin',
+      sectionAccount: 'Account',
+      settings: 'Settings',
+    },
+    settings: {
+      title: 'Settings',
+      subtitle: 'Manage your account, biometrics, and access control.',
+      account: 'Account',
+      biometric: '{biometric}',
+      biometricHint: 'Shared for sign-in and Merchants vault unlock.',
+      biometricUnavailable: 'This device or browser does not support biometrics.',
     },
     apis: {
       choose: 'Choose API',
