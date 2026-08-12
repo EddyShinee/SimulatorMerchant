@@ -40,6 +40,7 @@ import {
 } from '../utils/finvietNotificationForm.js'
 import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
+import { normalizeAesKeyBase64 } from '../utils/aesKey.js'
 import {
   loadStoredPrivateKeyPem,
   loadStoredPublicCertPem,
@@ -101,15 +102,6 @@ export default function PosStandalone() {
     let binary = ''
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
     return btoa(binary)
-  }
-
-  const toVtcJwtSecret = (value) => {
-    const s = String(value || '').trim()
-    if (/^[0-9a-fA-F]{32}$/.test(s)) {
-      const bytes = s.match(/.{1,2}/g).map((hex) => Number.parseInt(hex, 16))
-      return btoa(String.fromCharCode(...bytes))
-    }
-    return s
   }
 
   const handlePrivateKeyFile = (file) => {
@@ -298,7 +290,7 @@ export default function PosStandalone() {
   useEffect(() => {
     if (!isNotification || isFinviet || !isVtc) return
     setNotificationForm((prev) => {
-      const jwtSecret = toVtcJwtSecret(prev.jwtSecret?.trim() || aesKey.trim() || DEFAULT_AES_KEY)
+      const jwtSecret = normalizeAesKeyBase64(prev.jwtSecret || aesKey || DEFAULT_AES_KEY)
       if (prev.jwtSecret === jwtSecret) return prev
       return { ...prev, jwtSecret }
     })
@@ -405,12 +397,12 @@ export default function PosStandalone() {
     setError('')
     setEncryptingCardPan(true)
     try {
-      const key = aesKey.trim() || DEFAULT_AES_KEY
+      const key = normalizeAesKeyBase64(aesKey || DEFAULT_AES_KEY)
       const { data } = await api.post('/api/simulator/pos-standalone/encrypt-card-pan', {
         plainPan: plainPan.trim(),
         aesKey: key,
       })
-      const nextForm = { ...notificationForm, cardPan: data.cardPan, jwtSecret: toVtcJwtSecret(key) }
+      const nextForm = { ...notificationForm, cardPan: data.cardPan, jwtSecret: key }
       handleNotificationFormChange(nextForm)
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('posStandalone.encryptCardPanFailed'))

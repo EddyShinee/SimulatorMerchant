@@ -47,8 +47,8 @@ export const CALLBACK_URL_PRESETS = [
   { id: 'vtc-qa', label: '2C2P QA — VTC', url: 'https://softpos-qa.2c2p.com/callback/vtc' },
 ]
 
-/** AES-128 key (hex) shared with 2C2P for cardPan encrypt/decrypt. */
-export const DEFAULT_AES_KEY = '42AE6C3B22AFC0D0DD9F046A84403C5D'
+/** AES-128 key (Base64, 16 bytes) — Spec §5.1.1 shared secret between acquirer and 2C2P. */
+export const DEFAULT_AES_KEY = 'Qq5sOyKvwNDdnwRqhEA8XQ=='
 
 /** Default test Visa PAN (Spec / VTC demo). */
 export const DEFAULT_PLAIN_PAN = '4111111111111111'
@@ -57,11 +57,8 @@ export const DEFAULT_PLAIN_PAN = '4111111111111111'
 export const DEFAULT_ENCRYPTED_CARD_PAN =
   'aT2FMJcJkJ4y+nWJUVoVlbxsgpRKIKLiRn1DTdD2/o8MXkWU6NN2r9s1zVk='
 
-/**
- * extraData.jwtSecret — VTC/SoftPOS dùng để decrypt cardPan (AES-128-GCM).
- * Phải trùng key đã dùng encrypt cardPan (thường cùng DEFAULT_AES_KEY).
- */
-export const DEFAULT_JWT_SECRET = 'Qq5sOyKvwNDdnwRqhEA8XQ=='
+/** extraData.jwtSecret — same AES-128 key (Base64) VTC uses to decrypt cardPan. */
+export const DEFAULT_JWT_SECRET = DEFAULT_AES_KEY
 
 const DEFAULT_EXTRA_DATA = {
   merchantId: '70470400000TEST3',

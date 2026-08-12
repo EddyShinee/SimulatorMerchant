@@ -1,4 +1,5 @@
 import { DEFAULT_AES_KEY, DEFAULT_PLAIN_PAN } from '../config/posStandaloneConfig.js'
+import { normalizeAesKeyBase64 } from './aesKey.js'
 
 const PRIVATE_KEY = 'simulator.posStandalone.privateKeyPem'
 const PUBLIC_CERT = 'simulator.posStandalone.publicCertPem'
@@ -45,7 +46,11 @@ export function clearStoredKeyPair() {
 }
 
 export function loadStoredAesKey() {
-  return read(AES_KEY) || DEFAULT_AES_KEY
+  const stored = read(AES_KEY)
+  if (!stored) return DEFAULT_AES_KEY
+  const normalized = normalizeAesKeyBase64(stored)
+  if (normalized !== stored.trim()) saveStoredAesKey(normalized)
+  return normalized
 }
 
 export function saveStoredAesKey(key) {

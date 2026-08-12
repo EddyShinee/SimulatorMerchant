@@ -1,9 +1,10 @@
 import { NOTIFICATION_TEMPLATES, generateTranId, DEFAULT_JWT_SECRET } from '../config/posStandaloneConfig.js'
+import { normalizeAesKeyBase64 } from './aesKey.js'
 
 export const DEFAULT_NOTIFICATION_FORM = templateToForm(NOTIFICATION_TEMPLATES.sale)
 
 export function resolveJwtSecret(form) {
-  return String(form?.jwtSecret ?? '').trim() || DEFAULT_JWT_SECRET
+  return normalizeAesKeyBase64(form?.jwtSecret) || DEFAULT_JWT_SECRET
 }
 
 export function withFreshTranIds(form) {

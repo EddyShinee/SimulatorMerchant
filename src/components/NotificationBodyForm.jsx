@@ -165,7 +165,7 @@ export default function NotificationBodyForm({
               <Field label={t('posStandalone.aesKey')}>
                 <input
                   className="input font-mono text-xs"
-                  type="password"
+                  type="text"
                   value={aesKey}
                   onChange={(e) => onAesKeyChange?.(e.target.value)}
                   placeholder={t('posStandalone.aesKeyHint')}

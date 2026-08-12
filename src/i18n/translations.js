@@ -570,9 +570,9 @@ export const translations = {
       jwtPayload: 'JWT payload (decoded)',
       jwtBodyMatch: 'JWT payload khớp request body',
       jwtBodyMismatch: 'JWT payload không khớp request body',
-      jwtSecretHint: 'AES-128 hex (32 ký tự) — VTC dùng để decrypt cardPan; phải trùng key encrypt',
+      jwtSecretHint: 'AES-128 Base64 (16 bytes) — trùng key encrypt cardPan (Spec §5.1.1)',
       vtcJwtSecretHint:
-        'VTC bắt buộc extraData.jwtSecret (AES-128 hex). Thiếu hoặc sai độ dài → server lỗi decrypt cardPan.',
+        'VTC decrypt cardPan bằng extraData.jwtSecret (AES key Base64). Phải trùng key dùng encrypt.',
       error403:
         '403 Forbidden: 2C2P từ chối request. Thường do (1) EC private key chưa đăng ký public cert với 2C2P, (2) tranId không tồn tại trên demo, (3) merchantId/subMid/subTid sai. Liên hệ 2C2P để lấy key pair acquirer đã onboard.',
       statusFailedTitle: '2C2P trả về {"status":"failed"}',
@@ -597,11 +597,11 @@ export const translations = {
       cardPanHint: 'Encrypted PAN (base64)',
       cardEncryptTitle: 'Encrypt cardPan (Spec §5.1)',
       cardEncryptHint:
-        'AES-128-GCM / NoPadding — IV 12 byte + ciphertext + auth tag → Base64. Dùng AES key acquirer đã share với 2C2P.',
+        'Spec §5.1.1: AES/GCM/NoPadding, IV 12 bytes ngẫu nhiên, output Base64(IV + ciphertext + tag).',
       plainPan: 'Số thẻ (plain PAN)',
       plainPanHint: 'VD: 4111111111111111',
       aesKey: 'AES-128 key',
-      aesKeyHint: 'Hex 32 ký tự hoặc Base64 (16 bytes)',
+      aesKeyHint: 'Base64 (16 bytes) — VD: Qq5sOyKvwNDdnwRqhEA8XQ==',
       encryptCardPan: '🔒 Encrypt → cardPan',
       encryptingCardPan: 'Đang encrypt…',
       encryptCardPanFailed: 'Encrypt cardPan thất bại.',
@@ -1355,9 +1355,9 @@ export const translations = {
       jwtPayload: 'JWT payload (decoded)',
       jwtBodyMatch: 'JWT payload matches request body',
       jwtBodyMismatch: 'JWT payload does not match request body',
-      jwtSecretHint: 'AES-128 hex (32 chars) — VTC uses this to decrypt cardPan; must match encrypt key',
+      jwtSecretHint: 'AES-128 Base64 (16 bytes) — must match cardPan encrypt key (Spec §5.1.1)',
       vtcJwtSecretHint:
-        'VTC requires extraData.jwtSecret (AES-128 hex). Missing or wrong key size → server cardPan decrypt error.',
+        'VTC decrypts cardPan with extraData.jwtSecret (AES key as Base64). Must match encrypt key.',
       error403:
         '403 Forbidden: 2C2P rejected the request. Usually (1) EC private key not registered with 2C2P, (2) tranId does not exist on demo, (3) wrong merchantId/subMid/subTid. Contact 2C2P for onboarded acquirer key pair.',
       statusFailedTitle: '2C2P returned {"status":"failed"}',
@@ -1383,11 +1383,11 @@ export const translations = {
       cardPanHint: 'Encrypted PAN (base64)',
       cardEncryptTitle: 'Encrypt cardPan (Spec §5.1)',
       cardEncryptHint:
-        'AES-128-GCM / NoPadding — 12-byte IV + ciphertext + auth tag → Base64. Use the acquirer AES key shared with 2C2P.',
+        'Spec §5.1.1: AES/GCM/NoPadding, random 12-byte IV, output Base64(IV + ciphertext + tag).',
       plainPan: 'Plain card PAN',
       plainPanHint: 'e.g. 4111111111111111',
       aesKey: 'AES-128 key',
-      aesKeyHint: '32 hex chars or Base64 (16 bytes)',
+      aesKeyHint: 'Base64 (16 bytes) — e.g. Qq5sOyKvwNDdnwRqhEA8XQ==',
       encryptCardPan: '🔒 Encrypt → cardPan',
       encryptingCardPan: 'Encrypting…',
       encryptCardPanFailed: 'Failed to encrypt cardPan.',
