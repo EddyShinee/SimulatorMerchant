@@ -3,7 +3,7 @@ import api from '../api/client.js'
 import { useAccess } from '../context/AccessContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { ROLES } from '../config/accessControl.js'
+import { ROLES, normalizeFeatureEntry } from '../config/accessControl.js'
 
 export default function AccessControl() {
   const { t } = useLanguage()
@@ -34,13 +34,14 @@ export default function AccessControl() {
     if (tab === 'members') void loadUsers()
   }, [tab, loadUsers])
 
-  const toggleFeature = async (key, enabled) => {
-    setSavingKey(key)
+  const toggleFeature = async (key, role, enabled) => {
+    setSavingKey(`${key}:${role}`)
     setError('')
     setMessage('')
     try {
       const { data } = await api.patch(`/api/access/features/${encodeURIComponent(key)}`, {
         key,
+        role,
         enabled,
       })
       setFeatures(data.features)
@@ -108,38 +109,52 @@ export default function AccessControl() {
           <p className="text-sm text-slate-500 dark:text-slate-400">{t('access.featuresHint')}</p>
           {catalog.map((group) => (
             <div key={group.id} className="card overflow-hidden">
-              <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                 <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(group.labelKey)}</h2>
+                <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {t('access.roleAdmin')}
+                </span>
+                <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {t('access.roleMember')}
+                </span>
               </div>
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {group.features.map((f) => {
-                  const on = features[f.key] !== false
+                  const flags = normalizeFeatureEntry(features[f.key])
                   const locked = Boolean(f.locked)
                   return (
-                    <li key={f.key} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <div>
+                    <li
+                      key={f.key}
+                      className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-2 px-4 py-3"
+                    >
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{t(f.labelKey)}</p>
                         <p className="font-mono text-[11px] text-slate-400">{f.key}</p>
-                        {f.global && (
-                          <p className="mt-0.5 text-[11px] text-slate-500">{t('access.featureGlobal')}</p>
-                        )}
                       </div>
-                      <button
-                        type="button"
-                        disabled={locked || savingKey === f.key}
-                        onClick={() => void toggleFeature(f.key, !on)}
-                        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                          on ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
-                        } ${locked ? 'cursor-not-allowed opacity-60' : ''}`}
-                        aria-pressed={on}
-                        title={locked ? t('access.featureLocked') : ''}
-                      >
-                        <span
-                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-                            on ? 'left-5' : 'left-0.5'
-                          }`}
-                        />
-                      </button>
+                      {[ROLES.admin, ROLES.member].map((role) => {
+                        const on = flags[role] !== false
+                        const busy = savingKey === `${f.key}:${role}`
+                        return (
+                          <div key={role} className="flex justify-center">
+                            <button
+                              type="button"
+                              disabled={locked || busy}
+                              onClick={() => void toggleFeature(f.key, role, !on)}
+                              className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                                on ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
+                              } ${locked || busy ? 'cursor-not-allowed opacity-60' : ''}`}
+                              aria-pressed={on}
+                              title={locked ? t('access.featureLocked') : ''}
+                            >
+                              <span
+                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                                  on ? 'left-5' : 'left-0.5'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </li>
                   )
                 })}

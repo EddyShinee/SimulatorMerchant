@@ -1,5 +1,5 @@
 import { ROLES } from '../../src/config/accessControl.js'
-import { ensureAppProfile, getFeatureMap, featureEnabled, isFlagOn } from '../utils/accessStore.js'
+import { ensureAppProfile, getFeatureMap, featureEnabled } from '../utils/accessStore.js'
 
 export async function attachAccess(req, res, next) {
   try {
@@ -29,9 +29,9 @@ export function requireAdmin(req, res, next) {
 export function requireFeature(featureKey) {
   return async (req, res, next) => {
     try {
-      if (req.access?.role === ROLES.admin) return next()
+      const role = req.access?.role === ROLES.admin ? ROLES.admin : ROLES.member
       const map = await getFeatureMap()
-      if (!featureEnabled(map, featureKey, req.access?.role)) {
+      if (!featureEnabled(map, featureKey, role)) {
         return res.status(403).json({
           error: 'FEATURE_DISABLED',
           message: 'This feature is disabled for your role.',
@@ -46,22 +46,5 @@ export function requireFeature(featureKey) {
   }
 }
 
-/** Global flag (no admin bypass) — registration, merchant-vault, etc. */
-export function requireFlag(featureKey) {
-  return async (req, res, next) => {
-    try {
-      const map = await getFeatureMap()
-      if (!isFlagOn(map, featureKey)) {
-        return res.status(403).json({
-          error: 'FEATURE_DISABLED',
-          message: 'This feature is currently disabled.',
-          feature: featureKey,
-        })
-      }
-      return next()
-    } catch (err) {
-      console.error('[access:flag]', err)
-      return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to check feature flag.' })
-    }
-  }
-}
+/** Same as requireFeature — kept for older route imports. */
+export const requireFlag = requireFeature

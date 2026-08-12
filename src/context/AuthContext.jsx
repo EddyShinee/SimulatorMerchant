@@ -99,11 +99,11 @@ export function AuthProvider({ children }) {
     return data
   }, [])
 
-  const enableTouchId = useCallback(async () => {
+  const enableTouchId = useCallback(async ({ replace = false } = {}) => {
     if (!browserSupportsWebAuthn()) {
       throw new Error('Touch ID / passkeys are not supported in this browser.')
     }
-    const { data: opt } = await api.post('/api/auth/webauthn/enroll/options', {})
+    const { data: opt } = await api.post('/api/auth/webauthn/enroll/options', { replace })
     const challengeToken = opt?.challengeToken || opt?.challengeId
     if (!opt?.options || !challengeToken) {
       throw new Error(opt?.message || 'Invalid Touch ID options from server.')
@@ -113,9 +113,18 @@ export function AuthProvider({ children }) {
       response: attestation,
       challengeToken,
       challengeId: challengeToken,
+      replace,
     })
     return data
   }, [])
+
+  const disableTouchId = useCallback(async () => {
+    const { data } = await api.delete('/api/auth/webauthn')
+    return data
+  }, [])
+
+  /** Re-register on this device and drop previous passkeys after success. */
+  const updateTouchId = useCallback(async () => enableTouchId({ replace: true }), [enableTouchId])
 
   const logout = useCallback(() => {
     setToken(null)
@@ -133,6 +142,8 @@ export function AuthProvider({ children }) {
       registerWithTouchId,
       getTouchIdStatus,
       enableTouchId,
+      disableTouchId,
+      updateTouchId,
       logout,
     }),
     [
@@ -144,6 +155,8 @@ export function AuthProvider({ children }) {
       registerWithTouchId,
       getTouchIdStatus,
       enableTouchId,
+      disableTouchId,
+      updateTouchId,
       logout,
     ]
   )

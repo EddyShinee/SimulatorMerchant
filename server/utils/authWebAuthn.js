@@ -23,6 +23,7 @@ import {
   saveAuthPasskey,
   updateAuthPasskeyCounter,
   deleteAuthPasskeys,
+  deleteOtherAuthPasskeys,
   getSupabaseAdmin,
 } from './merchantStore.js'
 import { getSupabase, isSupabaseConfigured } from './supabaseClient.js'
@@ -332,7 +333,7 @@ export async function finishAuthLogin(req, { response, challengeToken, challenge
 }
 
 /** Logged-in user enables Touch ID on existing account */
-export async function buildAuthEnrollOptions(req, userId, email) {
+export async function buildAuthEnrollOptions(req, userId, email, { replace = false } = {}) {
   assertPasskeyStoreReady()
   const uid = String(userId)
   const normalized = String(email || '').trim().toLowerCase()
@@ -360,10 +361,13 @@ export async function buildAuthEnrollOptions(req, userId, email) {
       residentKey: 'required',
       requireResidentKey: true,
     },
-    excludeCredentials: existing.map((c) => ({
-      id: c.credentialId,
-      transports: c.transports?.length ? c.transports : undefined,
-    })),
+    // replace=true → allow re-registering on the same device (update flow)
+    excludeCredentials: replace
+      ? []
+      : existing.map((c) => ({
+          id: c.credentialId,
+          transports: c.transports?.length ? c.transports : undefined,
+        })),
   })
 
   const challengeToken = signWebAuthnChallenge(uid, options.challenge, 'auth-enroll')
@@ -372,10 +376,14 @@ export async function buildAuthEnrollOptions(req, userId, email) {
     challengeToken,
     challengeId: challengeToken,
     alreadyEnabled: existing.length > 0,
+    replace: Boolean(replace),
   }
 }
 
-export async function finishAuthEnroll(req, { userId, email, response, challengeToken, challengeId }) {
+export async function finishAuthEnroll(
+  req,
+  { userId, email, response, challengeToken, challengeId, replace = false }
+) {
   assertPasskeyStoreReady()
   const uid = String(userId || '')
   const token = challengeToken || challengeId
@@ -411,14 +419,20 @@ export async function finishAuthEnroll(req, { userId, email, response, challenge
   }
 
   const info = verification.registrationInfo
+  const credentialId = info.credentialID
+
   await saveAuthPasskey({
     userId: uid,
     email: normalized,
-    credentialId: info.credentialID,
+    credentialId,
     publicKey: isoBase64URL.fromBuffer(info.credentialPublicKey),
     counter: info.counter ?? 0,
     transports: response?.response?.transports || [],
   })
+
+  if (replace) {
+    await deleteOtherAuthPasskeys(uid, credentialId)
+  }
 
   return { id: uid, email: normalized }
 }

@@ -1,7 +1,7 @@
 import express from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { attachAccess, requireAdmin } from '../middleware/access.js'
-import { FEATURE_GROUPS } from '../../src/config/accessControl.js'
+import { FEATURE_GROUPS, ROLES } from '../../src/config/accessControl.js'
 import { getFeatureMap, isFlagOn, listAppUsers, setFeatureEnabled, setUserRole } from '../utils/accessStore.js'
 
 const router = express.Router()
@@ -60,7 +60,14 @@ router.patch('/users/:id/role', requireAdmin, async (req, res) => {
 router.patch('/features/:key?', requireAdmin, async (req, res) => {
   try {
     const key = String(req.body?.key || req.params.key || '').trim()
-    const feature = await setFeatureEnabled(key, req.body?.enabled, req.user.sub)
+    const role = String(req.body?.role || '').trim()
+    if (role !== ROLES.admin && role !== ROLES.member) {
+      return res.status(400).json({
+        error: 'INVALID_ROLE',
+        message: 'role must be admin or member.',
+      })
+    }
+    const feature = await setFeatureEnabled(key, role, req.body?.enabled, req.user.sub)
     const features = await getFeatureMap()
     return res.json({ feature, features })
   } catch (err) {

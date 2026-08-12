@@ -7,6 +7,8 @@ import {
   ROLES,
   featureKeyForPath,
   isAdminRole,
+  isFeatureEnabledForRole,
+  normalizeFeatureMap,
 } from '../config/accessControl.js'
 
 const AccessContext = createContext(null)
@@ -14,8 +16,12 @@ const AccessContext = createContext(null)
 export function AccessProvider({ children }) {
   const { user, isAuthenticated, initializing: authInit } = useAuth()
   const [role, setRole] = useState(ROLES.member)
-  const [features, setFeatures] = useState(DEFAULT_FEATURE_MAP)
+  const [features, setFeaturesState] = useState(DEFAULT_FEATURE_MAP)
   const [loading, setLoading] = useState(true)
+
+  const setFeatures = useCallback((next) => {
+    setFeaturesState(normalizeFeatureMap(next || {}))
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -23,15 +29,21 @@ export function AccessProvider({ children }) {
       if (!isAuthenticated) {
         setRole(ROLES.member)
         const { data } = await api.get('/api/access/public')
-        setFeatures({ ...DEFAULT_FEATURE_MAP, ...(data.features || {}) })
+        const registrationOn = data.features?.registration !== false
+        setFeaturesState(
+          normalizeFeatureMap({
+            ...DEFAULT_FEATURE_MAP,
+            registration: { admin: registrationOn, member: registrationOn },
+          })
+        )
         return
       }
       const { data } = await api.get('/api/access/session')
       setRole(data.role === ROLES.admin ? ROLES.admin : ROLES.member)
-      setFeatures({ ...DEFAULT_FEATURE_MAP, ...(data.features || {}) })
+      setFeaturesState(normalizeFeatureMap(data.features || {}))
     } catch {
       setRole(user?.role === ROLES.admin ? ROLES.admin : ROLES.member)
-      setFeatures(DEFAULT_FEATURE_MAP)
+      setFeaturesState(DEFAULT_FEATURE_MAP)
     } finally {
       setLoading(false)
     }
@@ -45,17 +57,13 @@ export function AccessProvider({ children }) {
   const isAdmin = isAdminRole(role)
 
   const isFeatureOn = useCallback(
-    (key) => {
-      if (!key || key === 'dashboard') return true
-      return features[key] !== false
-    },
-    [features]
+    (key) => isFeatureEnabledForRole(features, key, role),
+    [features, role]
   )
 
   const canAccess = useCallback(
     (key) => {
-      if (isAdmin) return true
-      if (key === '__admin__') return false
+      if (key === '__admin__') return isAdmin
       return isFeatureOn(key)
     },
     [isAdmin, isFeatureOn]
@@ -83,7 +91,7 @@ export function AccessProvider({ children }) {
       refresh,
       setFeatures,
     }),
-    [role, isAdmin, features, authInit, loading, isFeatureOn, canAccess, canOpenPath, refresh]
+    [role, isAdmin, features, authInit, loading, isFeatureOn, canAccess, canOpenPath, refresh, setFeatures]
   )
 
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>

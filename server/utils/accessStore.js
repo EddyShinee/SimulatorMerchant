@@ -1,8 +1,16 @@
 import { getSupabaseAdmin, isMerchantStoreConfigured } from './merchantStore.js'
-import { FEATURE_KEYS, DEFAULT_FEATURE_MAP, ROLES } from '../../src/config/accessControl.js'
+import {
+  FEATURE_KEYS,
+  DEFAULT_FEATURE_MAP,
+  ROLES,
+  normalizeFeatureEntry,
+  normalizeFeatureMap,
+  isFeatureEnabledForRole,
+  defaultRoleFlags,
+} from '../../src/config/accessControl.js'
 
 const memoryProfiles = new Map()
-const memoryFeatures = { ...DEFAULT_FEATURE_MAP }
+const memoryFeatures = normalizeFeatureMap(DEFAULT_FEATURE_MAP)
 
 function adminEmails() {
   return String(process.env.ADMIN_EMAILS || '')
@@ -12,9 +20,18 @@ function adminEmails() {
 }
 
 export function mapFeatureRows(rows) {
-  const map = { ...DEFAULT_FEATURE_MAP }
+  const map = normalizeFeatureMap({})
   for (const row of rows || []) {
-    if (row?.key) map[row.key] = row.enabled !== false
+    if (!row?.key) continue
+    if (row.admin_enabled != null || row.member_enabled != null) {
+      map[row.key] = {
+        admin: row.admin_enabled !== false,
+        member: row.member_enabled !== false,
+      }
+      continue
+    }
+    // Legacy single `enabled` column
+    map[row.key] = defaultRoleFlags(row.enabled !== false)
   }
   return map
 }
@@ -83,19 +100,22 @@ export async function ensureAppProfile({ id, email }) {
 
 export async function getFeatureMap() {
   if (!isMerchantStoreConfigured() || !getSupabaseAdmin()) {
-    return { ...memoryFeatures }
+    return normalizeFeatureMap(memoryFeatures)
   }
-  const { data, error } = await getSupabaseAdmin().from('app_features').select('key, enabled')
+  const { data, error } = await getSupabaseAdmin()
+    .from('app_features')
+    .select('key, enabled, admin_enabled, member_enabled')
   if (error) {
     console.error('[access] list features', error.message)
-    return { ...DEFAULT_FEATURE_MAP }
+    return normalizeFeatureMap({})
   }
   return mapFeatureRows(data)
 }
 
-export async function setFeatureEnabled(key, enabled, updatedBy) {
+export async function setFeatureEnabled(key, role, enabled, updatedBy) {
   const k = decodeURIComponent(String(key || '')).trim()
-  if (!k || k === 'dashboard' || !FEATURE_KEYS.includes(k)) {
+  const r = role === ROLES.admin ? ROLES.admin : role === ROLES.member ? ROLES.member : ''
+  if (!k || k === 'dashboard' || !FEATURE_KEYS.includes(k) || !r) {
     const err = new Error('This feature cannot be changed.')
     err.code = 'FEATURE_LOCKED'
     throw err
@@ -103,27 +123,39 @@ export async function setFeatureEnabled(key, enabled, updatedBy) {
   const on = Boolean(enabled)
 
   if (!isMerchantStoreConfigured() || !getSupabaseAdmin()) {
-    memoryFeatures[k] = on
-    return { key: k, enabled: on }
+    const current = normalizeFeatureEntry(memoryFeatures[k])
+    current[r] = on
+    memoryFeatures[k] = current
+    return { key: k, ...current }
   }
 
   const admin = getSupabaseAdmin()
+  const map = await getFeatureMap()
+  const current = normalizeFeatureEntry(map[k])
+  current[r] = on
+
   const { data, error } = await admin
     .from('app_features')
     .upsert({
       key: k,
-      enabled: on,
+      enabled: current.admin && current.member,
+      admin_enabled: current.admin,
+      member_enabled: current.member,
       updated_at: new Date().toISOString(),
       updated_by: updatedBy || null,
     })
-    .select('key, enabled')
+    .select('key, admin_enabled, member_enabled')
     .single()
 
   if (error) {
     console.error('[access] update feature', error.message)
     throw new Error('Failed to update feature flag.')
   }
-  return { key: data.key, enabled: Boolean(data.enabled) }
+  return {
+    key: data.key,
+    admin: data.admin_enabled !== false,
+    member: data.member_enabled !== false,
+  }
 }
 
 export async function listAppUsers() {
@@ -207,15 +239,12 @@ export async function setUserRole(userId, role, actorId) {
 }
 
 export function featureEnabled(map, key, role) {
-  if (role === ROLES.admin) return true
-  if (!key || key === 'dashboard') return true
-  return map?.[key] !== false
+  return isFeatureEnabledForRole(map, key, role)
 }
 
-/** Global flag (no admin bypass) — registration, merchant-vault, etc. */
+/** Public / unauthenticated flags use the member column (new users are members). */
 export function isFlagOn(map, key) {
-  if (!key || key === 'dashboard') return true
-  return map?.[key] !== false
+  return isFeatureEnabledForRole(map, key, ROLES.member)
 }
 
 export async function assertFlagOn(key) {

@@ -13,6 +13,8 @@ ALTER TABLE public.app_profiles
 CREATE TABLE IF NOT EXISTS public.app_features (
   key TEXT PRIMARY KEY,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  admin_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  member_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_by UUID NULL REFERENCES auth.users(id) ON DELETE SET NULL
 );
@@ -26,22 +28,22 @@ CREATE POLICY "Authenticated can read features"
   TO authenticated
   USING (true);
 
-INSERT INTO public.app_features (key, enabled) VALUES
-  ('dashboard', TRUE),
-  ('payment-flow', TRUE),
-  ('payment-token', TRUE),
-  ('payment-options', TRUE),
-  ('payment-option-details', TRUE),
-  ('do-payment', TRUE),
-  ('payment-action', TRUE),
-  ('transaction-status-inquiry', TRUE),
-  ('payment-inquiry', TRUE),
-  ('payment-pos', TRUE),
-  ('analysis', TRUE),
-  ('payout-create', TRUE),
-  ('payout-inquiry', TRUE),
-  ('pos-standalone', TRUE),
-  ('inbox', TRUE),
-  ('registration', TRUE),
-  ('merchant-vault', TRUE)
+INSERT INTO public.app_features (key, enabled, admin_enabled, member_enabled) VALUES
+  ('dashboard', TRUE, TRUE, TRUE),
+  ('payment-flow', TRUE, TRUE, TRUE),
+  ('payment-token', TRUE, TRUE, TRUE),
+  ('payment-options', TRUE, TRUE, TRUE),
+  ('payment-option-details', TRUE, TRUE, TRUE),
+  ('do-payment', TRUE, TRUE, TRUE),
+  ('payment-action', TRUE, TRUE, TRUE),
+  ('transaction-status-inquiry', TRUE, TRUE, TRUE),
+  ('payment-inquiry', TRUE, TRUE, TRUE),
+  ('payment-pos', TRUE, TRUE, TRUE),
+  ('analysis', TRUE, TRUE, TRUE),
+  ('payout-create', TRUE, TRUE, TRUE),
+  ('payout-inquiry', TRUE, TRUE, TRUE),
+  ('pos-standalone', TRUE, TRUE, TRUE),
+  ('inbox', TRUE, TRUE, TRUE),
+  ('registration', TRUE, TRUE, TRUE),
+  ('merchant-vault', TRUE, TRUE, TRUE)
 ON CONFLICT (key) DO NOTHING;

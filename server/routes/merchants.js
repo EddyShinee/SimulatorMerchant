@@ -2,7 +2,7 @@ import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { requireAuth } from '../middleware/auth.js'
-import { requireFlag } from '../middleware/access.js'
+import { attachAccess, requireFeature } from '../middleware/access.js'
 import {
   isMerchantStoreConfigured,
   getVaultRow,
@@ -27,8 +27,8 @@ const router = express.Router()
 const VAULT_TOKEN_TTL = process.env.VAULT_TOKEN_EXPIRES_IN || '30m'
 const MIN_VAULT_PASSWORD_LEN = 6
 
-router.use(requireAuth)
-router.use(requireFlag('merchant-vault'))
+router.use(requireAuth, attachAccess)
+router.use(requireFeature('merchant-vault'))
 
 function userId(req) {
   return req.user?.sub

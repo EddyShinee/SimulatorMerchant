@@ -96,7 +96,7 @@ function usePageTitle(pathname, t) {
 }
 
 export default function SimulatorLayout() {
-  const { user, logout, enableTouchId, getTouchIdStatus } = useAuth()
+  const { user, logout, enableTouchId, updateTouchId, disableTouchId, getTouchIdStatus } = useAuth()
   const { isAdmin, canAccess } = useAccess()
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -154,13 +154,14 @@ export default function SimulatorLayout() {
     navigate('/login', { replace: true })
   }
 
-  const handleEnableTouchId = async () => {
+  const runTouchIdAction = async (action, successKey) => {
     setTouchIdMsg('')
     setTouchIdBusy(true)
     try {
-      await enableTouchId()
-      setTouchIdEnabled(true)
-      setTouchIdMsg(t('auth.enableTouchIdSuccess'))
+      await action()
+      const status = await getTouchIdStatus()
+      setTouchIdEnabled(Boolean(status?.enabled))
+      setTouchIdMsg(t(successKey))
     } catch (err) {
       if (err?.name === 'NotAllowedError') {
         setTouchIdMsg(t('auth.touchIdCancelled'))
@@ -170,6 +171,18 @@ export default function SimulatorLayout() {
     } finally {
       setTouchIdBusy(false)
     }
+  }
+
+  const handleEnableTouchId = () => runTouchIdAction(() => enableTouchId(), 'auth.enableTouchIdSuccess')
+
+  const handleUpdateTouchId = () => {
+    if (!window.confirm(t('auth.confirmUpdateTouchId'))) return
+    void runTouchIdAction(() => updateTouchId(), 'auth.updateTouchIdSuccess')
+  }
+
+  const handleDisableTouchId = () => {
+    if (!window.confirm(t('auth.confirmRemoveTouchId'))) return
+    void runTouchIdAction(() => disableTouchId(), 'auth.removeTouchIdSuccess')
   }
 
   const closeMobile = () => setMobileOpen(false)
@@ -290,10 +303,33 @@ export default function SimulatorLayout() {
         </div>
         {touchIdAvailable && (
           <div className="mb-2 space-y-1.5 px-1">
+            <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {t('auth.touchIdManage')}
+            </p>
             {touchIdEnabled ? (
-              <p className="px-2 text-[11px] text-emerald-600 dark:text-emerald-400">
-                {t('auth.touchIdEnabled')}
-              </p>
+              <>
+                <p className="px-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+                  {t('auth.touchIdEnabled')}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    className="btn-secondary w-full text-xs"
+                    disabled={touchIdBusy}
+                    onClick={handleUpdateTouchId}
+                  >
+                    {touchIdBusy ? t('common.loading') : t('auth.updateTouchId')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary w-full text-xs text-red-600 hover:text-red-700 dark:text-red-400"
+                    disabled={touchIdBusy}
+                    onClick={handleDisableTouchId}
+                  >
+                    {t('auth.removeTouchId')}
+                  </button>
+                </div>
+              </>
             ) : (
               <button
                 type="button"

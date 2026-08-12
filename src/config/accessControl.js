@@ -1,4 +1,4 @@
-/** App feature keys — admin toggles these; members only see enabled ones. */
+/** App feature keys — toggled per role (admin / member). */
 
 export const ROLES = {
   admin: 'admin',
@@ -11,7 +11,7 @@ export const FEATURE_GROUPS = [
     labelKey: 'access.groupMain',
     features: [
       { key: 'dashboard', labelKey: 'nav.dashboard', locked: true },
-      { key: 'registration', labelKey: 'access.registration', global: true },
+      { key: 'registration', labelKey: 'access.registration' },
       { key: 'payment-flow', labelKey: 'nav.paymentFlow' },
       { key: 'inbox', labelKey: 'nav.requestInbox' },
     ],
@@ -21,7 +21,7 @@ export const FEATURE_GROUPS = [
     labelKey: 'access.groupApi',
     features: [
       { key: 'payment-token', labelKey: 'apis.paymentToken' },
-      { key: 'merchant-vault', labelKey: 'access.merchantVault', global: true },
+      { key: 'merchant-vault', labelKey: 'access.merchantVault' },
       { key: 'payment-options', labelKey: 'apis.paymentOptions' },
       { key: 'payment-option-details', labelKey: 'apis.paymentOptionDetails' },
       { key: 'do-payment', labelKey: 'apis.doPayment' },
@@ -49,9 +49,39 @@ export const FEATURE_GROUPS = [
 
 export const FEATURE_KEYS = FEATURE_GROUPS.flatMap((g) => g.features.map((f) => f.key))
 
+export function defaultRoleFlags(on = true) {
+  return { admin: on, member: on }
+}
+
 export const DEFAULT_FEATURE_MAP = Object.fromEntries(
-  FEATURE_GROUPS.flatMap((g) => g.features.map((f) => [f.key, true]))
+  FEATURE_GROUPS.flatMap((g) => g.features.map((f) => [f.key, defaultRoleFlags(true)]))
 )
+
+export function normalizeFeatureEntry(entry) {
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    return {
+      admin: entry.admin !== false,
+      member: entry.member !== false,
+    }
+  }
+  const on = entry !== false
+  return { admin: on, member: on }
+}
+
+export function normalizeFeatureMap(map) {
+  const next = { ...DEFAULT_FEATURE_MAP }
+  for (const key of FEATURE_KEYS) {
+    next[key] = normalizeFeatureEntry(map?.[key] ?? next[key])
+  }
+  return next
+}
+
+export function isFeatureEnabledForRole(map, key, role) {
+  if (!key || key === 'dashboard') return true
+  const entry = normalizeFeatureEntry(map?.[key])
+  const r = role === ROLES.admin ? ROLES.admin : ROLES.member
+  return entry[r] !== false
+}
 
 export function isAdminRole(role) {
   return role === ROLES.admin

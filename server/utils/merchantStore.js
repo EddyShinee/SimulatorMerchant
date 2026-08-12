@@ -407,6 +407,30 @@ export async function deleteAuthPasskeys(userId) {
   await db.query('DELETE FROM auth_webauthn_credentials WHERE user_id = $1', [String(userId)])
 }
 
+export async function deleteOtherAuthPasskeys(userId, keepCredentialId) {
+  const uid = String(userId)
+  const keep = String(keepCredentialId || '')
+  const admin = getSupabaseAdmin()
+  if (admin) {
+    let q = admin.from('auth_webauthn_credentials').delete().eq('user_id', uid)
+    if (keep) q = q.neq('credential_id', keep)
+    const { error } = await q
+    if (error) throw error
+    return
+  }
+
+  const db = getPool()
+  if (!db) throw storeUnavailableError()
+  if (keep) {
+    await db.query(
+      'DELETE FROM auth_webauthn_credentials WHERE user_id = $1 AND credential_id <> $2',
+      [uid, keep]
+    )
+  } else {
+    await db.query('DELETE FROM auth_webauthn_credentials WHERE user_id = $1', [uid])
+  }
+}
+
 export async function countAuthPasskeys(userId) {
   const list = await listAuthPasskeysByUserId(userId)
   return list.length

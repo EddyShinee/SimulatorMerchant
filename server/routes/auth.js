@@ -12,6 +12,7 @@ import {
   buildAuthEnrollOptions,
   finishAuthEnroll,
   getAuthPasskeyStatus,
+  deletePasskeys,
 } from '../utils/authWebAuthn.js'
 import { requireAuth } from '../middleware/auth.js'
 import { assertFlagOn, ensureAppProfile } from '../utils/accessStore.js'
@@ -251,7 +252,8 @@ router.get('/webauthn/status', requireAuth, async (req, res) => {
 
 router.post('/webauthn/enroll/options', requireAuth, async (req, res) => {
   try {
-    const result = await buildAuthEnrollOptions(req, req.user.sub, req.user.email)
+    const replace = Boolean(req.body?.replace)
+    const result = await buildAuthEnrollOptions(req, req.user.sub, req.user.email, { replace })
     return res.json(result)
   } catch (err) {
     return webauthnError(res, err, 'Failed to start Touch ID enrollment.')
@@ -266,10 +268,20 @@ router.post('/webauthn/enroll', requireAuth, async (req, res) => {
       response: req.body?.response,
       challengeToken: req.body?.challengeToken,
       challengeId: req.body?.challengeId,
+      replace: Boolean(req.body?.replace),
     })
     return res.json({ ok: true, user: await authUserPayload(user) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to enable Touch ID.')
+  }
+})
+
+router.delete('/webauthn', requireAuth, async (req, res) => {
+  try {
+    await deletePasskeys(req.user.sub)
+    return res.json({ ok: true, enabled: false, count: 0 })
+  } catch (err) {
+    return webauthnError(res, err, 'Failed to remove Touch ID.')
   }
 })
 

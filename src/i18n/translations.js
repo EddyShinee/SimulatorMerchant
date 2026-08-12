@@ -98,6 +98,15 @@ export const translations = {
       enableTouchId: 'Bật {biometric}',
       enableTouchIdSuccess: 'Đã gắn {biometric} vào tài khoản (dùng chung đăng nhập + Merchants).',
       touchIdEnabled: '{biometric} đã bật',
+      touchIdManage: '{biometric}',
+      updateTouchId: 'Cập nhật',
+      updateTouchIdSuccess: 'Đã cập nhật {biometric} trên thiết bị này.',
+      confirmUpdateTouchId:
+        'Đăng ký lại {biometric} trên thiết bị này? Passkey cũ sẽ bị thay thế sau khi xác nhận thành công.',
+      removeTouchId: 'Xóa',
+      removeTouchIdSuccess: 'Đã tắt {biometric}.',
+      confirmRemoveTouchId:
+        'Tắt {biometric}? Bạn sẽ không đăng nhập bằng {biometric} và không mở vault bằng {biometric} nữa.',
     },
     nav: {
       dashboard: 'Tổng quan',
@@ -716,13 +725,12 @@ export const translations = {
     },
     access: {
       title: 'Phân quyền',
-      subtitle: 'Admin bật/tắt menu và tính năng. Member chỉ thấy những mục đang bật.',
+      subtitle: 'Bật/tắt từng tính năng riêng cho Admin và Member.',
       tabFeatures: 'Tính năng & menu',
       tabMembers: 'Thành viên',
       featuresHint:
-        'Tắt menu → Member không thấy trang đó. Admin vẫn thấy mọi menu. Mục toàn cục (đăng ký, lưu merchant) tắt thì áp dụng cho cả Admin.',
-      featureGlobal: 'Áp dụng cho tất cả mọi người, kể cả Admin.',
-      featureLocked: 'Dashboard luôn bật để Member còn trang chủ.',
+        'Bỏ chọn Admin hoặc Member → role đó mất menu/trang tương ứng. Đăng ký công khai dùng cột Member.',
+      featureLocked: 'Dashboard luôn bật để còn trang chủ.',
       featureSaved: 'Đã cập nhật tính năng.',
       roleSaved: 'Đã cập nhật quyền.',
       saveError: 'Không lưu được thay đổi.',
@@ -845,6 +853,15 @@ export const translations = {
       enableTouchId: 'Enable {biometric}',
       enableTouchIdSuccess: '{biometric} linked (shared for login + Merchants vault).',
       touchIdEnabled: '{biometric} enabled',
+      touchIdManage: '{biometric}',
+      updateTouchId: 'Update',
+      updateTouchIdSuccess: '{biometric} updated on this device.',
+      confirmUpdateTouchId:
+        'Re-register {biometric} on this device? Old passkeys will be replaced after a successful confirmation.',
+      removeTouchId: 'Remove',
+      removeTouchIdSuccess: '{biometric} disabled.',
+      confirmRemoveTouchId:
+        'Disable {biometric}? You will no longer sign in or unlock the vault with {biometric}.',
     },
     nav: {
       dashboard: 'Dashboard',
@@ -1464,13 +1481,12 @@ export const translations = {
     },
     access: {
       title: 'Access control',
-      subtitle: 'Admins enable or disable menus and features. Members only see what is turned on.',
+      subtitle: 'Enable or disable each feature separately for Admin and Member.',
       tabFeatures: 'Features & menus',
       tabMembers: 'Members',
       featuresHint:
-        'Turn a menu off and members lose that page. Admins still see all menus. Global flags (registration, merchant vault) apply to everyone, including admins.',
-      featureGlobal: 'Applies to everyone, including admins.',
-      featureLocked: 'Dashboard stays on so members still have a home page.',
+        'Uncheck Admin or Member to hide that menu/page for that role. Public registration uses the Member column.',
+      featureLocked: 'Dashboard stays on so there is still a home page.',
       featureSaved: 'Feature updated.',
       roleSaved: 'Role updated.',
       saveError: 'Could not save the change.',
