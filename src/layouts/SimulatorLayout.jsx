@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import AccountMenu from '../components/AccountMenu.jsx'
 import { API_CATALOG } from '../config/apis.js'
 import { isPaymentFlowRoute } from '../config/paymentFlowWizard.js'
 import {
@@ -12,11 +12,9 @@ import {
   IconDashboard,
   IconFlow,
   IconInbox,
-  IconLogout,
   IconMenu,
   IconClose,
   IconPayout,
-  IconSettings,
 } from '../components/icons.jsx'
 import { AppBrandSidebar } from '../components/AppBrand.jsx'
 import { PaymentFlowProvider } from '../context/PaymentFlowContext.jsx'
@@ -95,19 +93,12 @@ function usePageTitle(pathname, t) {
 }
 
 export default function SimulatorLayout() {
-  const { user, logout } = useAuth()
-  const { isAdmin, canAccess } = useAccess()
+  const { canAccess } = useAccess()
   const { t } = useLanguage()
-  const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { unread: inboxUnread } = useInboxUnread(canAccess('inbox') ? 10000 : 0)
   const pageTitle = usePageTitle(location.pathname, t)
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -115,7 +106,7 @@ export default function SimulatorLayout() {
     <div className="flex h-full flex-col">
       <AppBrandSidebar />
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2 pb-4">
         <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
           {t('nav.sectionMain')}
         </p>
@@ -206,33 +197,7 @@ export default function SimulatorLayout() {
             />
           </>
         )}
-
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('nav.sectionAccount')}
-        </p>
-        <NavItem
-          to="/app/settings"
-          icon={IconSettings}
-          label={t('nav.settings')}
-          onClick={closeMobile}
-          end={false}
-        />
       </nav>
-
-      <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-        <div className="mb-2 px-3 py-1">
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={user?.email}>
-            {user?.email}
-          </p>
-          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
-            {isAdmin ? t('access.roleAdmin') : t('access.roleMember')}
-          </p>
-        </div>
-        <button onClick={handleLogout} className="btn-secondary w-full">
-          <IconLogout className="h-4 w-4" />
-          {t('common.logout')}
-        </button>
-      </div>
     </div>
   )
 
@@ -278,6 +243,7 @@ export default function SimulatorLayout() {
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
               <LanguageSwitcher />
+              <AccountMenu />
             </div>
           </header>
 
