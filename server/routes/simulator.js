@@ -1,5 +1,6 @@
 import express from 'express'
 import { requireAuth } from '../middleware/auth.js'
+import { attachAccess, requireFeature } from '../middleware/access.js'
 
 import { parsePaymentResponse, encodeCallbackDisplayToken } from '../utils/paymentResponse.js'
 import { callbackDisplayUrl, resolveFrontendOrigin } from '../utils/frontendOrigin.js'
@@ -119,7 +120,7 @@ router.all(/^\/hook(\/.*)?$/, async (req, res) => {
 // PROTECTED endpoints (auth per-route — do NOT use router.use(requireAuth))
 // ---------------------------------------------------------------------------
 
-router.get('/requests', requireAuth, async (req, res) => {
+router.get('/requests', requireAuth, attachAccess, requireFeature('inbox'), async (req, res) => {
   try {
     const result = await listInboxRequests(req.user.sub, {
       page: req.query.page,
@@ -137,7 +138,7 @@ router.get('/requests', requireAuth, async (req, res) => {
   }
 })
 
-router.get('/requests/unread-count', requireAuth, async (req, res) => {
+router.get('/requests/unread-count', requireAuth, attachAccess, requireFeature('inbox'), async (req, res) => {
   try {
     const since = req.query.since || null
     const count = await countInboxSince(req.user.sub, since)
@@ -148,7 +149,7 @@ router.get('/requests/unread-count', requireAuth, async (req, res) => {
   }
 })
 
-router.delete('/requests', requireAuth, async (req, res) => {
+router.delete('/requests', requireAuth, attachAccess, requireFeature('inbox'), async (req, res) => {
   try {
     await clearInboxRequests(req.user.sub)
     return res.json({ ok: true, count: 0 })

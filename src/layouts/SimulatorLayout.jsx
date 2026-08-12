@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
@@ -16,6 +17,7 @@ import {
   IconMenu,
   IconClose,
   IconPayout,
+  IconShield,
 } from '../components/icons.jsx'
 import { AppBrandSidebar } from '../components/AppBrand.jsx'
 import { PaymentFlowProvider } from '../context/PaymentFlowContext.jsx'
@@ -79,6 +81,7 @@ function ApiRadioItem({ to, label, onClick }) {
 
 function usePageTitle(pathname, t) {
   if (pathname === '/app' || pathname === '/app/') return t('nav.dashboard')
+  if (pathname.includes('/access')) return t('nav.accessControl')
   if (isPaymentFlowRoute(pathname)) return t('nav.paymentFlow')
   if (pathname.includes('/inbox')) return t('nav.requestInbox')
   if (pathname.includes('/pos-standalone')) return t('nav.posStandalone')
@@ -94,11 +97,12 @@ function usePageTitle(pathname, t) {
 
 export default function SimulatorLayout() {
   const { user, logout, enableTouchId, getTouchIdStatus } = useAuth()
+  const { isAdmin, canAccess } = useAccess()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { unread: inboxUnread } = useInboxUnread()
+  const { unread: inboxUnread } = useInboxUnread(canAccess('inbox') ? 10000 : 0)
   const pageTitle = usePageTitle(location.pathname, t)
   const [touchIdAvailable, setTouchIdAvailable] = useState(false)
   const [touchIdEnabled, setTouchIdEnabled] = useState(null)
@@ -179,76 +183,110 @@ export default function SimulatorLayout() {
           {t('nav.sectionMain')}
         </p>
         <NavItem to="/app" icon={IconDashboard} label={t('nav.dashboard')} onClick={closeMobile} />
+        {isAdmin && (
+          <NavItem
+            to="/app/access"
+            icon={IconShield}
+            label={t('nav.accessControl')}
+            onClick={closeMobile}
+          />
+        )}
 
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('nav.sectionPaymentFlow')}
-        </p>
-        <NavItem
-          to="/app/payment-flow"
-          icon={IconFlow}
-          label={t('nav.paymentFlow')}
-          onClick={closeMobile}
-          end={false}
-        />
+        {canAccess('payment-flow') && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionPaymentFlow')}
+            </p>
+            <NavItem
+              to="/app/payment-flow"
+              icon={IconFlow}
+              label={t('nav.paymentFlow')}
+              onClick={closeMobile}
+              end={false}
+            />
+          </>
+        )}
 
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('apis.choose')}
-        </p>
-        <div className="space-y-0.5">
-          {API_CATALOG.map((api) => (
-            <ApiRadioItem
-              key={api.id}
-              to={`/app/api/${api.id}`}
-              label={t(api.nameKey)}
+        {API_CATALOG.some((api) => canAccess(api.id)) && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('apis.choose')}
+            </p>
+            <div className="space-y-0.5">
+              {API_CATALOG.filter((api) => canAccess(api.id)).map((api) => (
+                <ApiRadioItem
+                  key={api.id}
+                  to={`/app/api/${api.id}`}
+                  label={t(api.nameKey)}
+                  onClick={closeMobile}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {(canAccess('payout-create') || canAccess('payout-inquiry')) && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionPayout')}
+            </p>
+            {canAccess('payout-create') && (
+              <NavItem
+                to="/app/payout/create"
+                icon={IconPayout}
+                label={t('nav.payoutCreate')}
+                onClick={closeMobile}
+              />
+            )}
+            {canAccess('payout-inquiry') && (
+              <NavItem
+                to="/app/payout/inquiry"
+                icon={IconPayout}
+                label={t('nav.payoutInquiry')}
+                onClick={closeMobile}
+              />
+            )}
+          </>
+        )}
+
+        {canAccess('pos-standalone') && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionPosStandalone')}
+            </p>
+            <NavItem
+              to="/app/pos-standalone"
+              icon={IconApi}
+              label={t('nav.posStandalone')}
               onClick={closeMobile}
             />
-          ))}
-        </div>
+          </>
+        )}
 
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('nav.sectionPayout')}
-        </p>
-        <NavItem
-          to="/app/payout/create"
-          icon={IconPayout}
-          label={t('nav.payoutCreate')}
-          onClick={closeMobile}
-        />
-        <NavItem
-          to="/app/payout/inquiry"
-          icon={IconPayout}
-          label={t('nav.payoutInquiry')}
-          onClick={closeMobile}
-        />
-
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('nav.sectionPosStandalone')}
-        </p>
-        <NavItem
-          to="/app/pos-standalone"
-          icon={IconApi}
-          label={t('nav.posStandalone')}
-          onClick={closeMobile}
-        />
-
-        <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {t('nav.sectionTools')}
-        </p>
-        <NavItem
-          to="/app/inbox"
-          icon={IconInbox}
-          label={t('nav.requestInbox')}
-          badge={inboxUnread}
-          onClick={closeMobile}
-        />
+        {canAccess('inbox') && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionTools')}
+            </p>
+            <NavItem
+              to="/app/inbox"
+              icon={IconInbox}
+              label={t('nav.requestInbox')}
+              badge={inboxUnread}
+              onClick={closeMobile}
+            />
+          </>
+        )}
       </nav>
 
       <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-        <div
-          className="mb-2 truncate px-3 py-1 text-xs text-slate-500 dark:text-slate-400"
-          title={user?.email}
-        >
-          {user?.email}
+        <div className="mb-2 px-3 py-1">
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={user?.email}>
+            {user?.email}
+          </p>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+            {isAdmin ? t('access.roleAdmin') : t('access.roleMember')}
+          </p>
         </div>
         {touchIdAvailable && (
           <div className="mb-2 space-y-1.5 px-1">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api, { getInboxUrls } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
@@ -46,9 +47,10 @@ function methodPill(method) {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const { canAccess, isAdmin } = useAccess()
   const { t, lang } = useLanguage()
   const { flow } = usePaymentFlow()
-  const { unread: inboxUnread } = useInboxUnread(15000)
+  const { unread: inboxUnread } = useInboxUnread(canAccess('inbox') ? 15000 : 0)
 
   const [requests, setRequests] = useState([])
   const [inboxLoading, setInboxLoading] = useState(true)
@@ -80,8 +82,8 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    loadInbox()
-  }, [loadInbox])
+    if (canAccess('inbox')) loadInbox()
+  }, [loadInbox, canAccess])
 
   useEffect(() => {
     let cancelled = false
@@ -239,18 +241,30 @@ export default function Dashboard() {
           <h2 className="font-semibold text-slate-900 dark:text-slate-100">{t('dashboard.quickActions')}</h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('dashboard.quickActionsDesc')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <QuickAction to="/app/payment-flow" variant="primary">
-              <IconFlow className="mr-1 inline h-4 w-4" />
-              {t('nav.paymentFlow')}
-            </QuickAction>
-            <QuickAction to="/app/payment-flow/token">{t('apis.paymentToken')}</QuickAction>
-            <QuickAction to="/app/payment-flow/pay">{t('apis.doPayment')}</QuickAction>
-            <QuickAction to={inquiryTo}>{t('apis.paymentInquiry')}</QuickAction>
-            <QuickAction to="/app/api/analysis">{t('apis.analysis')}</QuickAction>
-            <QuickAction to="/app/pos-standalone">{t('nav.posStandalone')}</QuickAction>
+            {canAccess('payment-flow') && (
+              <QuickAction to="/app/payment-flow" variant="primary">
+                <IconFlow className="mr-1 inline h-4 w-4" />
+                {t('nav.paymentFlow')}
+              </QuickAction>
+            )}
+            {canAccess('payment-flow') && canAccess('payment-token') && (
+              <QuickAction to="/app/payment-flow/token">{t('apis.paymentToken')}</QuickAction>
+            )}
+            {canAccess('payment-flow') && canAccess('do-payment') && (
+              <QuickAction to="/app/payment-flow/pay">{t('apis.doPayment')}</QuickAction>
+            )}
+            {canAccess('payment-flow') && canAccess('payment-inquiry') && (
+              <QuickAction to={inquiryTo}>{t('apis.paymentInquiry')}</QuickAction>
+            )}
+            {canAccess('analysis') && <QuickAction to="/app/api/analysis">{t('apis.analysis')}</QuickAction>}
+            {canAccess('pos-standalone') && (
+              <QuickAction to="/app/pos-standalone">{t('nav.posStandalone')}</QuickAction>
+            )}
+            {isAdmin && <QuickAction to="/app/access">{t('nav.accessControl')}</QuickAction>}
           </div>
         </div>
 
+        {canAccess('inbox') && (
         <div className="card p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -309,6 +323,7 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+        )}
       </div>
 
       {/* Webhook & callback URLs */}

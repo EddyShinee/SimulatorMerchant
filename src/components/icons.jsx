@@ -105,6 +105,15 @@ export function IconFlow(props) {
   )
 }
 
+export function IconShield(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3l8 4v5c0 5-3.4 7.6-8 9-4.6-1.4-8-4-8-9V7l8-4z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  )
+}
+
 export function IconPayout(props) {
   return (
     <svg {...base} {...props}>

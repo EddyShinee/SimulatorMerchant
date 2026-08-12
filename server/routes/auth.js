@@ -14,6 +14,7 @@ import {
   getAuthPasskeyStatus,
 } from '../utils/authWebAuthn.js'
 import { requireAuth } from '../middleware/auth.js'
+import { assertFlagOn, ensureAppProfile } from '../utils/accessStore.js'
 
 const router = express.Router()
 
@@ -25,8 +26,9 @@ function signToken(user) {
   })
 }
 
-function authUserPayload(user) {
-  return { id: user.id, email: user.email }
+async function authUserPayload(user) {
+  const profile = await ensureAppProfile({ id: user.id, email: user.email })
+  return { id: profile.id, email: profile.email, role: profile.role }
 }
 
 function webauthnError(res, err, fallback) {
@@ -41,9 +43,11 @@ function webauthnError(res, err, fallback) {
           code === 'UNKNOWN_CREDENTIAL' ||
           code === 'REGISTER_FAILED'
         ? 400
-        : code === 'STORE_UNAVAILABLE'
-          ? 503
-          : 500
+        : code === 'FEATURE_DISABLED'
+          ? 403
+          : code === 'STORE_UNAVAILABLE'
+            ? 503
+            : 500
   console.error('[auth:webauthn]', code, err?.message)
   return res.status(status).json({
     error: code,
@@ -63,6 +67,7 @@ if (!isSupabaseConfigured()) {
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
+    await assertFlagOn('registration')
     const email = String(req.body?.email || '').trim().toLowerCase()
     const password = String(req.body?.password || '')
 
@@ -97,7 +102,7 @@ router.post('/register', async (req, res) => {
       const token = signToken(user)
       return res.status(201).json({
         token,
-        user: authUserPayload(user),
+        user: await authUserPayload(user),
         emailConfirmationRequired: !data.session,
       })
     }
@@ -119,8 +124,11 @@ router.post('/register', async (req, res) => {
     })
 
     const token = signToken(user)
-    return res.status(201).json({ token, user: authUserPayload(user) })
+    return res.status(201).json({ token, user: await authUserPayload(user) })
   } catch (err) {
+    if (err?.code === 'FEATURE_DISABLED') {
+      return res.status(403).json({ error: 'FEATURE_DISABLED', message: err.message })
+    }
     console.error('register error', err)
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' })
   }
@@ -148,7 +156,7 @@ router.post('/login', async (req, res) => {
 
       const user = { id: data.user.id, email: data.user.email || email }
       const token = signToken(user)
-      return res.json({ token, user: authUserPayload(user) })
+      return res.json({ token, user: await authUserPayload(user) })
     }
 
     await initUsersDb()
@@ -167,7 +175,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = signToken(user)
-    return res.json({ token, user: authUserPayload(user) })
+    return res.json({ token, user: await authUserPayload(user) })
   } catch (err) {
     console.error('login error', err)
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' })
@@ -178,6 +186,7 @@ router.post('/login', async (req, res) => {
 
 router.post('/webauthn/register/options', async (req, res) => {
   try {
+    await assertFlagOn('registration')
     const email = String(req.body?.email || '').trim().toLowerCase()
     if (!EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: 'INVALID_EMAIL', message: 'A valid email is required.' })
@@ -191,6 +200,7 @@ router.post('/webauthn/register/options', async (req, res) => {
 
 router.post('/webauthn/register', async (req, res) => {
   try {
+    await assertFlagOn('registration')
     const user = await finishAuthRegister(req, {
       response: req.body?.response,
       challengeToken: req.body?.challengeToken,
@@ -199,7 +209,7 @@ router.post('/webauthn/register', async (req, res) => {
       email: req.body?.email,
     })
     const token = signToken(user)
-    return res.status(201).json({ token, user: authUserPayload(user) })
+    return res.status(201).json({ token, user: await authUserPayload(user) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to register with Touch ID.')
   }
@@ -223,7 +233,7 @@ router.post('/webauthn/login', async (req, res) => {
       challengeId: req.body?.challengeId,
     })
     const token = signToken(user)
-    return res.json({ token, user: authUserPayload(user) })
+    return res.json({ token, user: await authUserPayload(user) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to sign in with Touch ID.')
   }
@@ -257,14 +267,20 @@ router.post('/webauthn/enroll', requireAuth, async (req, res) => {
       challengeToken: req.body?.challengeToken,
       challengeId: req.body?.challengeId,
     })
-    return res.json({ ok: true, user: authUserPayload(user) })
+    return res.json({ ok: true, user: await authUserPayload(user) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to enable Touch ID.')
   }
 })
 
-router.get('/me', (req, res) => {
-  return res.json({ user: { id: req.user.sub, email: req.user.email } })
+router.get('/me', async (req, res) => {
+  try {
+    const user = await authUserPayload({ id: req.user.sub, email: req.user.email })
+    return res.json({ user })
+  } catch (err) {
+    console.error('[auth:me]', err)
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to load profile.' })
+  }
 })
 
 export default router

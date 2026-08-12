@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import * as jose from 'jose'
 import { requireAuth } from '../middleware/auth.js'
+import { attachAccess, requireFeature } from '../middleware/access.js'
 import { loadPrivateKey } from '../utils/privateKey.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -15,7 +16,7 @@ const DEFAULT_PRIVATE_FILE = '123.pfx'
 const DEFAULT_PUBLIC_FILE = 'abc.cer'
 
 const router = express.Router()
-router.use(requireAuth)
+router.use(requireAuth, attachAccess, requireFeature('payment-action'))
 
 function readDefaultKey(filename) {
   const filePath = path.join(DEFAULT_KEY_DIR, filename)

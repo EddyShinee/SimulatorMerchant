@@ -26,6 +26,10 @@ export function useInboxUnread(pollIntervalMs = 10000) {
   }, [])
 
   useEffect(() => {
+    if (!pollIntervalMs) {
+      setUnread(0)
+      return undefined
+    }
     refresh()
     const id = setInterval(refresh, pollIntervalMs)
     return () => clearInterval(id)

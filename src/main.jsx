@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { LanguageProvider } from './context/LanguageContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { AccessProvider } from './context/AccessContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import ToastContainer from './components/ToastContainer.jsx'
 import './index.css'
@@ -15,10 +16,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <ToastProvider>
-              <App />
-              <ToastContainer />
-            </ToastProvider>
+            <AccessProvider>
+              <ToastProvider>
+                <App />
+                <ToastContainer />
+              </ToastProvider>
+            </AccessProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

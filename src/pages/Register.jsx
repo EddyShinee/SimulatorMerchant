@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
@@ -9,6 +10,7 @@ import { AppBrandCentered } from '../components/AppBrand.jsx'
 
 export default function Register() {
   const { register, registerWithTouchId } = useAuth()
+  const { isFeatureOn, loading: accessLoading } = useAccess()
   const { t } = useLanguage()
   const navigate = useNavigate()
 
@@ -100,6 +102,14 @@ export default function Register() {
             <p className="mt-1.5 text-sm text-slate-500">{t('auth.registerSubtitle')}</p>
           </div>
 
+          {!accessLoading && !isFeatureOn('registration') ? (
+            <div className="card space-y-4 p-6 text-center sm:p-8">
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t('auth.registrationClosed')}</p>
+              <Link to="/login" className="btn-primary inline-flex">
+                {t('auth.goLogin')}
+              </Link>
+            </div>
+          ) : (
           <div className="card p-6 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               {error && (
@@ -181,6 +191,7 @@ export default function Register() {
               </div>
             )}
           </div>
+          )}
 
           <p className="mt-6 text-center text-sm text-slate-600">
             {t('auth.haveAccount')}{' '}

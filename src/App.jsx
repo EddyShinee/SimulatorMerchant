@@ -1,6 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
+import FeatureRoute from './components/FeatureRoute.jsx'
 import SimulatorLayout from './layouts/SimulatorLayout.jsx'
 import PaymentFlowLayout from './layouts/PaymentFlowLayout.jsx'
 import ApiPaymentLayout from './layouts/ApiPaymentLayout.jsx'
@@ -23,6 +24,16 @@ import PaymentFlowHub from './pages/PaymentFlowHub.jsx'
 import PaymentCallbackFrontend from './pages/PaymentCallbackFrontend.jsx'
 import CreatePayout from './pages/CreatePayout.jsx'
 import PayoutInquiry from './pages/PayoutInquiry.jsx'
+import AccessControl from './pages/AccessControl.jsx'
+
+function GatedApiConsole() {
+  const { apiId } = useParams()
+  return (
+    <FeatureRoute feature={apiId}>
+      <ApiConsole />
+    </FeatureRoute>
+  )
+}
 
 // Redirect authenticated users away from auth pages.
 function PublicOnly({ children }) {
@@ -61,7 +72,22 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="payment-flow" element={<PaymentFlowLayout />}>
+        <Route
+          path="access"
+          element={
+            <FeatureRoute adminOnly>
+              <AccessControl />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="payment-flow"
+          element={
+            <FeatureRoute feature="payment-flow">
+              <PaymentFlowLayout />
+            </FeatureRoute>
+          }
+        >
           <Route index element={<PaymentFlowHub />} />
           <Route path="token" element={<PaymentToken />} />
           <Route path="options" element={<PaymentOptions />} />
@@ -72,21 +98,112 @@ export default function App() {
           <Route path="status" element={<TransactionStatusInquiry />} />
         </Route>
         <Route element={<ApiPaymentLayout />}>
-          <Route path="api/payment-options" element={<PaymentOptions />} />
-          <Route path="api/payment-option-details" element={<PaymentOptionDetails />} />
-          <Route path="api/do-payment" element={<DoPayment />} />
+          <Route
+            path="api/payment-options"
+            element={
+              <FeatureRoute feature="payment-options">
+                <PaymentOptions />
+              </FeatureRoute>
+            }
+          />
+          <Route
+            path="api/payment-option-details"
+            element={
+              <FeatureRoute feature="payment-option-details">
+                <PaymentOptionDetails />
+              </FeatureRoute>
+            }
+          />
+          <Route
+            path="api/do-payment"
+            element={
+              <FeatureRoute feature="do-payment">
+                <DoPayment />
+              </FeatureRoute>
+            }
+          />
         </Route>
-        <Route path="api/payment-token" element={<PaymentToken />} />
-        <Route path="api/payment-action" element={<PaymentAction />} />
-        <Route path="api/payment-pos" element={<PaymentPos />} />
-        <Route path="api/payment-inquiry" element={<PaymentInquiry />} />
-        <Route path="api/transaction-status-inquiry" element={<TransactionStatusInquiry />} />
-        <Route path="api/analysis" element={<Analysis />} />
-        <Route path="api/:apiId" element={<ApiConsole />} />
-        <Route path="pos-standalone" element={<PosStandalone />} />
-        <Route path="payout/create" element={<CreatePayout />} />
-        <Route path="payout/inquiry" element={<PayoutInquiry />} />
-        <Route path="inbox" element={<RequestInbox />} />
+        <Route
+          path="api/payment-token"
+          element={
+            <FeatureRoute feature="payment-token">
+              <PaymentToken />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/payment-action"
+          element={
+            <FeatureRoute feature="payment-action">
+              <PaymentAction />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/payment-pos"
+          element={
+            <FeatureRoute feature="payment-pos">
+              <PaymentPos />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/payment-inquiry"
+          element={
+            <FeatureRoute feature="payment-inquiry">
+              <PaymentInquiry />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/transaction-status-inquiry"
+          element={
+            <FeatureRoute feature="transaction-status-inquiry">
+              <TransactionStatusInquiry />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/analysis"
+          element={
+            <FeatureRoute feature="analysis">
+              <Analysis />
+            </FeatureRoute>
+          }
+        />
+        <Route path="api/:apiId" element={<GatedApiConsole />} />
+        <Route
+          path="pos-standalone"
+          element={
+            <FeatureRoute feature="pos-standalone">
+              <PosStandalone />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="payout/create"
+          element={
+            <FeatureRoute feature="payout-create">
+              <CreatePayout />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="payout/inquiry"
+          element={
+            <FeatureRoute feature="payout-inquiry">
+              <PayoutInquiry />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="inbox"
+          element={
+            <FeatureRoute feature="inbox">
+              <RequestInbox />
+            </FeatureRoute>
+          }
+        />
       </Route>
 
       <Route path="/callback/frontend" element={<PaymentCallbackFrontend />} />

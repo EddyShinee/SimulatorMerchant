@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAccess } from '../context/AccessContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import InvoiceCopyBar from '../components/InvoiceCopyBar.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
@@ -212,6 +213,7 @@ export default function PaymentToken() {
   const { t } = useLanguage()
   const toast = useToast()
   const { user } = useAuth()
+  const { isFeatureOn } = useAccess()
   const { flow, updateFlow, recordStep } = usePaymentFlow()
   const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
@@ -559,20 +561,22 @@ export default function PaymentToken() {
                     value={merchantId}
                     onChange={(e) => setMerchantId(e.target.value)}
                   />
-                  <MerchantVaultPicker
-                    currentMid={merchantId}
-                    currentSecretKey={secretKey}
-                    currentPageEnv={env}
-                    onSelect={({ mid, secretKey: key, environment }) => {
-                      if (mid) setMerchantId(mid)
-                      if (key !== undefined) setSecretKey(key)
-                      if (environment) handleEnv(vaultEnvToPageEnv(environment))
-                      updateFlow({
-                        merchantId: mid || merchantId,
-                        ...(key !== undefined ? { secretKey: key } : {}),
-                      })
-                    }}
-                  />
+                  {isFeatureOn('merchant-vault') && (
+                    <MerchantVaultPicker
+                      currentMid={merchantId}
+                      currentSecretKey={secretKey}
+                      currentPageEnv={env}
+                      onSelect={({ mid, secretKey: key, environment }) => {
+                        if (mid) setMerchantId(mid)
+                        if (key !== undefined) setSecretKey(key)
+                        if (environment) handleEnv(vaultEnvToPageEnv(environment))
+                        updateFlow({
+                          merchantId: mid || merchantId,
+                          ...(key !== undefined ? { secretKey: key } : {}),
+                        })
+                      }}
+                    />
+                  )}
                 </div>
               </div>
               <div>

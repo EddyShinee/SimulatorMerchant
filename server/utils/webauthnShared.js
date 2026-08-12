@@ -74,6 +74,28 @@ export function readAnonWebAuthnChallenge(challengeToken, type) {
   return payload
 }
 
+/** True when rpID equals hostname or is a valid suffix (WebAuthn RP ID rules). */
+export function isRpIdValidForHost(rpID, hostname) {
+  const r = String(rpID || '').toLowerCase().replace(/\.$/, '')
+  const h = String(hostname || '').toLowerCase().replace(/\.$/, '')
+  if (!r || !h) return false
+  return h === r || h.endsWith(`.${r}`)
+}
+
+/**
+ * RP ID for this page origin.
+ * - www.eddy.io.vn → eddy.io.vn (share Touch ID with apex)
+ * - simulator-merchant.vercel.app stays full host (vercel.app is a public suffix)
+ */
+export function rpIdFromHostname(hostname) {
+  const host = String(hostname || '')
+    .toLowerCase()
+    .replace(/\.$/, '')
+  if (!host || host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host || 'localhost'
+  if (host.startsWith('www.') && host.split('.').length > 2) return host.slice(4)
+  return host
+}
+
 export function getWebAuthnRpConfig(req) {
   const originHeader = String(req.headers.origin || '').trim()
   let hostname = 'localhost'
@@ -83,7 +105,11 @@ export function getWebAuthnRpConfig(req) {
     /* keep default */
   }
 
-  const rpID = process.env.WEBAUTHN_RP_ID || hostname
+  const configuredRpId = String(process.env.WEBAUTHN_RP_ID || '').trim()
+  const rpID =
+    configuredRpId && isRpIdValidForHost(configuredRpId, hostname)
+      ? configuredRpId
+      : rpIdFromHostname(hostname)
   const rpName = process.env.WEBAUTHN_RP_NAME || 'Simulator Merchant'
 
   const configured = (process.env.WEBAUTHN_ORIGIN || '')
@@ -96,6 +122,8 @@ export function getWebAuthnRpConfig(req) {
       [
         originHeader,
         ...configured,
+        'https://www.eddy.io.vn',
+        'https://eddy.io.vn',
         'https://simulator-merchant.vercel.app',
         'http://localhost:5173',
         'http://127.0.0.1:5173',

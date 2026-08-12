@@ -2,6 +2,7 @@ import express from 'express'
 import crypto from 'crypto'
 import * as jose from 'jose'
 import { requireAuth } from '../middleware/auth.js'
+import { attachAccess, requireFeature } from '../middleware/access.js'
 import {
   loadPrivateKeyFromInput,
   assertEs256PrivateKey,
@@ -10,7 +11,7 @@ import { loadPublicKeyFromPem } from '../utils/publicKey.js'
 import { encryptCardPan } from '../utils/cardPanEncrypt.js'
 
 const router = express.Router()
-router.use(requireAuth)
+router.use(requireAuth, attachAccess, requireFeature('pos-standalone'))
 
 function notificationClaims(payload) {
   return typeof payload === 'string' ? JSON.parse(payload) : payload

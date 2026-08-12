@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
@@ -9,6 +10,7 @@ import { AppBrandCentered } from '../components/AppBrand.jsx'
 
 export default function Login() {
   const { login, loginWithTouchId } = useAuth()
+  const { isFeatureOn } = useAccess()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -147,12 +149,16 @@ export default function Login() {
             )}
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            {t('auth.noAccount')}{' '}
-            <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700">
-              {t('auth.goRegister')}
-            </Link>
-          </p>
+          {isFeatureOn('registration') ? (
+            <p className="mt-6 text-center text-sm text-slate-600">
+              {t('auth.noAccount')}{' '}
+              <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700">
+                {t('auth.goRegister')}
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-6 text-center text-sm text-slate-500">{t('auth.registrationClosed')}</p>
+          )}
         </div>
       </div>
     </div>

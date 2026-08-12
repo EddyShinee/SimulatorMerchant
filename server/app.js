@@ -9,6 +9,7 @@ import simulatorRouter from './routes/simulator.js'
 import paymentActionRouter from './routes/paymentAction.js'
 import posStandaloneRouter from './routes/posStandalone.js'
 import merchantsRouter from './routes/merchants.js'
+import accessRouter from './routes/access.js'
 import { requireAuth } from './middleware/auth.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -57,6 +58,9 @@ app.use('/api/simulator', posStandaloneRouter)
 
 // Saved merchant credentials (vault-locked)
 app.use('/api/merchants', merchantsRouter)
+
+// Roles + feature flags (admin / member)
+app.use('/api/access', accessRouter)
 
 // Serve the built frontend (used for local `npm start`; on Vercel the static
 // files and SPA fallback are handled by the platform, not Express).
