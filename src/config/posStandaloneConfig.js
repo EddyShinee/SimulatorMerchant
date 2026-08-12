@@ -61,7 +61,7 @@ export const DEFAULT_ENCRYPTED_CARD_PAN =
  * extraData.jwtSecret — VTC/SoftPOS dùng để decrypt cardPan (AES-128-GCM).
  * Phải trùng key đã dùng encrypt cardPan (thường cùng DEFAULT_AES_KEY).
  */
-export const DEFAULT_JWT_SECRET = DEFAULT_AES_KEY
+export const DEFAULT_JWT_SECRET = 'Qq5sOyKvwNDdnwRqhEA8XQ=='
 
 const DEFAULT_EXTRA_DATA = {
   merchantId: '70470400000TEST3',
