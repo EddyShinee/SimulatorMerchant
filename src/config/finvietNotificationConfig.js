@@ -63,10 +63,10 @@ export function buildFinvietNotificationTemplate() {
     },
     customer_info: {
       card_info: {
-        card_type: 'OTHER',
+        card_type: 'VISA',
         card_holder: null,
-        card_number: '545909****0362',
-        card_origin: 'OTHER',
+        card_number: '411111****1111',
+        card_origin: 'INTERNATIONAL',
       },
       customer_name: null,
     },

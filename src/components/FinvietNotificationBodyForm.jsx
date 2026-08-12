@@ -237,7 +237,7 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               className="input font-mono text-xs"
               value={form.cardNumber}
               onChange={(e) => set('cardNumber', e.target.value)}
-              placeholder="545909****0362"
+              placeholder="411111****1111"
             />
           </Field>
           <Field label={L('card_info.card_origin')}>

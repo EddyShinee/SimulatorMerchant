@@ -1,6 +1,10 @@
-import { NOTIFICATION_TEMPLATES, generateTranId } from '../config/posStandaloneConfig.js'
+import { NOTIFICATION_TEMPLATES, generateTranId, DEFAULT_JWT_SECRET } from '../config/posStandaloneConfig.js'
 
 export const DEFAULT_NOTIFICATION_FORM = templateToForm(NOTIFICATION_TEMPLATES.sale)
+
+export function resolveJwtSecret(form) {
+  return String(form?.jwtSecret ?? '').trim() || DEFAULT_JWT_SECRET
+}
 
 export function withFreshTranIds(form) {
   const id = generateTranId()
@@ -29,7 +33,7 @@ export function templateToForm(template = {}) {
     merchantId: template.extraData?.merchantId ?? '',
     subMid: template.extraData?.subMid ?? '',
     subTid: template.extraData?.subTid ?? '',
-    jwtSecret: template.extraData?.jwtSecret ?? '',
+    jwtSecret: template.extraData?.jwtSecret ?? DEFAULT_JWT_SECRET,
   }
 }
 
@@ -50,10 +54,10 @@ export function formToNotificationBody(form) {
       merchantId: form.merchantId.trim(),
       subMid: form.subMid.trim(),
       subTid: form.subTid.trim(),
+      jwtSecret: resolveJwtSecret(form),
     },
   }
 
-  if (form.jwtSecret.trim()) body.extraData.jwtSecret = form.jwtSecret.trim()
   if (form.issCountryCode.trim()) body.issCountryCode = form.issCountryCode.trim()
   if (form.cardPan.trim()) body.cardPan = form.cardPan.trim()
   if (form.approvalCode.trim()) body.approvalCode = form.approvalCode.trim()

@@ -1,4 +1,4 @@
-import { DEFAULT_AES_KEY } from '../config/posStandaloneConfig.js'
+import { DEFAULT_AES_KEY, DEFAULT_PLAIN_PAN } from '../config/posStandaloneConfig.js'
 
 const PRIVATE_KEY = 'simulator.posStandalone.privateKeyPem'
 const PUBLIC_CERT = 'simulator.posStandalone.publicCertPem'
@@ -53,7 +53,7 @@ export function saveStoredAesKey(key) {
 }
 
 export function loadStoredPlainPan() {
-  return read(PLAIN_PAN)
+  return read(PLAIN_PAN) || DEFAULT_PLAIN_PAN
 }
 
 export function saveStoredPlainPan(pan) {

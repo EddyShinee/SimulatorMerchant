@@ -14,6 +14,8 @@ import {
   buildOperationUrl,
   defaultRequestBody,
   generateTranId,
+  DEFAULT_AES_KEY,
+  isVtcCallbackUrl,
 } from '../config/posStandaloneConfig.js'
 import { buildFinvietNotificationTemplate, isFinvietCallbackUrl, FINVIET_DEFAULT_SECRET_KEY } from '../config/finvietNotificationConfig.js'
 import {
@@ -213,6 +215,8 @@ export default function PosStandalone() {
   const isNotification = operation === 'notification'
   const isFinviet =
     isNotification && (callbackPreset === 'finviet' || isFinvietCallbackUrl(callbackUrl))
+  const isVtc =
+    isNotification && (callbackPreset === 'vtc-qa' || isVtcCallbackUrl(callbackUrl))
 
   const signFinvietBody = useCallback(async (body, secretKey) => {
     const unsigned = { ...body }
@@ -281,6 +285,15 @@ export default function PosStandalone() {
       if (preset?.url) setCallbackUrl(preset.url)
     }
   }, [callbackPreset, user?.id])
+
+  useEffect(() => {
+    if (!isNotification || isFinviet || !isVtc) return
+    setNotificationForm((prev) => {
+      const jwtSecret = prev.jwtSecret?.trim() || aesKey.trim() || DEFAULT_AES_KEY
+      if (prev.jwtSecret === jwtSecret) return prev
+      return { ...prev, jwtSecret }
+    })
+  }, [isNotification, isFinviet, isVtc, aesKey])
 
   useEffect(() => {
     if (!isNotification) {
@@ -383,11 +396,12 @@ export default function PosStandalone() {
     setError('')
     setEncryptingCardPan(true)
     try {
+      const key = aesKey.trim() || DEFAULT_AES_KEY
       const { data } = await api.post('/api/simulator/pos-standalone/encrypt-card-pan', {
         plainPan: plainPan.trim(),
-        aesKey: aesKey.trim(),
+        aesKey: key,
       })
-      const nextForm = { ...notificationForm, cardPan: data.cardPan }
+      const nextForm = { ...notificationForm, cardPan: data.cardPan, jwtSecret: key }
       handleNotificationFormChange(nextForm)
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('posStandalone.encryptCardPanFailed'))
@@ -800,6 +814,7 @@ export default function PosStandalone() {
                   }}
                   onEncryptCardPan={handleEncryptCardPan}
                   encrypting={encryptingCardPan}
+                  showVtcJwtHint={isVtc}
                 />
                 )
               ) : (

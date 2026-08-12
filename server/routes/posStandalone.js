@@ -8,6 +8,7 @@ import {
   assertEs256PrivateKey,
 } from '../utils/privateKey.js'
 import { loadPublicKeyFromPem } from '../utils/publicKey.js'
+import { encryptCardPan } from '../utils/cardPanEncrypt.js'
 import { finvietBodyWithSignatureSync, finvietPreSignString } from '../utils/finvietSignature.js'
 
 const router = express.Router()

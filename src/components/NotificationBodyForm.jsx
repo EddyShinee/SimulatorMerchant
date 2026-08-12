@@ -24,6 +24,7 @@ export default function NotificationBodyForm({
   onAesKeyChange,
   onEncryptCardPan,
   encrypting = false,
+  showVtcJwtHint = false,
 }) {
   const set = (key, value) => onChange({ ...form, [key]: value })
 
@@ -212,10 +213,14 @@ export default function NotificationBodyForm({
           <Field label="extraData.jwtSecret" className="sm:col-span-2">
             <input
               className="input font-mono text-xs"
+              type="text"
               value={form.jwtSecret}
               onChange={(e) => set('jwtSecret', e.target.value)}
               placeholder={t('posStandalone.jwtSecretHint')}
             />
+            {showVtcJwtHint ? (
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('posStandalone.vtcJwtSecretHint')}</p>
+            ) : null}
           </Field>
         </div>
       </div>

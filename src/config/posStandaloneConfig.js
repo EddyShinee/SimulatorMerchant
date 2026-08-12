@@ -50,10 +50,24 @@ export const CALLBACK_URL_PRESETS = [
 /** AES-128 key (hex) shared with 2C2P for cardPan encrypt/decrypt. */
 export const DEFAULT_AES_KEY = '42AE6C3B22AFC0D0DD9F046A84403C5D'
 
+/** Default test Visa PAN (Spec / VTC demo). */
+export const DEFAULT_PLAIN_PAN = '4111111111111111'
+
+/** AES-128-GCM encrypted DEFAULT_PLAIN_PAN with DEFAULT_AES_KEY (IV random at generation time). */
+export const DEFAULT_ENCRYPTED_CARD_PAN =
+  'aT2FMJcJkJ4y+nWJUVoVlbxsgpRKIKLiRn1DTdD2/o8MXkWU6NN2r9s1zVk='
+
+/**
+ * extraData.jwtSecret — VTC/SoftPOS dùng để decrypt cardPan (AES-128-GCM).
+ * Phải trùng key đã dùng encrypt cardPan (thường cùng DEFAULT_AES_KEY).
+ */
+export const DEFAULT_JWT_SECRET = DEFAULT_AES_KEY
+
 const DEFAULT_EXTRA_DATA = {
-  merchantId: '7047040000TEST3',
-  subMid: '7047040000TEST3',
-  subTid: 'R0998430',
+  merchantId: '70470400000TEST3',
+  subMid: '70470400000TEST3',
+  subTid: 'HDL001',
+  jwtSecret: DEFAULT_JWT_SECRET,
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -65,9 +79,9 @@ export const NOTIFICATION_TEMPLATES = {
     posReference: '1781771250027',
     issCountryCode: '0704',
     linkedTranId: 'M260811173920fa2f47',
-    deviceAlias: 'HDL001',
+    deviceAlias: 'R0998430',
     amount: { currency: 'VND', value: 130000 },
-    cardPan: 'idwkVGYhsHycaagFjqdOGEjH5TGjbE/NbgXwMqPxzk1OpqACZZG7qBy+hw==',
+    cardPan: DEFAULT_ENCRYPTED_CARD_PAN,
     extraData: { ...DEFAULT_EXTRA_DATA },
   },
   void: {
@@ -78,7 +92,7 @@ export const NOTIFICATION_TEMPLATES = {
     amount: { currency: 'VND', value: 130000 },
     posReference: '1781771250027',
     linkedTranId: 'M260811173920fa2f47',
-    deviceAlias: 'HDL001',
+    deviceAlias: 'R0998430',
     paymentMethod: 'VISA',
     issCountryCode: '0704',
     extraData: { ...DEFAULT_EXTRA_DATA },
@@ -91,7 +105,7 @@ export const NOTIFICATION_TEMPLATES = {
     approvalCode: 'R54321',
     amount: { currency: 'VND', value: 130000 },
     posReference: '1781771250027',
-    deviceAlias: 'HDL001',
+    deviceAlias: 'R0998430',
     paymentMethod: 'VISA',
     issCountryCode: '0704',
     extraData: { ...DEFAULT_EXTRA_DATA },
@@ -104,7 +118,7 @@ export const NOTIFICATION_TEMPLATES = {
     approvalCode: '838601',
     amount: { currency: 'VND', value: 130000 },
     posReference: '1781771250027',
-    deviceAlias: 'HDL001',
+    deviceAlias: 'R0998430',
     paymentMethod: 'VISA',
     issCountryCode: '0704',
     extraData: { ...DEFAULT_EXTRA_DATA },
@@ -155,4 +169,8 @@ export function generateTranId() {
   const rand = Math.random().toString(16).slice(2, 6)
   const tail = String(Math.floor(Math.random() * 100)).padStart(2, '0')
   return `M${ts}${rand}${tail}`
+}
+
+export function isVtcCallbackUrl(url) {
+  return String(url || '').toLowerCase().includes('/vtc')
 }
