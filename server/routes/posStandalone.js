@@ -8,7 +8,7 @@ import {
   assertEs256PrivateKey,
 } from '../utils/privateKey.js'
 import { loadPublicKeyFromPem } from '../utils/publicKey.js'
-import { encryptCardPan } from '../utils/cardPanEncrypt.js'
+import { finvietBodyWithSignatureSync, finvietPreSignString } from '../utils/finvietSignature.js'
 
 const router = express.Router()
 router.use(requireAuth, attachAccess, requireFeature('pos-standalone'))
@@ -89,6 +89,27 @@ router.post('/pos-standalone/encrypt-card-pan', (req, res) => {
   }
 })
 
+// POST /api/simulator/pos-standalone/finviet-sign
+router.post('/pos-standalone/finviet-sign', (req, res) => {
+  try {
+    const { body, secretKey } = req.body || {}
+    if (!secretKey?.trim()) {
+      return res.status(400).json({ error: 'MISSING_SECRET', message: 'FinViet secret key is required.' })
+    }
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ error: 'MISSING_BODY', message: 'Request body object is required.' })
+    }
+    const signed = finvietBodyWithSignatureSync(body, secretKey.trim())
+    return res.json({
+      body: signed,
+      preSignString: finvietPreSignString(body),
+      signature: signed.signature,
+    })
+  } catch (e) {
+    return res.status(400).json({ error: 'SIGN_FAILED', message: e.message })
+  }
+})
+
 // POST /api/simulator/pos-standalone/send
 router.post('/pos-standalone/send', async (req, res) => {
   const started = Date.now()
@@ -103,6 +124,7 @@ router.post('/pos-standalone/send', async (req, res) => {
       privateKeyFile,
       privateKeyPassword,
       notificationBody,
+      finvietSecretKey,
     } = req.body || {}
 
     if (!url || typeof url !== 'string') {
@@ -123,6 +145,15 @@ router.post('/pos-standalone/send', async (req, res) => {
     const headers = { Accept: 'application/json' }
 
     let requestBody = body
+    let finvietSignedBody = null
+    if (finvietSecretKey?.trim() && (notificationBody ?? body)) {
+      try {
+        finvietSignedBody = finvietBodyWithSignatureSync(notificationBody ?? body, finvietSecretKey.trim())
+      } catch (e) {
+        return res.status(400).json({ error: 'FINVIET_SIGN_FAILED', message: e.message })
+      }
+    }
+
     if (shouldSign) {
       if (!privateKeyPem?.trim() && !privateKeyFile?.base64) {
         return res.status(400).json({ error: 'MISSING_KEY', message: 'EC private key (PEM) is required for webhook-jwt.' })
@@ -147,9 +178,10 @@ router.post('/pos-standalone/send', async (req, res) => {
       headers.Authorization = `Bearer ${bearerToken.trim()}`
     }
 
-    if (!shouldSign && upperMethod !== 'GET' && body != null) {
+    if (!shouldSign && upperMethod !== 'GET' && (finvietSignedBody ?? body) != null) {
       headers['Content-Type'] = 'application/json'
-      requestBody = typeof body === 'string' ? body : JSON.stringify(body)
+      const outgoing = finvietSignedBody ?? body
+      requestBody = typeof outgoing === 'string' ? outgoing : JSON.stringify(outgoing)
     }
 
     const controller = new AbortController()
@@ -190,6 +222,7 @@ router.post('/pos-standalone/send', async (req, res) => {
       body: parsedBody,
       rawBody: text,
       webhookJwt: headers['webhook-jwt'] || null,
+      finvietSignedBody,
     })
   } catch (err) {
     const aborted = err?.name === 'AbortError'

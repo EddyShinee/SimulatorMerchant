@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api, { getInboxUrls } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import NotificationBodyForm from '../components/NotificationBodyForm.jsx'
+import FinvietNotificationBodyForm from '../components/FinvietNotificationBodyForm.jsx'
 import {
   POS_OPERATIONS,
   POS_ENV_OPTIONS,
@@ -14,6 +15,7 @@ import {
   defaultRequestBody,
   generateTranId,
 } from '../config/posStandaloneConfig.js'
+import { buildFinvietNotificationTemplate, isFinvietCallbackUrl, FINVIET_DEFAULT_SECRET_KEY } from '../config/finvietNotificationConfig.js'
 import {
   DEFAULT_NOTIFICATION_FORM,
   templateToForm,
@@ -22,6 +24,15 @@ import {
   withFreshTranIds,
   withFreshTranIdsBody,
 } from '../utils/notificationForm.js'
+import {
+  DEFAULT_FINVIET_FORM,
+  templateToFinvietForm,
+  finvietFormToBody,
+  parseFinvietFormFromJson,
+  withFreshFinvietIds,
+  withFreshFinvietIdsBody,
+} from '../utils/finvietNotificationForm.js'
+import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
 import {
   loadStoredPrivateKeyPem,
@@ -32,6 +43,8 @@ import {
   saveStoredAesKey,
   loadStoredPlainPan,
   saveStoredPlainPan,
+  loadStoredFinvietSecret,
+  saveStoredFinvietSecret,
 } from '../utils/posStandaloneKeyStore.js'
 
 function ResultCard({ title, text }) {
@@ -59,6 +72,9 @@ export default function PosStandalone() {
   const [callbackPreset, setCallbackPreset] = useState('simulator')
   const [bodyJson, setBodyJson] = useState('')
   const [notificationForm, setNotificationForm] = useState(DEFAULT_NOTIFICATION_FORM)
+  const [finvietForm, setFinvietForm] = useState(DEFAULT_FINVIET_FORM)
+  const [finvietSigning, setFinvietSigning] = useState(false)
+  const finvietSignSkipRef = useRef(false)
   const [notificationEditMode, setNotificationEditMode] = useState('form')
   const [privateKeyPem, setPrivateKeyPem] = useState(loadStoredPrivateKeyPem)
   const [privateKeyFile, setPrivateKeyFile] = useState(null)
@@ -190,6 +206,51 @@ export default function PosStandalone() {
 
   const opMeta = POS_OPERATIONS.find((o) => o.id === operation) || POS_OPERATIONS[0]
   const isNotification = operation === 'notification'
+  const isFinviet =
+    isNotification && (callbackPreset === 'finviet' || isFinvietCallbackUrl(callbackUrl))
+
+  const signFinvietBody = useCallback(async (body, secretKey) => {
+    const unsigned = { ...body }
+    delete unsigned.signature
+    return finvietBodyWithSignature(unsigned, secretKey.trim())
+  }, [])
+
+  const applyFinvietSignature = useCallback(
+    async (form = finvietForm) => {
+      const secret = form.secretKey?.trim()
+      if (!secret) return null
+      setFinvietSigning(true)
+      try {
+        saveStoredFinvietSecret(secret)
+        const signed = await signFinvietBody(finvietFormToBody(form), secret)
+        finvietSignSkipRef.current = true
+        setFinvietForm((prev) =>
+          prev.signature === signed.signature ? prev : { ...prev, signature: signed.signature }
+        )
+        if (notificationEditMode === 'form') {
+          setBodyJson(JSON.stringify(signed, null, 2))
+        }
+        return signed
+      } finally {
+        setFinvietSigning(false)
+      }
+    },
+    [finvietForm, notificationEditMode, signFinvietBody]
+  )
+
+  useEffect(() => {
+    if (!isFinviet || notificationEditMode !== 'form') return
+    if (finvietSignSkipRef.current) {
+      finvietSignSkipRef.current = false
+      return
+    }
+    const secret = finvietForm.secretKey?.trim()
+    if (!secret) return
+    const timer = setTimeout(() => {
+      void applyFinvietSignature(finvietForm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [isFinviet, notificationEditMode, finvietForm, applyFinvietSignature])
 
   useEffect(() => {
     if (callbackPreset === 'simulator') {
@@ -201,18 +262,30 @@ export default function PosStandalone() {
   }, [callbackPreset, user?.id])
 
   useEffect(() => {
-    if (isNotification) {
+    if (!isNotification) {
+      const def = defaultRequestBody(operation)
+      setBodyJson(def ? JSON.stringify(def, null, 2) : '')
+      setError('')
+      setResult(null)
+      return
+    }
+
+    if (isFinviet) {
+      const form = withFreshFinvietIds({
+        ...templateToFinvietForm(buildFinvietNotificationTemplate()),
+        secretKey: loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
+      })
+      setFinvietForm(form)
+      setBodyJson(JSON.stringify(finvietFormToBody(form), null, 2))
+    } else {
       const form = withFreshTranIds(templateToForm(NOTIFICATION_TEMPLATES.sale))
       setNotificationForm(form)
       setBodyJson(JSON.stringify(formToNotificationBody(form), null, 2))
-      setNotificationEditMode('form')
-    } else {
-      const def = defaultRequestBody(operation)
-      setBodyJson(def ? JSON.stringify(def, null, 2) : '')
     }
+    setNotificationEditMode('form')
     setError('')
     setResult(null)
-  }, [operation, isNotification])
+  }, [operation, isNotification, isFinviet])
 
   const targetUrl = useMemo(() => {
     if (isNotification) return callbackUrl.trim()
@@ -220,6 +293,16 @@ export default function PosStandalone() {
   }, [operation, baseUrl, transactionId, callbackUrl, isNotification])
 
   const applyTemplate = (key) => {
+    if (isFinviet) {
+      const form = withFreshFinvietIds({
+        ...templateToFinvietForm(buildFinvietNotificationTemplate()),
+        secretKey: finvietForm.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
+      })
+      setFinvietForm(form)
+      setBodyJson(JSON.stringify(finvietFormToBody(form), null, 2))
+      setNotificationEditMode('form')
+      return
+    }
     if (NOTIFICATION_TEMPLATES[key]) {
       const form = withFreshTranIds(templateToForm(NOTIFICATION_TEMPLATES[key]))
       setNotificationForm(form)
@@ -229,6 +312,12 @@ export default function PosStandalone() {
   }
 
   const syncNotificationTranIds = (body) => {
+    if (isFinviet) {
+      const next = withFreshFinvietIdsBody(body)
+      setFinvietForm(templateToFinvietForm(next))
+      setBodyJson(JSON.stringify(next, null, 2))
+      return next
+    }
     const next = withFreshTranIdsBody(body)
     setNotificationForm((prev) => ({ ...prev, tranId: next.tranId, linkedTranId: next.linkedTranId }))
     setBodyJson(JSON.stringify(next, null, 2))
@@ -237,11 +326,14 @@ export default function PosStandalone() {
 
   const switchNotificationMode = (mode) => {
     if (mode === 'json' && notificationEditMode === 'form') {
-      setBodyJson(JSON.stringify(formToNotificationBody(notificationForm), null, 2))
+      setBodyJson(
+        JSON.stringify(isFinviet ? finvietFormToBody(finvietForm) : formToNotificationBody(notificationForm), null, 2)
+      )
     }
     if (mode === 'form' && notificationEditMode === 'json') {
       try {
-        setNotificationForm(parseNotificationFormFromJson(bodyJson))
+        if (isFinviet) setFinvietForm(parseFinvietFormFromJson(bodyJson))
+        else setNotificationForm(parseNotificationFormFromJson(bodyJson))
       } catch {
         setError(t('posStandalone.invalidJson'))
         return
@@ -251,6 +343,14 @@ export default function PosStandalone() {
   }
 
   const handleNotificationFormChange = (nextForm) => {
+    if (isFinviet) {
+      if (nextForm.secretKey?.trim()) saveStoredFinvietSecret(nextForm.secretKey.trim())
+      setFinvietForm(nextForm)
+      if (notificationEditMode === 'form' && !nextForm.secretKey?.trim()) {
+        setBodyJson(JSON.stringify(finvietFormToBody(nextForm), null, 2))
+      }
+      return
+    }
     setNotificationForm(nextForm)
     if (notificationEditMode === 'form') {
       setBodyJson(JSON.stringify(formToNotificationBody(nextForm), null, 2))
@@ -301,11 +401,14 @@ export default function PosStandalone() {
     let notificationBody = null
     let signingPrivateKeyPem = privateKeyPem
     let signingPrivateKeyFile = privateKeyFile
+    const signWebhook = isNotification && !isFinviet
     if (isNotification) {
       try {
         notificationBody =
           notificationEditMode === 'form'
-            ? formToNotificationBody(notificationForm)
+            ? isFinviet
+              ? finvietFormToBody(finvietForm)
+              : formToNotificationBody(notificationForm)
             : JSON.parse(bodyJson)
         notificationBody = syncNotificationTranIds(notificationBody)
       } catch {
@@ -313,7 +416,21 @@ export default function PosStandalone() {
         return
       }
 
-      if (!privateKeyPem.trim() && !privateKeyFile?.base64) {
+      if (isFinviet) {
+        const secret = finvietForm.secretKey?.trim()
+        if (!secret) {
+          setError(t('posStandalone.finvietSecretRequired'))
+          return
+        }
+        try {
+          notificationBody = await signFinvietBody(notificationBody, secret)
+        } catch (e) {
+          setError(e.message || t('posStandalone.finvietSignFailed'))
+          return
+        }
+      }
+
+      if (signWebhook && !privateKeyPem.trim() && !privateKeyFile?.base64) {
         setError(t('posStandalone.keyRequired'))
         return
       }
@@ -325,12 +442,13 @@ export default function PosStandalone() {
         method: isNotification ? 'POST' : opMeta.method,
         url: targetUrl,
         bearerToken: isNotification ? undefined : bearerToken.trim(),
-        body: parsedBody,
-        signWebhookJwt: isNotification,
-        privateKeyPem: isNotification ? signingPrivateKeyPem : undefined,
-        privateKeyFile: isNotification ? signingPrivateKeyFile : undefined,
-        privateKeyPassword: isNotification ? privateKeyPassword || undefined : undefined,
-        notificationBody: isNotification ? notificationBody : undefined,
+        body: signWebhook ? null : isNotification ? notificationBody : parsedBody,
+        signWebhookJwt: signWebhook,
+        privateKeyPem: signWebhook ? signingPrivateKeyPem : undefined,
+        privateKeyFile: signWebhook ? signingPrivateKeyFile : undefined,
+        privateKeyPassword: signWebhook ? privateKeyPassword || undefined : undefined,
+        notificationBody: signWebhook ? notificationBody : isNotification ? notificationBody : undefined,
+        finvietSecretKey: isFinviet ? finvietForm.secretKey?.trim() : undefined,
       })
 
       setResult(data)
@@ -356,15 +474,20 @@ export default function PosStandalone() {
 
   const decodedJwt = result?.webhookJwt ? decodeJwtPayload(result.webhookJwt) : null
   const sentBody = useMemo(() => {
-    if (!result?.webhookJwt) return null
+    if (!result) return null
     try {
+      if (isFinviet) {
+        if (result?.finvietSignedBody) return result.finvietSignedBody
+        return notificationEditMode === 'form' ? finvietFormToBody(finvietForm) : JSON.parse(bodyJson)
+      }
+      if (!result?.webhookJwt) return null
       return notificationEditMode === 'form'
         ? formToNotificationBody(notificationForm)
         : JSON.parse(bodyJson)
     } catch {
       return null
     }
-  }, [result?.webhookJwt, notificationEditMode, notificationForm, bodyJson])
+  }, [result, isFinviet, notificationEditMode, finvietForm, notificationForm, bodyJson])
 
   const jwtBodyMatch = decodedJwt && sentBody ? payloadsMatch(decodedJwt, sentBody) : null
 
@@ -475,12 +598,18 @@ export default function PosStandalone() {
                   }}
                 />
                 <p className="mt-1 text-xs text-slate-400">{t('posStandalone.callbackHint')}</p>
-                {callbackUrl.includes('2c2p.com') && (
+                {callbackUrl.includes('2c2p.com') && !isFinviet && (
                   <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                     {t('posStandalone.callback2c2pWarning')}
                   </p>
                 )}
+                {isFinviet && (
+                  <p className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                    {t('posStandalone.finvietCallbackHint')}
+                  </p>
+                )}
               </div>
+              {!isFinviet && (
               <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
                 <p className="label mb-3">webhook-jwt (ES256)</p>
                 <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{t('posStandalone.keyPersistHint')}</p>
@@ -555,19 +684,30 @@ export default function PosStandalone() {
                   spellCheck={false}
                 />
               </div>
+              )}
               <div>
                 <label className="label mb-2">{t('posStandalone.notificationTemplates')}</label>
                 <div className="flex flex-wrap gap-2">
-                  {Object.keys(NOTIFICATION_TEMPLATES).map((key) => (
+                  {isFinviet ? (
                     <button
-                      key={key}
                       type="button"
-                      onClick={() => applyTemplate(key)}
-                      className="btn-secondary text-xs capitalize"
+                      onClick={() => applyTemplate('finviet')}
+                      className="btn-secondary text-xs"
                     >
-                      {key}
+                      FinViet
                     </button>
-                  ))}
+                  ) : (
+                    Object.keys(NOTIFICATION_TEMPLATES).map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => applyTemplate(key)}
+                        className="btn-secondary text-xs capitalize"
+                      >
+                        {key}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -608,6 +748,15 @@ export default function PosStandalone() {
               </div>
 
               {isNotification && notificationEditMode === 'form' ? (
+                isFinviet ? (
+                  <FinvietNotificationBodyForm
+                    form={finvietForm}
+                    onChange={handleNotificationFormChange}
+                    onRegenerateSignature={() => applyFinvietSignature()}
+                    signing={finvietSigning}
+                    t={t}
+                  />
+                ) : (
                 <NotificationBodyForm
                   form={notificationForm}
                   onChange={handleNotificationFormChange}
@@ -625,6 +774,7 @@ export default function PosStandalone() {
                   onEncryptCardPan={handleEncryptCardPan}
                   encrypting={encryptingCardPan}
                 />
+                )
               ) : (
                 <textarea
                   className="input min-h-[220px] font-mono text-xs"
@@ -691,7 +841,7 @@ export default function PosStandalone() {
                 )}
               </div>
 
-              {result.webhookJwt && (
+              {result.webhookJwt && !isFinviet && (
                 <>
                   <ResultCard title="🔏 webhook-jwt" text={result.webhookJwt} />
                   <button type="button" onClick={handleVerifyJwt} className="btn-secondary text-xs">
@@ -743,6 +893,13 @@ export default function PosStandalone() {
                 <ResultCard
                   title={`📤 ${t('posStandalone.requestHeaders')}`}
                   text={JSON.stringify(result.requestHeaders, null, 2)}
+                />
+              )}
+
+              {isFinviet && sentBody && (
+                <ResultCard
+                  title={`📤 ${t('posStandalone.finvietRequestBody')}`}
+                  text={JSON.stringify(sentBody, null, 2)}
                 />
               )}
 

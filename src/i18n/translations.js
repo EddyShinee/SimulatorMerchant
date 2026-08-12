@@ -645,6 +645,21 @@ export const translations = {
       pasteFailed: 'Không thể đọc clipboard.',
       endpointNotFound:
         'API /pos-standalone/send chưa có trên server. Chạy lại `npm run dev` (hoặc restart backend) rồi thử lại.',
+      finvietCallbackHint:
+        'FinViet: gửi JSON body trực tiếp (không webhook-jwt). Cấu trúc amount / transaction / customer_info / merchant_* như tài liệu partner.',
+      finvietSignSpec:
+        'Chữ ký HMAC-SHA256 (§3.1): sort key alphabet → JSON compact → HMAC secret SmartPOS → hex vào field signature.',
+      finvietSecretKey: 'Secret key (SmartPOS cấp)',
+      finvietSecretKeyHint: 'VD: 2C2P_SECRET_KEY',
+      finvietSecretRequired: 'Nhập secret key FinViet để ký request.',
+      finvietSignFailed: 'Không tạo được chữ ký FinViet.',
+      finvietRegenerateSignature: 'Tạo lại chữ ký',
+      finvietSigning: 'Đang ký…',
+      finvietSignatureAuto: 'Tự động khi có secret key',
+      finvietSectionMain: 'FinViet — chính',
+      finvietSectionMerchant: 'FinViet — merchant',
+      finvietSignatureHint: 'Chữ ký partner (SHA) — điền theo spec FinViet',
+      finvietRequestBody: 'Request body (FinViet)',
     },
     apiCaller: {
       title: 'Gọi API',
@@ -1411,6 +1426,21 @@ export const translations = {
       pasteFailed: 'Could not read clipboard.',
       endpointNotFound:
         'API /pos-standalone/send is not available. Restart the backend (`npm run dev`) and try again.',
+      finvietCallbackHint:
+        'FinViet: send a plain JSON body (no webhook-jwt). Uses amount / transaction / customer_info / merchant_* fields per partner spec.',
+      finvietSignSpec:
+        'HMAC-SHA256 signature (§3.1): sort keys alphabetically → compact JSON → HMAC with SmartPOS secret → hex in signature field.',
+      finvietSecretKey: 'Secret key (from SmartPOS)',
+      finvietSecretKeyHint: 'e.g. 2C2P_SECRET_KEY',
+      finvietSecretRequired: 'Enter the FinViet secret key to sign the request.',
+      finvietSignFailed: 'Could not generate FinViet signature.',
+      finvietRegenerateSignature: 'Regenerate signature',
+      finvietSigning: 'Signing…',
+      finvietSignatureAuto: 'Auto-generated when secret key is set',
+      finvietSectionMain: 'FinViet — main',
+      finvietSectionMerchant: 'FinViet — merchant',
+      finvietSignatureHint: 'Partner signature (SHA) — fill per FinViet spec',
+      finvietRequestBody: 'Request body (FinViet)',
     },
     apiCaller: {
       title: 'API Caller',

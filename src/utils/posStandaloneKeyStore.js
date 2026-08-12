@@ -4,6 +4,7 @@ const PRIVATE_KEY = 'simulator.posStandalone.privateKeyPem'
 const PUBLIC_CERT = 'simulator.posStandalone.publicCertPem'
 const AES_KEY = 'simulator.posStandalone.aesKey'
 const PLAIN_PAN = 'simulator.posStandalone.plainPan'
+const FINVIET_SECRET = 'simulator.posStandalone.finvietSecret'
 
 function read(key) {
   try {
@@ -57,4 +58,12 @@ export function loadStoredPlainPan() {
 
 export function saveStoredPlainPan(pan) {
   write(PLAIN_PAN, pan)
+}
+
+export function loadStoredFinvietSecret() {
+  return read(FINVIET_SECRET)
+}
+
+export function saveStoredFinvietSecret(secret) {
+  write(FINVIET_SECRET, secret)
 }
