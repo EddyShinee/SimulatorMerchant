@@ -30,7 +30,10 @@ import {
   finvietFormToBody,
   parseFinvietFormFromJson,
   withFreshFinvietIds,
-  withFreshFinvietIdsBody,
+  withFreshFinvietTimestampsBody,
+  withFreshFinvietTimestamps,
+  ensureFinvietMerchantBillId,
+  finvietSignFingerprint,
 } from '../utils/finvietNotificationForm.js'
 import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
@@ -75,6 +78,7 @@ export default function PosStandalone() {
   const [finvietForm, setFinvietForm] = useState(DEFAULT_FINVIET_FORM)
   const [finvietSigning, setFinvietSigning] = useState(false)
   const finvietSignSkipRef = useRef(false)
+  const finvietSignFingerprintRef = useRef('')
   const [notificationEditMode, setNotificationEditMode] = useState('form')
   const [privateKeyPem, setPrivateKeyPem] = useState(loadStoredPrivateKeyPem)
   const [privateKeyFile, setPrivateKeyFile] = useState(null)
@@ -222,11 +226,12 @@ export default function PosStandalone() {
       setFinvietSigning(true)
       try {
         saveStoredFinvietSecret(secret)
-        const signed = await signFinvietBody(finvietFormToBody(form), secret)
+        const refreshed = withFreshFinvietTimestamps(ensureFinvietMerchantBillId(form))
+        const signed = await signFinvietBody(finvietFormToBody(refreshed, { refreshTimes: false }), secret)
         finvietSignSkipRef.current = true
-        setFinvietForm((prev) =>
-          prev.signature === signed.signature ? prev : { ...prev, signature: signed.signature }
-        )
+        finvietSignFingerprintRef.current = finvietSignFingerprint({ ...refreshed, signature: signed.signature })
+        const nextForm = { ...refreshed, signature: signed.signature }
+        setFinvietForm(nextForm)
         if (notificationEditMode === 'form') {
           setBodyJson(JSON.stringify(signed, null, 2))
         }
@@ -238,6 +243,11 @@ export default function PosStandalone() {
     [finvietForm, notificationEditMode, signFinvietBody]
   )
 
+  const finvietSignPayload = useMemo(
+    () => (isFinviet && notificationEditMode === 'form' ? finvietSignFingerprint(finvietForm) : ''),
+    [isFinviet, notificationEditMode, finvietForm]
+  )
+
   useEffect(() => {
     if (!isFinviet || notificationEditMode !== 'form') return
     if (finvietSignSkipRef.current) {
@@ -246,11 +256,13 @@ export default function PosStandalone() {
     }
     const secret = finvietForm.secretKey?.trim()
     if (!secret) return
+    if (finvietSignPayload && finvietSignPayload === finvietSignFingerprintRef.current) return
+
     const timer = setTimeout(() => {
       void applyFinvietSignature(finvietForm)
-    }, 400)
+    }, 200)
     return () => clearTimeout(timer)
-  }, [isFinviet, notificationEditMode, finvietForm, applyFinvietSignature])
+  }, [isFinviet, notificationEditMode, finvietSignPayload, finvietForm.secretKey, applyFinvietSignature, finvietForm])
 
   useEffect(() => {
     if (callbackPreset === 'simulator') {
@@ -313,7 +325,7 @@ export default function PosStandalone() {
 
   const syncNotificationTranIds = (body) => {
     if (isFinviet) {
-      const next = withFreshFinvietIdsBody(body)
+      const next = withFreshFinvietTimestampsBody(body)
       setFinvietForm(templateToFinvietForm(next))
       setBodyJson(JSON.stringify(next, null, 2))
       return next

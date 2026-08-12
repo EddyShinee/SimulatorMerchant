@@ -5,13 +5,26 @@ import {
   FINVIET_CARD_TYPE_OPTIONS,
   FINVIET_CARD_ORIGIN_OPTIONS,
 } from '../config/finvietNotificationConfig.js'
+import { formatFinvietTimestamp } from '../utils/finvietNotificationForm.js'
 
-function Field({ label, children, className = '' }) {
+function Field({ label, children, className = '', hint }) {
   return (
     <div className={className}>
       <label className="label">{label}</label>
       {children}
+      {hint ? <p className="mt-1 text-[10px] text-slate-400">{hint}</p> : null}
     </div>
+  )
+}
+
+function AutoTimestampField({ label, value, hint }) {
+  return (
+    <Field label={label} hint={hint}>
+      <div className="input font-mono text-xs text-slate-600 dark:text-slate-300">
+        {value}
+        <span className="ml-2 text-slate-400">({formatFinvietTimestamp(value)})</span>
+      </div>
+    </Field>
   )
 }
 
@@ -72,14 +85,7 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               ))}
             </select>
           </Field>
-          <Field label="timestamp">
-            <input
-              className="input font-mono text-xs"
-              type="number"
-              value={form.timestamp}
-              onChange={(e) => set('timestamp', e.target.value)}
-            />
-          </Field>
+          <AutoTimestampField label="timestamp" value={form.timestamp} hint={t('posStandalone.finvietTimestampAuto')} />
           <Field label="store_code">
             <input className="input font-mono text-xs" value={form.storeCode} onChange={(e) => set('storeCode', e.target.value)} />
           </Field>
@@ -113,12 +119,8 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               onChange={(e) => set('merchantCode', e.target.value)}
             />
           </Field>
-          <Field label="merchant_bill_id">
-            <input
-              className="input font-mono text-xs"
-              value={form.merchantBillId}
-              onChange={(e) => set('merchantBillId', e.target.value)}
-            />
+          <Field label="merchant_bill_id" hint={t('posStandalone.finvietMerchantBillIdAuto')}>
+            <div className="input font-mono text-xs text-slate-600 dark:text-slate-300">{form.merchantBillId}</div>
           </Field>
           <Field label="store_code_partner">
             <input
@@ -199,30 +201,9 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               placeholder={t('posStandalone.optional')}
             />
           </Field>
-          <Field label="created_at">
-            <input
-              className="input font-mono text-xs"
-              type="number"
-              value={form.createdAt}
-              onChange={(e) => set('createdAt', e.target.value)}
-            />
-          </Field>
-          <Field label="success_at">
-            <input
-              className="input font-mono text-xs"
-              type="number"
-              value={form.successAt}
-              onChange={(e) => set('successAt', e.target.value)}
-            />
-          </Field>
-          <Field label="updated_at">
-            <input
-              className="input font-mono text-xs"
-              type="number"
-              value={form.updatedAt}
-              onChange={(e) => set('updatedAt', e.target.value)}
-            />
-          </Field>
+          <AutoTimestampField label="created_at" value={form.createdAt} hint={t('posStandalone.finvietTimestampAuto')} />
+          <AutoTimestampField label="success_at" value={form.successAt} hint={t('posStandalone.finvietTimestampAuto')} />
+          <AutoTimestampField label="updated_at" value={form.updatedAt} hint={t('posStandalone.finvietTimestampAuto')} />
           <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
             <input type="checkbox" checked={form.isGlobal} onChange={(e) => set('isGlobal', e.target.checked)} />
             is_global

@@ -12,25 +12,44 @@ function nullIfEmpty(value) {
   return s ? s : null
 }
 
+/** Millisecond timestamps for FinViet notify body (auto-generated). */
+export function freshFinvietTimestamps(now = Date.now()) {
+  return {
+    timestamp: now,
+    createdAt: now - 50_000,
+    successAt: now,
+    updatedAt: now,
+  }
+}
+
+export function withFreshFinvietTimestamps(form, now = Date.now()) {
+  return { ...form, ...freshFinvietTimestamps(now) }
+}
+
+export function ensureFinvietMerchantBillId(form) {
+  return form.merchantBillId?.trim() ? form : { ...form, merchantBillId: generateFinvietMerchantBillId() }
+}
+
+export function formatFinvietTimestamp(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return '—'
+  return new Date(n).toLocaleString('vi-VN')
+}
+
 export const DEFAULT_FINVIET_FORM = {
   ...templateToFinvietForm(buildFinvietNotificationTemplate()),
   secretKey: loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
 }
 
 export function withFreshFinvietIds(form) {
-  const ts = Date.now()
-  const created = ts - 50000
-  const success = ts - 10000
+  const times = freshFinvietTimestamps()
   return {
     ...form,
     secretKey: form.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
-    timestamp: ts,
+    ...times,
     merchantBillId: generateFinvietMerchantBillId(),
     refCode: generateFinvietRefCode(),
     paymentTransid: generateFinvietPaymentTransId(),
-    createdAt: created,
-    successAt: success,
-    updatedAt: success,
   }
 }
 
@@ -69,46 +88,54 @@ export function templateToFinvietForm(template = {}) {
   }
 }
 
-export function finvietFormToBody(form) {
+export function finvietFormToBody(form, { refreshTimes = true } = {}) {
+  const f = refreshTimes ? withFreshFinvietTimestamps(form) : form
   const body = {
-    amount: Number(form.amount),
-    status: form.status,
-    currency: form.currency.trim(),
-    timestamp: Number(form.timestamp),
-    store_code: form.storeCode.trim(),
+    amount: Number(f.amount),
+    status: f.status,
+    currency: f.currency.trim(),
+    timestamp: Number(f.timestamp),
+    store_code: f.storeCode.trim(),
     transaction: {
-      ref_code: form.refCode.trim(),
-      error_msg: form.errorMsg.trim(),
-      is_global: Boolean(form.isGlobal),
-      created_at: Number(form.createdAt),
-      error_code: form.errorCode.trim(),
-      is_timeout: Boolean(form.isTimeout),
-      success_at: Number(form.successAt),
-      updated_at: Number(form.updatedAt),
-      approve_code: form.approveCode.trim(),
-      payment_status: form.paymentStatus,
-      payment_channel: form.paymentChannel,
-      payment_transid: form.paymentTransid.trim(),
+      ref_code: f.refCode.trim(),
+      error_msg: f.errorMsg.trim(),
+      is_global: Boolean(f.isGlobal),
+      created_at: Number(f.createdAt),
+      error_code: f.errorCode.trim(),
+      is_timeout: Boolean(f.isTimeout),
+      success_at: Number(f.successAt),
+      updated_at: Number(f.updatedAt),
+      approve_code: f.approveCode.trim(),
+      payment_status: f.paymentStatus,
+      payment_channel: f.paymentChannel,
+      payment_transid: f.paymentTransid.trim(),
     },
     customer_info: {
       card_info: {
-        card_type: form.cardType,
-        card_holder: nullIfEmpty(form.cardHolder),
-        card_number: form.cardNumber.trim(),
-        card_origin: form.cardOrigin,
+        card_type: f.cardType,
+        card_holder: nullIfEmpty(f.cardHolder),
+        card_number: f.cardNumber.trim(),
+        card_origin: f.cardOrigin,
       },
-      customer_name: nullIfEmpty(form.customerName),
+      customer_name: nullIfEmpty(f.customerName),
     },
-    merchant_code: form.merchantCode.trim(),
-    merchant_bill_id: form.merchantBillId.trim(),
-    store_code_partner: form.storeCodePartner.trim(),
-    merchant_code_partner: form.merchantCodePartner.trim(),
+    merchant_code: f.merchantCode.trim(),
+    merchant_bill_id: f.merchantBillId?.trim() || generateFinvietMerchantBillId(),
+    store_code_partner: f.storeCodePartner.trim(),
+    merchant_code_partner: f.merchantCodePartner.trim(),
   }
 
-  if (form.retailAppId?.trim()) body.retail_app_id = form.retailAppId.trim()
-  if (form.signature?.trim()) body.signature = form.signature.trim()
+  if (f.retailAppId?.trim()) body.retail_app_id = f.retailAppId.trim()
+  if (f.signature?.trim()) body.signature = f.signature.trim()
 
   return body
+}
+
+/** Fields that affect the HMAC signature (excludes signature + secretKey). */
+export function finvietSignFingerprint(form) {
+  const body = finvietFormToBody(ensureFinvietMerchantBillId(form), { refreshTimes: false })
+  delete body.signature
+  return JSON.stringify(body)
 }
 
 export function parseFinvietFormFromJson(jsonText) {
@@ -116,21 +143,16 @@ export function parseFinvietFormFromJson(jsonText) {
   return templateToFinvietForm(parsed)
 }
 
-export function withFreshFinvietIdsBody(body) {
-  const ts = Date.now()
-  const created = ts - 50000
-  const success = ts - 10000
+export function withFreshFinvietTimestampsBody(body) {
+  const times = freshFinvietTimestamps()
   return {
     ...body,
-    timestamp: ts,
-    merchant_bill_id: generateFinvietMerchantBillId(),
+    timestamp: times.timestamp,
     transaction: {
       ...body.transaction,
-      ref_code: generateFinvietRefCode(),
-      payment_transid: generateFinvietPaymentTransId(),
-      created_at: created,
-      success_at: success,
-      updated_at: success,
+      created_at: times.createdAt,
+      success_at: times.successAt,
+      updated_at: times.updatedAt,
     },
   }
 }

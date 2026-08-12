@@ -13,13 +13,13 @@ function nowMs() {
   return Date.now()
 }
 
-/** DFT_DDMMYYYY_NNNNNN */
+/** INV_DDMMYYYY_NNNNNN — invoice-style merchant bill id */
 export function generateFinvietMerchantBillId() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
   const date = `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}`
-  const seq = String(Math.floor(Math.random() * 100000)).padStart(5, '0')
-  return `DFT_${date}_${seq}`
+  const seq = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+  return `INV_${date}_${seq}`
 }
 
 export function generateFinvietPaymentTransId() {
