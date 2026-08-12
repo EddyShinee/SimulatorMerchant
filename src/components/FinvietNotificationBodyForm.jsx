@@ -39,7 +39,7 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
           <Field label={t('posStandalone.finvietSecretKey')}>
             <input
               className="input font-mono text-xs"
-              type="password"
+              type="text"
               autoComplete="off"
               value={form.secretKey}
               onChange={(e) => set('secretKey', e.target.value)}
