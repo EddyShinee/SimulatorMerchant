@@ -30,9 +30,10 @@ import {
   finvietFormToBody,
   parseFinvietFormFromJson,
   withFreshFinvietIds,
-  withFreshFinvietTimestampsBody,
   withFreshFinvietTimestamps,
   ensureFinvietMerchantBillId,
+  regenerateFinvietAutoFields,
+  regenerateFinvietAutoFieldsBody,
   finvietSignFingerprint,
 } from '../utils/finvietNotificationForm.js'
 import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
@@ -219,14 +220,22 @@ export default function PosStandalone() {
     return finvietBodyWithSignature(unsigned, secretKey.trim())
   }, [])
 
+  const finvietSecret = useCallback(
+    (form = finvietForm) =>
+      form.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
+    [finvietForm]
+  )
+
   const applyFinvietSignature = useCallback(
-    async (form = finvietForm) => {
-      const secret = form.secretKey?.trim()
-      if (!secret) return null
+    async (form = finvietForm, { regenerate = false } = {}) => {
+      const secret = finvietSecret(form)
       setFinvietSigning(true)
       try {
         saveStoredFinvietSecret(secret)
-        const refreshed = withFreshFinvietTimestamps(ensureFinvietApproveCode(ensureFinvietMerchantBillId(form)))
+        const base = regenerate
+          ? regenerateFinvietAutoFields({ ...form, secretKey: secret })
+          : { ...form, secretKey: secret }
+        const refreshed = withFreshFinvietTimestamps(ensureFinvietMerchantBillId(base))
         const signed = await signFinvietBody(finvietFormToBody(refreshed, { refreshTimes: false }), secret)
         finvietSignSkipRef.current = true
         finvietSignFingerprintRef.current = finvietSignFingerprint({ ...refreshed, signature: signed.signature })
@@ -240,7 +249,7 @@ export default function PosStandalone() {
         setFinvietSigning(false)
       }
     },
-    [finvietForm, notificationEditMode, signFinvietBody]
+    [finvietForm, notificationEditMode, signFinvietBody, finvietSecret]
   )
 
   const finvietSignPayload = useMemo(
@@ -254,7 +263,7 @@ export default function PosStandalone() {
       finvietSignSkipRef.current = false
       return
     }
-    const secret = finvietForm.secretKey?.trim()
+    const secret = finvietForm.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY
     if (!secret) return
     if (finvietSignPayload && finvietSignPayload === finvietSignFingerprintRef.current) return
 
@@ -325,8 +334,9 @@ export default function PosStandalone() {
 
   const syncNotificationTranIds = (body) => {
     if (isFinviet) {
-      const next = withFreshFinvietTimestampsBody(body)
-      setFinvietForm(templateToFinvietForm(next))
+      const next = regenerateFinvietAutoFieldsBody(body)
+      const nextForm = templateToFinvietForm(next)
+      setFinvietForm((prev) => ({ ...prev, ...nextForm, secretKey: finvietSecret(prev), signature: '' }))
       setBodyJson(JSON.stringify(next, null, 2))
       return next
     }
@@ -429,13 +439,18 @@ export default function PosStandalone() {
       }
 
       if (isFinviet) {
-        const secret = finvietForm.secretKey?.trim()
-        if (!secret) {
-          setError(t('posStandalone.finvietSecretRequired'))
-          return
-        }
+        const secret = finvietSecret(finvietForm)
         try {
           notificationBody = await signFinvietBody(notificationBody, secret)
+          const nextForm = templateToFinvietForm(notificationBody)
+          finvietSignSkipRef.current = true
+          setFinvietForm((prev) => ({
+            ...prev,
+            ...nextForm,
+            secretKey: secret,
+            signature: notificationBody.signature,
+          }))
+          setBodyJson(JSON.stringify(notificationBody, null, 2))
         } catch (e) {
           setError(e.message || t('posStandalone.finvietSignFailed'))
           return
@@ -460,7 +475,7 @@ export default function PosStandalone() {
         privateKeyFile: signWebhook ? signingPrivateKeyFile : undefined,
         privateKeyPassword: signWebhook ? privateKeyPassword || undefined : undefined,
         notificationBody: signWebhook ? notificationBody : isNotification ? notificationBody : undefined,
-        finvietSecretKey: isFinviet ? finvietForm.secretKey?.trim() : undefined,
+        finvietSecretKey: isFinviet ? finvietSecret(finvietForm) : undefined,
       })
 
       setResult(data)
@@ -764,7 +779,7 @@ export default function PosStandalone() {
                   <FinvietNotificationBodyForm
                     form={finvietForm}
                     onChange={handleNotificationFormChange}
-                    onRegenerateSignature={() => applyFinvietSignature()}
+                    onRegenerateSignature={() => applyFinvietSignature(finvietForm, { regenerate: true })}
                     signing={finvietSigning}
                     t={t}
                   />

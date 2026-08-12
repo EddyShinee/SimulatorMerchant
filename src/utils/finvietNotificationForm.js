@@ -46,7 +46,7 @@ export const DEFAULT_FINVIET_FORM = {
   secretKey: loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
 }
 
-export function withFreshFinvietIds(form) {
+export function regenerateFinvietAutoFields(form) {
   const times = freshFinvietTimestamps()
   return {
     ...form,
@@ -56,7 +56,69 @@ export function withFreshFinvietIds(form) {
     refCode: generateFinvietRefCode(),
     paymentTransid: generateFinvietPaymentTransId(),
     approveCode: generateFinvietApproveCode(),
+    signature: '',
   }
+}
+
+export function regenerateFinvietAutoFieldsBody(body) {
+  const times = freshFinvietTimestamps()
+  const tx = body.transaction || {}
+  return {
+    ...body,
+    timestamp: times.timestamp,
+    merchant_bill_id: generateFinvietMerchantBillId(),
+    signature: undefined,
+    transaction: {
+      ...tx,
+      ref_code: generateFinvietRefCode(),
+      payment_transid: generateFinvietPaymentTransId(),
+      approve_code: generateFinvietApproveCode(),
+      created_at: times.createdAt,
+      success_at: times.successAt,
+      updated_at: times.updatedAt,
+    },
+  }
+}
+
+export function finvietFieldLabel(key) {
+  const labels = {
+    amount: 'Amount',
+    currency: 'Currency',
+    status: 'Status',
+    timestamp: 'Timestamp',
+    store_code: 'Store Code',
+    retail_app_id: 'Retail App ID',
+    signature: 'Signature',
+    merchant_code: 'Merchant Code',
+    merchant_bill_id: 'Merchant Bill ID',
+    store_code_partner: 'Store Code Partner',
+    merchant_code_partner: 'Merchant Code Partner',
+    ref_code: 'Ref Code',
+    payment_transid: 'Payment Trans ID',
+    payment_status: 'Payment Status',
+    payment_channel: 'Payment Channel',
+    approve_code: 'Approve Code',
+    error_code: 'Error Code',
+    error_msg: 'Error Message',
+    created_at: 'Created At',
+    success_at: 'Success At',
+    updated_at: 'Updated At',
+    is_global: 'Is Global',
+    is_timeout: 'Is Timeout',
+    customer_name: 'Customer Name',
+    'card_info.card_type': 'Card Type',
+    'card_info.card_number': 'Card Number',
+    'card_info.card_origin': 'Card Origin',
+    'card_info.card_holder': 'Card Holder',
+  }
+  return labels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function withFreshFinvietIds(form) {
+  return regenerateFinvietAutoFields({
+    ...form,
+    secretKey: form.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
+  })
 }
 
 export function templateToFinvietForm(template = {}) {
@@ -152,15 +214,5 @@ export function parseFinvietFormFromJson(jsonText) {
 }
 
 export function withFreshFinvietTimestampsBody(body) {
-  const times = freshFinvietTimestamps()
-  return {
-    ...body,
-    timestamp: times.timestamp,
-    transaction: {
-      ...body.transaction,
-      created_at: times.createdAt,
-      success_at: times.successAt,
-      updated_at: times.updatedAt,
-    },
-  }
+  return regenerateFinvietAutoFieldsBody(body)
 }
