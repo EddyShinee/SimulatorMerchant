@@ -30,6 +30,11 @@ export function generateFinvietRefCode() {
   return String(Math.floor(100000000000 + Math.random() * 900000000000))
 }
 
+/** 6-digit authorization code (e.g. 069302). */
+export function generateFinvietApproveCode() {
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+}
+
 export function buildFinvietNotificationTemplate() {
   const ts = nowMs()
   const created = ts - 50000
@@ -51,7 +56,7 @@ export function buildFinvietNotificationTemplate() {
       is_timeout: false,
       success_at: success,
       updated_at: success,
-      approve_code: '069302',
+      approve_code: generateFinvietApproveCode(),
       payment_status: 'success',
       payment_channel: 'card',
       payment_transid: generateFinvietPaymentTransId(),

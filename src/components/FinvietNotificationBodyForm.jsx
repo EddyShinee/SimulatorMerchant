@@ -178,12 +178,8 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               ))}
             </select>
           </Field>
-          <Field label="approve_code">
-            <input
-              className="input font-mono text-xs"
-              value={form.approveCode}
-              onChange={(e) => set('approveCode', e.target.value)}
-            />
+          <Field label="approve_code" hint={t('posStandalone.finvietApproveCodeAuto')}>
+            <div className="input font-mono text-xs text-slate-600 dark:text-slate-300">{form.approveCode}</div>
           </Field>
           <Field label="error_code">
             <input

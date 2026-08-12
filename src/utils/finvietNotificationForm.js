@@ -3,6 +3,7 @@ import {
   generateFinvietMerchantBillId,
   generateFinvietPaymentTransId,
   generateFinvietRefCode,
+  generateFinvietApproveCode,
   FINVIET_DEFAULT_SECRET_KEY,
 } from '../config/finvietNotificationConfig.js'
 import { loadStoredFinvietSecret } from './posStandaloneKeyStore.js'
@@ -30,6 +31,10 @@ export function ensureFinvietMerchantBillId(form) {
   return form.merchantBillId?.trim() ? form : { ...form, merchantBillId: generateFinvietMerchantBillId() }
 }
 
+export function ensureFinvietApproveCode(form) {
+  return form.approveCode?.trim() ? form : { ...form, approveCode: generateFinvietApproveCode() }
+}
+
 export function formatFinvietTimestamp(ms) {
   const n = Number(ms)
   if (!Number.isFinite(n) || n <= 0) return '—'
@@ -50,6 +55,7 @@ export function withFreshFinvietIds(form) {
     merchantBillId: generateFinvietMerchantBillId(),
     refCode: generateFinvietRefCode(),
     paymentTransid: generateFinvietPaymentTransId(),
+    approveCode: generateFinvietApproveCode(),
   }
 }
 
@@ -105,7 +111,7 @@ export function finvietFormToBody(form, { refreshTimes = true } = {}) {
       is_timeout: Boolean(f.isTimeout),
       success_at: Number(f.successAt),
       updated_at: Number(f.updatedAt),
-      approve_code: f.approveCode.trim(),
+      approve_code: f.approveCode?.trim() || generateFinvietApproveCode(),
       payment_status: f.paymentStatus,
       payment_channel: f.paymentChannel,
       payment_transid: f.paymentTransid.trim(),
@@ -133,7 +139,9 @@ export function finvietFormToBody(form, { refreshTimes = true } = {}) {
 
 /** Fields that affect the HMAC signature (excludes signature + secretKey). */
 export function finvietSignFingerprint(form) {
-  const body = finvietFormToBody(ensureFinvietMerchantBillId(form), { refreshTimes: false })
+  const body = finvietFormToBody(ensureFinvietApproveCode(ensureFinvietMerchantBillId(form)), {
+    refreshTimes: false,
+  })
   delete body.signature
   return JSON.stringify(body)
 }

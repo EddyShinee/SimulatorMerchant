@@ -226,7 +226,7 @@ export default function PosStandalone() {
       setFinvietSigning(true)
       try {
         saveStoredFinvietSecret(secret)
-        const refreshed = withFreshFinvietTimestamps(ensureFinvietMerchantBillId(form))
+        const refreshed = withFreshFinvietTimestamps(ensureFinvietApproveCode(ensureFinvietMerchantBillId(form)))
         const signed = await signFinvietBody(finvietFormToBody(refreshed, { refreshTimes: false }), secret)
         finvietSignSkipRef.current = true
         finvietSignFingerprintRef.current = finvietSignFingerprint({ ...refreshed, signature: signed.signature })
