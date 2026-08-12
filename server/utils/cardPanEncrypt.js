@@ -16,7 +16,11 @@ export function parseAes128Key(input) {
 }
 
 /**
- * Spec §5.1: AES-128-GCM, 12-byte IV, ciphertext + auth tag → Base64(IV || ciphertext || tag).
+ * Spec §5.1.1:
+ * 1. AES/GCM/NoPadding, 128-bit key
+ * 2. Random 12-byte IV per encryption
+ * 3. Ciphertext + GCM auth tag
+ * 4. Base64(IV || ciphertext || tag) → cardPan field
  */
 export function encryptCardPan(plainPan, keyInput) {
   const pan = String(plainPan || '').replace(/\s/g, '')

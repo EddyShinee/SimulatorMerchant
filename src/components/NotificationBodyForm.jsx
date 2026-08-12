@@ -183,7 +183,7 @@ export default function NotificationBodyForm({
             </button>
           </div>
 
-          <Field label="cardPan" className="sm:col-span-2">
+          <Field label="cardPan" className="sm:col-span-2" hint={t('posStandalone.cardPanAutoOnSend')}>
             <input
               className="input font-mono text-xs"
               value={form.cardPan}

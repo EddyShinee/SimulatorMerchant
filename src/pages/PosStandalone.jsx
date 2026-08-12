@@ -40,7 +40,6 @@ import {
 } from '../utils/finvietNotificationForm.js'
 import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
-import { normalizeAesKeyBase64 } from '../utils/aesKey.js'
 import {
   loadStoredPrivateKeyPem,
   loadStoredPublicCertPem,
@@ -290,7 +289,7 @@ export default function PosStandalone() {
   useEffect(() => {
     if (!isNotification || isFinviet || !isVtc) return
     setNotificationForm((prev) => {
-      const jwtSecret = normalizeAesKeyBase64(prev.jwtSecret || aesKey || DEFAULT_AES_KEY)
+      const jwtSecret = prev.jwtSecret?.trim() || aesKey.trim() || DEFAULT_AES_KEY
       if (prev.jwtSecret === jwtSecret) return prev
       return { ...prev, jwtSecret }
     })
@@ -393,16 +392,22 @@ export default function PosStandalone() {
     }
   }
 
+  const encryptCardPanToForm = async (form = notificationForm) => {
+    const key = aesKey.trim() || DEFAULT_AES_KEY
+    const pan = plainPan.trim()
+    if (!pan) throw new Error(t('posStandalone.plainPanRequired'))
+    const { data } = await api.post('/api/simulator/pos-standalone/encrypt-card-pan', {
+      plainPan: pan,
+      aesKey: key,
+    })
+    return { ...form, cardPan: data.cardPan, jwtSecret: key }
+  }
+
   const handleEncryptCardPan = async () => {
     setError('')
     setEncryptingCardPan(true)
     try {
-      const key = normalizeAesKeyBase64(aesKey || DEFAULT_AES_KEY)
-      const { data } = await api.post('/api/simulator/pos-standalone/encrypt-card-pan', {
-        plainPan: plainPan.trim(),
-        aesKey: key,
-      })
-      const nextForm = { ...notificationForm, cardPan: data.cardPan, jwtSecret: key }
+      const nextForm = await encryptCardPanToForm()
       handleNotificationFormChange(nextForm)
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('posStandalone.encryptCardPanFailed'))
@@ -441,11 +446,17 @@ export default function PosStandalone() {
     const signWebhook = isNotification && !isFinviet
     if (isNotification) {
       try {
+        let softposForm = notificationForm
+        if (!isFinviet && plainPan.trim() && notificationEditMode === 'form') {
+          softposForm = await encryptCardPanToForm(notificationForm)
+          setNotificationForm(softposForm)
+        }
+
         notificationBody =
           notificationEditMode === 'form'
             ? isFinviet
               ? finvietFormToBody(finvietForm)
-              : formToNotificationBody(notificationForm)
+              : formToNotificationBody(softposForm)
             : JSON.parse(bodyJson)
         notificationBody = syncNotificationTranIds(notificationBody)
       } catch {
