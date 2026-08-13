@@ -570,8 +570,9 @@ export const translations = {
       jwtPayload: 'JWT payload (decoded)',
       jwtBodyMatch: 'JWT payload khớp request body',
       jwtBodyMismatch: 'JWT payload không khớp request body',
-      jwtSecretHint: 'AES-128 hex (32 ký tự) — trùng key encrypt cardPan',
-      vtcJwtSecretHint: 'VTC dùng extraData.jwtSecret để decrypt cardPan — phải trùng AES key.',
+      jwtSecretHint: 'Base64 của AES key — VTC dùng field này decrypt cardPan',
+      vtcJwtSecretHint:
+        'AES key (hex) dùng encrypt; jwtSecret (Base64) gửi VTC. Hex trong jwtSecret → server lỗi key size.',
       error403:
         '403 Forbidden: 2C2P từ chối request. Thường do (1) EC private key chưa đăng ký public cert với 2C2P, (2) tranId không tồn tại trên demo, (3) merchantId/subMid/subTid sai. Liên hệ 2C2P để lấy key pair acquirer đã onboard.',
       statusFailedTitle: '2C2P trả về {"status":"failed"}',
@@ -1356,8 +1357,9 @@ export const translations = {
       jwtPayload: 'JWT payload (decoded)',
       jwtBodyMatch: 'JWT payload matches request body',
       jwtBodyMismatch: 'JWT payload does not match request body',
-      jwtSecretHint: 'AES-128 hex (32 chars) — must match cardPan encrypt key',
-      vtcJwtSecretHint: 'VTC uses extraData.jwtSecret to decrypt cardPan — must match AES key.',
+      jwtSecretHint: 'Base64 of AES key — VTC uses this to decrypt cardPan',
+      vtcJwtSecretHint:
+        'AES key (hex) for encrypt; jwtSecret (Base64) for VTC. Hex in jwtSecret causes server key-size error.',
       error403:
         '403 Forbidden: 2C2P rejected the request. Usually (1) EC private key not registered with 2C2P, (2) tranId does not exist on demo, (3) wrong merchantId/subMid/subTid. Contact 2C2P for onboarded acquirer key pair.',
       statusFailedTitle: '2C2P returned {"status":"failed"}',

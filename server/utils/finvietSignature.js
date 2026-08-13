@@ -1,7 +1,11 @@
 import crypto from 'crypto'
-import { finvietPreSignString, sortObjectKeysDeep } from '../../src/utils/finvietSignature.js'
+import {
+  finvietPreSignString,
+  sortObjectKeysTopLevel,
+  sortObjectKeysDeep,
+} from '../../src/utils/finvietSignature.js'
 
-export { sortObjectKeysDeep, finvietPreSignString }
+export { sortObjectKeysTopLevel, sortObjectKeysDeep, finvietPreSignString }
 
 export function finvietSignSync(payload, secretKey) {
   const secret = String(secretKey || '')
@@ -10,7 +14,7 @@ export function finvietSignSync(payload, secretKey) {
 }
 
 export function finvietBodyWithSignatureSync(payload, secretKey) {
-  const body = sortObjectKeysDeep({ ...payload })
+  const body = sortObjectKeysTopLevel({ ...payload })
   delete body.signature
   const signature = finvietSignSync(body, secretKey)
   return { ...body, signature }

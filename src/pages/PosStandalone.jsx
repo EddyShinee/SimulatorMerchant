@@ -40,6 +40,7 @@ import {
 } from '../utils/finvietNotificationForm.js'
 import { finvietBodyWithSignature } from '../utils/finvietSignature.js'
 import { decodeJwtPayload, payloadsMatch } from '../utils/jwtDecode.js'
+import { toVtcJwtSecret } from '../utils/vtcJwtSecret.js'
 import {
   loadStoredPrivateKeyPem,
   loadStoredPublicCertPem,
@@ -289,7 +290,7 @@ export default function PosStandalone() {
   useEffect(() => {
     if (!isNotification || isFinviet || !isVtc) return
     setNotificationForm((prev) => {
-      const jwtSecret = prev.jwtSecret?.trim() || aesKey.trim() || DEFAULT_AES_KEY
+      const jwtSecret = toVtcJwtSecret(aesKey.trim() || DEFAULT_AES_KEY)
       if (prev.jwtSecret === jwtSecret) return prev
       return { ...prev, jwtSecret }
     })
@@ -400,7 +401,7 @@ export default function PosStandalone() {
       plainPan: pan,
       aesKey: key,
     })
-    return { ...form, cardPan: data.cardPan, jwtSecret: key }
+    return { ...form, cardPan: data.cardPan, jwtSecret: toVtcJwtSecret(key) }
   }
 
   const handleEncryptCardPan = async () => {

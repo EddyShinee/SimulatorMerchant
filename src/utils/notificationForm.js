@@ -1,9 +1,10 @@
-import { NOTIFICATION_TEMPLATES, generateTranId, DEFAULT_JWT_SECRET } from '../config/posStandaloneConfig.js'
+import { NOTIFICATION_TEMPLATES, generateTranId, DEFAULT_JWT_SECRET, DEFAULT_AES_KEY } from '../config/posStandaloneConfig.js'
+import { toVtcJwtSecret } from './vtcJwtSecret.js'
 
 export const DEFAULT_NOTIFICATION_FORM = templateToForm(NOTIFICATION_TEMPLATES.sale)
 
 export function resolveJwtSecret(form) {
-  return String(form?.jwtSecret ?? '').trim() || DEFAULT_JWT_SECRET
+  return toVtcJwtSecret(form?.jwtSecret || DEFAULT_AES_KEY) || DEFAULT_JWT_SECRET
 }
 
 export function withFreshTranIds(form) {

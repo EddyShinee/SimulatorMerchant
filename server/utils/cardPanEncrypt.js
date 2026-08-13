@@ -35,3 +35,21 @@ export function encryptCardPan(plainPan, keyInput) {
   const tag = cipher.getAuthTag()
   return Buffer.concat([iv, ciphertext, tag]).toString('base64')
 }
+
+/**
+ * VTC decrypts cardPan using extraData.jwtSecret.
+ * Their .NET code treats the secret as Base64 key bytes (not hex UTF-8).
+ */
+export function toVtcJwtSecret(aesKeyInput) {
+  const s = String(aesKeyInput || '').trim()
+  if (!s) return ''
+
+  if (/^[0-9a-fA-F]{32}$/.test(s)) {
+    return Buffer.from(s, 'hex').toString('base64')
+  }
+
+  const fromB64 = Buffer.from(s, 'base64')
+  if (fromB64.length === 16) return s
+
+  return s
+}
