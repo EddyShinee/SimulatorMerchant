@@ -44,7 +44,47 @@ body {
     @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;
   }
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900;
+    @apply max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900;
+  }
+  .split-panel {
+    @apply grid gap-6 lg:grid-cols-2;
+  }
+  .split-panel > * {
+    @apply min-w-0 max-w-full;
+  }
+  .result-panel {
+    @apply min-w-0 max-w-full space-y-4 overflow-hidden;
+  }
+  .code-block {
+    @apply max-w-full overflow-auto rounded-lg bg-slate-900 p-3 text-xs;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .code-block-plain {
+    @apply text-slate-100;
+  }
+  .json-view {
+    @apply font-mono text-xs leading-relaxed;
+    white-space: pre;
+  }
+  .page-title {
+    @apply text-xl font-bold text-slate-900 dark:text-slate-100 sm:text-2xl;
+  }
+  .page-header {
+    @apply flex flex-wrap items-center gap-2 sm:gap-3;
+  }
+  .form-grid-3 {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .form-grid-3-tight {
+    @apply grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .table-scroll {
+    @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+  }
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
   }
 }
 

@@ -19,7 +19,7 @@ export default function PaymentTokenField({ value, onChange, onPaste }) {
   return (
     <div>
       <label className="label">🔑 Payment Token</label>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <input
           type="text"
           className="input-single min-w-0 flex-1 font-mono text-xs"
@@ -29,7 +29,7 @@ export default function PaymentTokenField({ value, onChange, onPaste }) {
           autoComplete="off"
           spellCheck={false}
         />
-        <button type="button" onClick={handlePaste} className="btn-secondary shrink-0 whitespace-nowrap">
+        <button type="button" onClick={handlePaste} className="btn-secondary w-full shrink-0 whitespace-nowrap sm:w-auto">
           📋 {t('doPayment.pasteToken')}
         </button>
       </div>

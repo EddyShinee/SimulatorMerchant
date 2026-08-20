@@ -3,6 +3,7 @@ import api, { getInboxUrls } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import CodeBlock from '../components/CodeBlock.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import NotificationBodyForm from '../components/NotificationBodyForm.jsx'
 import FinvietNotificationBodyForm from '../components/FinvietNotificationBodyForm.jsx'
@@ -57,12 +58,12 @@ import {
 
 function ResultCard({ title, text }) {
   return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</p>
+    <div className="card min-w-0 overflow-hidden p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</p>
         <CopyButton text={text} />
       </div>
-      <pre className="max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{text}</pre>
+      <CodeBlock maxHeight="max-h-96">{text}</CodeBlock>
     </div>
   )
 }
@@ -570,18 +571,18 @@ export default function PosStandalone() {
   return (
     <div className="space-y-6">
       <LoadingOverlay show={loading} />
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="page-header">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
           {opMeta.method}
         </span>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+        <h1 className="page-title min-w-0 flex-1">
           📱 {t('posStandalone.title')}
         </h1>
       </div>
 
       <p className="text-sm text-slate-500 dark:text-slate-400">{t('posStandalone.subtitle')}</p>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="split-panel">
         <div className="space-y-5">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             ⚙️ {t('paymentToken.configuration')}

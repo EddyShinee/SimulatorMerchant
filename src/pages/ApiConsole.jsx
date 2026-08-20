@@ -98,7 +98,7 @@ export default function ApiConsole() {
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
           {method}
         </span>
-        <h1 className="text-2xl font-bold text-slate-900">{t(config.nameKey)}</h1>
+        <h1 className="page-title">{t(config.nameKey)}</h1>
       </div>
       <p className="-mt-3 text-slate-500">{t('apiCaller.subtitle')}</p>
 

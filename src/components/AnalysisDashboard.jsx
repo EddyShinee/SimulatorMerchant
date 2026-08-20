@@ -163,7 +163,7 @@ export default function AnalysisDashboard({ rows, meta }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid flex-1 gap-3 sm:grid-cols-3">
+        <div className="form-grid-3 flex-1">
           <Metric label="Total Transactions" value={profile.total} />
           <Metric label="Response Time" value={`${(meta.durationMs / 1000).toFixed(2)}s`} />
           <Metric label="Status Code" value={meta.status} />
@@ -469,7 +469,7 @@ export default function AnalysisDashboard({ rows, meta }) {
             valueKey="count"
             valueFormatter={(v) => `${Number(v).toLocaleString()} VND`}
           />
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 form-grid-3">
             <Metric
               label="Total Amount (All Status)"
               value={`${amountData.reduce((s, d) => s + d.totalAmount, 0).toLocaleString()} VND`}

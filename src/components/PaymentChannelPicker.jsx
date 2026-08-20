@@ -59,7 +59,7 @@ function ChannelCodePreview({ channel, context, selected }) {
         📌 {t('paymentOptionDetails.selectedChannelPreview')}
         {label && <span className="ml-1 font-normal text-brand-600 dark:text-brand-300">({label})</span>}
       </p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+      <div className="mt-2 form-grid-3-tight">
         <div className="rounded-lg border border-brand-200 bg-white px-3 py-2 dark:border-brand-800 dark:bg-slate-900">
           <p className="text-[10px] uppercase tracking-wide text-slate-500">channelCode</p>
           <p className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">

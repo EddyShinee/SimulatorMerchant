@@ -4,7 +4,9 @@ import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
+import CodeBlock from '../components/CodeBlock.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import JsonResultCard from '../components/JsonResultCard.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import PaymentTokenField from '../components/PaymentTokenField.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
@@ -84,7 +86,7 @@ function QrDisplay({ value }) {
       alt="QR code"
       width={260}
       height={260}
-      className="rounded-lg border border-slate-200 bg-white p-2"
+      className="mx-auto h-auto w-full max-w-[260px] rounded-lg border border-slate-200 bg-white p-2"
     />
   )
 }
@@ -226,12 +228,7 @@ export default function DoPayment() {
   const [qrType, setQrType] = useState('')
 
   // Token pay: wallet (Zalo/MoMo) or card (CC) — same payload shape
-  const [tokenPayMode, setTokenPayMode] = useState(() => {
-    if (flow.customerToken) return 'token'
-    if (isWalletChannel(flow.channelCode) || isCardChannel(flow.channelCode)) return 'token'
-    if (flow.tokenizeOnly || flow.customerTokenOnly) return 'token'
-    return 'none'
-  })
+  const [tokenPayMode, setTokenPayMode] = useState('none')
   const [responseReturnUrl, setResponseReturnUrl] = useState(
     () => flow.webPaymentUrl || buildResponseReturnUrl(flow.paymentToken, 'sandbox')
   )
@@ -260,6 +257,19 @@ export default function DoPayment() {
   const channelUpper = channelCode.trim().toUpperCase()
   const isWalletCh = isWalletChannel(channelUpper)
   const isCardCh = isCardChannel(channelUpper)
+
+  const applyTokenPayMode = (mode) => {
+    setTokenPayMode(mode)
+    if (mode === 'token') {
+      if (!responseReturnUrl.trim() && paymentToken.trim()) {
+        setResponseReturnUrl(buildResponseReturnUrl(paymentToken, env))
+      }
+      if (flow.channelCode && isWalletChannel(flow.channelCode)) {
+        setChannelCode(flow.channelCode)
+        setQrType((prev) => prev || 'URL')
+      }
+    }
+  }
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
@@ -320,9 +330,6 @@ export default function DoPayment() {
     }
 
     const code = String(flow.channelCode || '').toUpperCase()
-    if (flow.customerToken || isWalletChannel(code) || isCardChannel(code) || flow.tokenizeOnly) {
-      setTokenPayMode('token')
-    }
     if (isWalletChannel(code)) {
       setTokenSubChannelCode((prev) => prev || code)
     }
@@ -705,17 +712,17 @@ export default function DoPayment() {
       <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
-        <h1 className="text-2xl font-bold text-slate-900">💳 {t('doPayment.title')}</h1>
+        <h1 className="page-title">💳 {t('doPayment.title')}</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="split-panel">
         {/* ---------------- Configuration ---------------- */}
         <div className="space-y-5">
           <h2 className="text-lg font-semibold text-slate-900">⚙️ {t('paymentToken.configuration')}</h2>
 
           {/* Environment */}
           <div className="card p-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="form-grid-3">
               <div>
                 <label className="label">{t('paymentToken.environment')}</label>
                 <select className="input" value={env} onChange={(e) => handleEnv(e.target.value)}>
@@ -770,26 +777,38 @@ export default function DoPayment() {
             </div>
             <div>
               <label className="label">{t('doPayment.tokenPayMode')}</label>
-              <select
-                className="input"
-                value={tokenPayMode}
-                onChange={(e) => {
-                  const mode = e.target.value
-                  setTokenPayMode(mode)
-                  if (mode === 'token') {
-                    if (!responseReturnUrl.trim() && paymentToken.trim()) {
-                      setResponseReturnUrl(buildResponseReturnUrl(paymentToken, env))
-                    }
-                    if (flow.channelCode && isWalletChannel(flow.channelCode)) {
-                      setChannelCode(flow.channelCode)
-                      setQrType((prev) => prev || 'URL')
-                    }
-                  }
-                }}
-              >
-                <option value="none">{t('doPayment.tokenPayNone')}</option>
-                <option value="token">{t('doPayment.tokenPayUnified')}</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`text-sm font-semibold ${
+                    !isTokenPay ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {t('doPayment.tokenPayNormalLabel')}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isTokenPay}
+                  aria-label={t('doPayment.tokenPayMode')}
+                  onClick={() => applyTokenPayMode(isTokenPay ? 'none' : 'token')}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                    isTokenPay ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+                      isTokenPay ? 'left-5' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+                <span
+                  className={`text-sm font-semibold ${
+                    isTokenPay ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {t('doPayment.tokenPayTokenLabel')}
+                </span>
+              </div>
               <p className="mt-1 text-[11px] text-slate-400">
                 {isTokenPay ? t('doPayment.tokenPayUnifiedHint') : t('doPayment.tokenPayNoneHint')}
               </p>
@@ -817,7 +836,7 @@ export default function DoPayment() {
                 📌 {t('doPayment.flowChannelBadge')}: <span className="font-mono font-semibold">{flowChannelLabel}</span>
               </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="form-grid-3">
               <div>
                 <label className="label">Channel Code</label>
                 <input className="input" value={channelCode} onChange={(e) => setChannelCode(e.target.value)} />
@@ -835,9 +854,7 @@ export default function DoPayment() {
                 />
               </div>
             </div>
-            <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-              {JSON.stringify(codeJson, null, 2)}
-            </pre>
+            <CodeBlock maxHeight="max-h-60">{JSON.stringify(codeJson, null, 2)}</CodeBlock>
 
             {channelGroups.length > 0 && (
               <PaymentChannelPicker
@@ -904,7 +921,7 @@ export default function DoPayment() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('doPayment.ippHint')}</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="mt-3 form-grid-3">
                   <div>
                     <label className="label">isIppChosen</label>
                     <select
@@ -1064,9 +1081,7 @@ export default function DoPayment() {
                 </div>
               </div>
             )}
-            <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-              {JSON.stringify(paymentDataPreview, null, 2)}
-            </pre>
+            <CodeBlock maxHeight="max-h-60">{JSON.stringify(paymentDataPreview, null, 2)}</CodeBlock>
           </div>
 
           {/* Card details — raw PAN / expiry / CVV */}
@@ -1202,34 +1217,21 @@ export default function DoPayment() {
                 </div>
               )}
 
-              <div className="card p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-700">📨 {t('paymentToken.requestPayload')}</p>
-                  <CopyButton text={JSON.stringify(result.payload, null, 2)} />
-                </div>
-                <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-                  {JSON.stringify(result.payload, null, 2)}
-                </pre>
-              </div>
+              <JsonResultCard
+                title={`📨 ${t('paymentToken.requestPayload')}`}
+                text={JSON.stringify(result.payload, null, 2)}
+              />
 
               {result.response != null && (
-                <div className="card p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700">📬 {t('paymentToken.rawResponse')}</p>
-                    <CopyButton
-                      text={
-                        typeof result.response === 'string'
-                          ? result.response
-                          : JSON.stringify(result.response, null, 2)
-                      }
-                    />
-                  </div>
-                  <pre className="max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-                    {typeof result.response === 'string'
+                <JsonResultCard
+                  title={`📬 ${t('paymentToken.rawResponse')}`}
+                  text={
+                    typeof result.response === 'string'
                       ? result.response
-                      : JSON.stringify(result.response, null, 2)}
-                  </pre>
-                </div>
+                      : JSON.stringify(result.response, null, 2)
+                  }
+                  maxHeight="max-h-96"
+                />
               )}
 
               {(() => {

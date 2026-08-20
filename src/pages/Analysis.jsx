@@ -132,7 +132,7 @@ export default function Analysis() {
       <LoadingOverlay show={loading} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">GET</span>
-        <h1 className="text-2xl font-bold text-slate-900">📊 {t('analysis.title')}</h1>
+        <h1 className="page-title">📊 {t('analysis.title')}</h1>
       </div>
 
       <div className="card space-y-4 p-4">

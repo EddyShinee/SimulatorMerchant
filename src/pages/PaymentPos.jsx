@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import CodeBlock from '../components/CodeBlock.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import MerchantVaultPicker from '../components/MerchantVaultPicker.jsx'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
@@ -39,20 +40,14 @@ function randomClientId() {
   return crypto.randomUUID().replace(/-/g, '')
 }
 
-function ResultCard({ title, text, mono }) {
+function ResultCard({ title, text }) {
   return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-700">{title}</p>
+    <div className="card min-w-0 overflow-hidden p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 text-sm font-semibold text-slate-700">{title}</p>
         <CopyButton text={text} />
       </div>
-      <pre
-        className={`max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100 ${
-          mono ? 'break-all whitespace-pre-wrap' : ''
-        }`}
-      >
-        {text}
-      </pre>
+      <CodeBlock maxHeight="max-h-72">{text}</CodeBlock>
     </div>
   )
 }
@@ -213,16 +208,16 @@ export default function PaymentPos() {
       />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
-        <h1 className="text-2xl font-bold text-slate-900">🔐 {t('paymentPos.title')}</h1>
+        <h1 className="page-title">🔐 {t('paymentPos.title')}</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="split-panel">
         {/* Configuration */}
         <div className="space-y-5">
           <h2 className="text-lg font-semibold text-slate-900">⚙️ {t('paymentToken.configuration')}</h2>
 
           <div className="card p-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="form-grid-3">
               <div>
                 <label className="label">{t('paymentToken.environment')}</label>
                 <select className="input" value={env} onChange={(e) => handleEnv(e.target.value)}>
@@ -413,7 +408,7 @@ export default function PaymentPos() {
                 text={JSON.stringify(result.payloadData, null, 2)}
               />
               {result.jwtToken && (
-                <ResultCard title={`🔏 ${t('paymentPos.encryptedPayload')}`} text={result.jwtToken} mono />
+                <ResultCard title={`🔏 ${t('paymentPos.encryptedPayload')}`} text={result.jwtToken} />
               )}
               {result.apiPayload && (
                 <ResultCard

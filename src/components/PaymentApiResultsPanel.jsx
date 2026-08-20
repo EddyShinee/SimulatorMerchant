@@ -1,32 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from './CopyButton.jsx'
+import CodeBlock from './CodeBlock.jsx'
 
-function CollapsibleJsonCard({ title, text, mono, defaultOpen = false }) {
+function CollapsibleJsonCard({ title, text, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 bg-slate-50 px-4 py-2.5 text-left dark:bg-slate-800/60"
       >
-        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</span>
-        <span className="text-xs text-slate-400">{open ? '▼' : '▶'}</span>
+        <span className="min-w-0 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</span>
+        <span className="shrink-0 text-xs text-slate-400">{open ? '▼' : '▶'}</span>
       </button>
       {open && (
-        <div className="border-t border-slate-200 p-3 dark:border-slate-700">
+        <div className="min-w-0 border-t border-slate-200 p-3 dark:border-slate-700">
           <div className="mb-2 flex justify-end">
             <CopyButton text={text} />
           </div>
-          <pre
-            className={`max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100 ${
-              mono ? 'break-all whitespace-pre-wrap' : ''
-            }`}
-          >
-            {text}
-          </pre>
+          <CodeBlock maxHeight="max-h-72">{text}</CodeBlock>
         </div>
       )}
     </div>
@@ -101,7 +96,7 @@ export default function PaymentApiResultsPanel({
             <CollapsibleJsonCard title={requestTitle} text={requestText} defaultOpen={false} />
           )}
           {responseText != null && (
-            <CollapsibleJsonCard title={responseTitle} text={responseText} mono defaultOpen={false} />
+            <CollapsibleJsonCard title={responseTitle} text={responseText} defaultOpen={false} />
           )}
           {footerContent}
         </div>

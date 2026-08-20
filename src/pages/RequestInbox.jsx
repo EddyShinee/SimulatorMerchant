@@ -138,33 +138,37 @@ function RequestCard({ request, lang, t }) {
 
   return (
     <details className="card overflow-hidden" open={false}>
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 sm:gap-3">
-        <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${methodBadge(request.method)}`}>
-          {request.method}
-        </span>
-        {analysis.hasJwt && (
-          <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-            JWT
+      <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${methodBadge(request.method)}`}>
+            {request.method}
           </span>
-        )}
-        <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700 dark:text-slate-200">
-          {request.path}
-        </span>
-        {invoiceNo && (
-          <span
-            className="max-w-[10rem] truncate font-mono text-xs text-brand-600 dark:text-brand-400"
-            title={invoiceNo}
+          {analysis.hasJwt && (
+            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              JWT
+            </span>
+          )}
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-700 sm:text-sm dark:text-slate-200">
+            {request.path}
+          </span>
+        </div>
+        <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-end">
+          {invoiceNo && (
+            <span
+              className="max-w-[12rem] truncate font-mono text-xs text-brand-600 dark:text-brand-400"
+              title={invoiceNo}
+            >
+              {invoiceNo}
+            </span>
+          )}
+          <time
+            className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400"
+            dateTime={request.receivedAt}
+            title={request.receivedAt}
           >
-            {invoiceNo}
-          </span>
-        )}
-        <time
-          className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400"
-          dateTime={request.receivedAt}
-          title={request.receivedAt}
-        >
-          {formatReceivedAt(request.receivedAt, lang)}
-        </time>
+            {formatReceivedAt(request.receivedAt, lang)}
+          </time>
+        </div>
       </summary>
       <div className="space-y-3 border-t border-slate-100 px-4 py-4 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
@@ -342,7 +346,7 @@ export default function RequestInbox() {
     <div className={embedded ? 'space-y-5' : 'space-y-6'}>
       {!embedded && (
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('inbox.title')}</h1>
+          <h1 className="page-title">{t('inbox.title')}</h1>
           <p className="mt-1 text-slate-500 dark:text-slate-400">{t('inbox.subtitle')}</p>
         </div>
       )}

@@ -6,6 +6,7 @@ import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAccess } from '../context/AccessContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
+import CodeBlock from '../components/CodeBlock.jsx'
 import InvoiceCopyBar from '../components/InvoiceCopyBar.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import MerchantVaultPicker from '../components/MerchantVaultPicker.jsx'
@@ -512,10 +513,10 @@ export default function PaymentToken() {
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
           POST
         </span>
-        <h1 className="text-2xl font-bold text-slate-900">{t('paymentToken.title')}</h1>
+        <h1 className="page-title">{t('paymentToken.title')}</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="split-panel">
         {/* ---------------- Configuration ---------------- */}
         <div className="space-y-5">
           <h2 className="text-lg font-semibold text-slate-900">
@@ -524,7 +525,7 @@ export default function PaymentToken() {
 
           {/* Environment */}
           <div className="card space-y-4 p-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="form-grid-3">
               <div>
                 <label className="label">{t('paymentToken.environment')}</label>
                 <select className="input" value={env} onChange={(e) => handleEnv(e.target.value)}>
@@ -764,7 +765,7 @@ export default function PaymentToken() {
         </div>
 
         {/* ---------------- Results ---------------- */}
-        <div className="space-y-5">
+        <div className="result-panel space-y-5">
           <h2 className="text-lg font-semibold text-slate-900">📊 {t('paymentToken.results')}</h2>
 
           {!result ? (
@@ -772,7 +773,7 @@ export default function PaymentToken() {
               {t('paymentToken.noResult')}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="result-panel space-y-4">
               <InvoiceCopyBar invoiceNo={resultInvoiceNo} />
 
               {(result.status != null || result.error) && (
@@ -801,9 +802,9 @@ export default function PaymentToken() {
                 </div>
               )}
 
-              <div className="card p-4">
+              <div className="card min-w-0 overflow-hidden p-4">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="min-w-0 text-sm font-semibold text-slate-700">
                     📨 {t('paymentToken.requestPayload')}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -813,9 +814,9 @@ export default function PaymentToken() {
                     <CopyButton text={JSON.stringify(result.payload, null, 2)} />
                   </div>
                 </div>
-                <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                <CodeBlock maxHeight="max-h-72">
                   {JSON.stringify(result.payload, null, 2)}
-                </pre>
+                </CodeBlock>
                 {resultInvoiceNo && (
                   <p className="mt-2 text-xs text-slate-400">
                     Invoice: <span className="font-mono text-slate-500 dark:text-slate-300">{resultInvoiceNo}</span>
@@ -824,23 +825,23 @@ export default function PaymentToken() {
               </div>
 
               {result.jwtToken && (
-                <div className="card p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700">
+                <div className="card min-w-0 overflow-hidden p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 text-sm font-semibold text-slate-700">
                       🔏 {t('paymentToken.jwtToken')}
                     </p>
                     <CopyButton text={result.jwtToken} />
                   </div>
-                  <p className="break-all rounded-lg bg-slate-900 p-3 font-mono text-xs text-brand-200">
+                  <CodeBlock as="div" className="text-brand-200" language="text" maxHeight="max-h-96">
                     {result.jwtToken}
-                  </p>
+                  </CodeBlock>
                 </div>
               )}
 
               {result.response != null && (
-                <div className="card p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700">
+                <div className="card min-w-0 overflow-hidden p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 text-sm font-semibold text-slate-700">
                       📬 {t('paymentToken.rawResponse')}
                     </p>
                     <CopyButton
@@ -851,25 +852,25 @@ export default function PaymentToken() {
                       }
                     />
                   </div>
-                  <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                  <CodeBlock maxHeight="max-h-72">
                     {typeof result.response === 'string'
                       ? result.response
                       : JSON.stringify(result.response, null, 2)}
-                  </pre>
+                  </CodeBlock>
                 </div>
               )}
 
               {result.decodedResponse && (
-                <div className="card p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700">
+                <div className="card min-w-0 overflow-hidden p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="min-w-0 text-sm font-semibold text-slate-700">
                       🧩 {t('paymentToken.decodedResponse')}
                     </p>
                     <CopyButton text={JSON.stringify(result.decodedResponse, null, 2)} />
                   </div>
-                  <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                  <CodeBlock maxHeight="max-h-72">
                     {JSON.stringify(result.decodedResponse, null, 2)}
-                  </pre>
+                  </CodeBlock>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {webPaymentUrl && (
@@ -902,7 +903,7 @@ export default function PaymentToken() {
                     aria-label={t('paymentToken.closeIframe')}
                     onClick={() => setShowIframe(false)}
                   />
-                  <div className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="relative z-10 flex max-h-[92vh] w-[calc(100%-1rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:w-full">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -916,13 +917,15 @@ export default function PaymentToken() {
                         </button>
                       </div>
                     </div>
-                    <iframe
-                      title={t('paymentToken.iframePreview')}
-                      src={webPaymentUrl}
-                      className="h-[75vh] w-full min-h-[520px] bg-white"
-                      allow="payment *; clipboard-write *"
-                      referrerPolicy="no-referrer-when-downgrade"
-                    />
+                    <div className="min-h-0 flex-1">
+                      <iframe
+                        title={t('paymentToken.iframePreview')}
+                        src={webPaymentUrl}
+                        className="h-full min-h-[50vh] w-full bg-white sm:min-h-[320px]"
+                        allow="payment *; clipboard-write *"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

@@ -224,17 +224,17 @@ export default function PaymentOptions() {
       <LoadingOverlay show={loading} title={fetchProgress || undefined} onCancel={cancel} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">POST</span>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">🧾 {t('paymentOptions.title')}</h1>
+        <h1 className="page-title">🧾 {t('paymentOptions.title')}</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="split-panel">
         <div className="space-y-5">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             ⚙️ {t('paymentToken.configuration')}
           </h2>
 
           <div className="card p-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="form-grid-3">
               <div>
                 <label className="label">{t('paymentToken.environment')}</label>
                 <select className="input" value={env} onChange={(e) => handleEnv(e.target.value)}>

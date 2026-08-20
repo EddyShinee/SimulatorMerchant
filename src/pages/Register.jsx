@@ -98,7 +98,7 @@ export default function Register() {
         <div className="w-full max-w-md">
           <AppBrandCentered />
           <div className="mb-8 flex flex-col items-center text-center">
-            <h1 className="text-2xl font-bold text-slate-900">{t('auth.registerTitle')}</h1>
+            <h1 className="page-title">{t('auth.registerTitle')}</h1>
             <p className="mt-1.5 text-sm text-slate-500">{t('auth.registerSubtitle')}</p>
           </div>
 

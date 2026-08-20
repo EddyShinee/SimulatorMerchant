@@ -83,7 +83,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           <AppBrandCentered />
           <div className="mb-8 flex flex-col items-center text-center">
-            <h1 className="text-2xl font-bold text-slate-900">{t('auth.loginTitle')}</h1>
+            <h1 className="page-title">{t('auth.loginTitle')}</h1>
             <p className="mt-1.5 text-sm text-slate-500">{t('auth.loginSubtitle')}</p>
           </div>
 
