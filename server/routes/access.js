@@ -2,7 +2,7 @@ import express from 'express'
 import { requireAuth } from '../middleware/auth.js'
 import { attachAccess, requireAdmin } from '../middleware/access.js'
 import { FEATURE_GROUPS, ROLES } from '../../src/config/accessControl.js'
-import { getFeatureMap, isFlagOn, listAppUsers, setFeatureEnabled, setUserRole } from '../utils/accessStore.js'
+import { createAppUser, getFeatureMap, isFlagOn, listAppUsers, setFeatureEnabled, setUserPassword, setUserRole, setUserStatus } from '../utils/accessStore.js'
 
 const router = express.Router()
 
@@ -47,12 +47,60 @@ router.get('/users', requireAdmin, async (req, res) => {
   }
 })
 
+router.post('/users', requireAdmin, async (req, res) => {
+  try {
+    const user = await createAppUser({
+      email: req.body?.email,
+      password: req.body?.password,
+      role: req.body?.role,
+    })
+    return res.status(201).json({ user })
+  } catch (err) {
+    const status =
+      err.code === 'EMAIL_TAKEN'
+        ? 409
+        : err.code === 'STORE_UNAVAILABLE'
+          ? 503
+          : err.code === 'INVALID_EMAIL' || err.code === 'WEAK_PASSWORD'
+            ? 400
+            : 400
+    console.error('[access:create-user]', err.code || err.message)
+    return res.status(status).json({ error: err.code || 'CREATE_FAILED', message: err.message })
+  }
+})
+
 router.patch('/users/:id/role', requireAdmin, async (req, res) => {
   try {
     const user = await setUserRole(req.params.id, req.body?.role, req.user.sub)
     return res.json({ user })
   } catch (err) {
     const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'LAST_ADMIN' ? 409 : 400
+    return res.status(status).json({ error: err.code || 'UPDATE_FAILED', message: err.message })
+  }
+})
+
+router.patch('/users/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const user = await setUserStatus(req.params.id, req.body?.status, req.user.sub)
+    return res.json({ user })
+  } catch (err) {
+    const status =
+      err.code === 'NOT_FOUND'
+        ? 404
+        : err.code === 'LAST_ADMIN' || err.code === 'SELF_BLOCK'
+          ? 409
+          : 400
+    return res.status(status).json({ error: err.code || 'UPDATE_FAILED', message: err.message })
+  }
+})
+
+router.patch('/users/:id/password', requireAdmin, async (req, res) => {
+  try {
+    const user = await setUserPassword(req.params.id, req.body?.password)
+    return res.json({ user })
+  } catch (err) {
+    const status =
+      err.code === 'NOT_FOUND' ? 404 : err.code === 'STORE_UNAVAILABLE' ? 503 : 400
     return res.status(status).json({ error: err.code || 'UPDATE_FAILED', message: err.message })
   }
 })

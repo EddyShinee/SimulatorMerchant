@@ -22,7 +22,7 @@ import {
   deletePasskeys,
 } from '../utils/authWebAuthn.js'
 import { requireAuth } from '../middleware/auth.js'
-import { assertFlagOn, ensureAppProfile } from '../utils/accessStore.js'
+import { assertFlagOn, ensureAppProfile, assertAccountActive, recordLastLogin, touchProfileUpdated } from '../utils/accessStore.js'
 
 const router = express.Router()
 
@@ -34,8 +34,12 @@ function signToken(user) {
   })
 }
 
-async function authUserPayload(user) {
+async function authUserPayload(user, { login = false } = {}) {
   const profile = await ensureAppProfile({ id: user.id, email: user.email })
+  if (login) {
+    await assertAccountActive(profile.id)
+    await recordLastLogin(profile.id)
+  }
   return { id: profile.id, email: profile.email, role: profile.role }
 }
 
@@ -51,8 +55,10 @@ function webauthnError(res, err, fallback) {
           code === 'UNKNOWN_CREDENTIAL' ||
           code === 'REGISTER_FAILED'
         ? 400
-        : code === 'FEATURE_DISABLED'
+          : code === 'FEATURE_DISABLED'
           ? 403
+          : code === 'ACCOUNT_BLOCKED'
+            ? 403
           : code === 'STORE_UNAVAILABLE'
             ? 503
             : 500
@@ -110,7 +116,7 @@ router.post('/register', async (req, res) => {
       const token = signToken(user)
       return res.status(201).json({
         token,
-        user: await authUserPayload(user),
+        user: await authUserPayload(user, { login: true }),
         emailConfirmationRequired: !data.session,
       })
     }
@@ -132,7 +138,7 @@ router.post('/register', async (req, res) => {
     })
 
     const token = signToken(user)
-    return res.status(201).json({ token, user: await authUserPayload(user) })
+    return res.status(201).json({ token, user: await authUserPayload(user, { login: true }) })
   } catch (err) {
     if (err?.code === 'FEATURE_DISABLED') {
       return res.status(403).json({ error: 'FEATURE_DISABLED', message: err.message })
@@ -164,7 +170,7 @@ router.post('/login', async (req, res) => {
 
       const user = { id: data.user.id, email: data.user.email || email }
       const token = signToken(user)
-      return res.json({ token, user: await authUserPayload(user) })
+      return res.json({ token, user: await authUserPayload(user, { login: true }) })
     }
 
     await initUsersDb()
@@ -183,8 +189,11 @@ router.post('/login', async (req, res) => {
     }
 
     const token = signToken(user)
-    return res.json({ token, user: await authUserPayload(user) })
+    return res.json({ token, user: await authUserPayload(user, { login: true }) })
   } catch (err) {
+    if (err?.code === 'ACCOUNT_BLOCKED') {
+      return res.status(403).json({ error: 'ACCOUNT_BLOCKED', message: err.message })
+    }
     console.error('login error', err)
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' })
   }
@@ -250,6 +259,7 @@ router.patch('/password', requireAuth, async (req, res) => {
         }
       }
 
+      await touchProfileUpdated(userId)
       return res.json({ ok: true })
     }
 
@@ -270,6 +280,7 @@ router.patch('/password', requireAuth, async (req, res) => {
     const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10
     const passwordHash = await bcrypt.hash(newPassword, saltRounds)
     await updateUserPasswordHash(user.id, passwordHash)
+    await touchProfileUpdated(user.id)
     return res.json({ ok: true })
   } catch (err) {
     console.error('change password error', err)
@@ -304,7 +315,7 @@ router.post('/webauthn/register', async (req, res) => {
       email: req.body?.email,
     })
     const token = signToken(user)
-    return res.status(201).json({ token, user: await authUserPayload(user) })
+    return res.status(201).json({ token, user: await authUserPayload(user, { login: true }) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to register with Touch ID.')
   }
@@ -328,7 +339,7 @@ router.post('/webauthn/login', async (req, res) => {
       challengeId: req.body?.challengeId,
     })
     const token = signToken(user)
-    return res.json({ token, user: await authUserPayload(user) })
+    return res.json({ token, user: await authUserPayload(user, { login: true }) })
   } catch (err) {
     return webauthnError(res, err, 'Failed to sign in with Touch ID.')
   }

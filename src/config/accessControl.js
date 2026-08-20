@@ -5,6 +5,11 @@ export const ROLES = {
   member: 'member',
 }
 
+export const USER_STATUS = {
+  active: 'active',
+  blocked: 'blocked',
+}
+
 export const FEATURE_GROUPS = [
   {
     id: 'main',
