@@ -13,7 +13,11 @@ export const PAYMENT_ACTION_ENV_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ]
 
-export const PROCESS_TYPE_OPTIONS = ['I', 'R', 'V']
+export const PROCESS_TYPE_OPTIONS = [
+  { value: 'I', labelKey: 'paymentAction.processTypeInquiry' },
+  { value: 'R', labelKey: 'paymentAction.processTypeRefund' },
+  { value: 'V', labelKey: 'paymentAction.processTypeVoid' },
+]
 
 // Timestamp format per 2C2P docs: ddMMyyHHmmss
 export function generateTimestamp() {

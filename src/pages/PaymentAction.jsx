@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import api from '../api/client.js'
+import api, { getInboxUrls } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import PasteButton from '../components/PasteButton.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
@@ -229,6 +230,7 @@ function LoyaltyEditor({ value, onChange, title }) {
 export default function PaymentAction() {
   const { t } = useLanguage()
   const toast = useToast()
+  const { user } = useAuth()
   const { flow, updateFlow } = usePaymentFlow()
   const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
@@ -293,6 +295,13 @@ export default function PaymentAction() {
 
   const updateSub = (idx, patch) =>
     setSubMerchants((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
+
+  const handleProcessTypeChange = (value) => {
+    setProcessType(value)
+    if (value === 'R') {
+      setNotifyURL(getInboxUrls(user?.id).backendCallback)
+    }
+  }
 
   const fields = useMemo(
     () => ({
@@ -490,11 +499,15 @@ export default function PaymentAction() {
                 <input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               <div>
-                <label className="label">Process Type</label>
-                <select className="input" value={processType} onChange={(e) => setProcessType(e.target.value)}>
+                <label className="label">{t('paymentAction.processType')}</label>
+                <select
+                  className="input"
+                  value={processType}
+                  onChange={(e) => handleProcessTypeChange(e.target.value)}
+                >
                   {PROCESS_TYPE_OPTIONS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
+                    <option key={p.value} value={p.value}>
+                      {t(p.labelKey)}
                     </option>
                   ))}
                 </select>
@@ -518,8 +531,11 @@ export default function PaymentAction() {
               </div>
               {showNotify && (
                 <div className="sm:col-span-2">
-                  <label className="label">Notify URL</label>
+                  <label className="label">{t('paymentAction.notifyUrl')}</label>
                   <input className="input" value={notifyURL} onChange={(e) => setNotifyURL(e.target.value)} />
+                  {processType === 'R' && (
+                    <p className="mt-1 text-xs text-slate-400">{t('paymentAction.notifyUrlRefundHint')}</p>
+                  )}
                 </div>
               )}
             </div>
