@@ -126,6 +126,11 @@ export function AuthProvider({ children }) {
   /** Re-register on this device and drop previous passkeys after success. */
   const updateTouchId = useCallback(async () => enableTouchId({ replace: true }), [enableTouchId])
 
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    const { data } = await api.patch('/api/auth/password', { currentPassword, newPassword })
+    return data
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
@@ -144,6 +149,7 @@ export function AuthProvider({ children }) {
       enableTouchId,
       disableTouchId,
       updateTouchId,
+      changePassword,
       logout,
     }),
     [
@@ -157,6 +163,7 @@ export function AuthProvider({ children }) {
       enableTouchId,
       disableTouchId,
       updateTouchId,
+      changePassword,
       logout,
     ]
   )

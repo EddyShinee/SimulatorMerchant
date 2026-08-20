@@ -15,6 +15,7 @@ import {
   IconMenu,
   IconClose,
   IconPayout,
+  IconUsers,
 } from '../components/icons.jsx'
 import { AppBrandSidebar } from '../components/AppBrand.jsx'
 import { PaymentFlowProvider } from '../context/PaymentFlowContext.jsx'
@@ -79,6 +80,7 @@ function ApiRadioItem({ to, label, onClick }) {
 function usePageTitle(pathname, t) {
   if (pathname === '/app' || pathname === '/app/') return t('nav.dashboard')
   if (pathname.includes('/settings') || pathname.includes('/access')) return t('nav.settings')
+  if (pathname.includes('/members')) return t('nav.members')
   if (isPaymentFlowRoute(pathname)) return t('nav.paymentFlow')
   if (pathname.includes('/inbox')) return t('nav.requestInbox')
   if (pathname.includes('/pos-standalone')) return t('nav.posStandalone')
@@ -93,7 +95,7 @@ function usePageTitle(pathname, t) {
 }
 
 export default function SimulatorLayout() {
-  const { canAccess } = useAccess()
+  const { canAccess, isAdmin } = useAccess()
   const { t } = useLanguage()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -202,6 +204,20 @@ export default function SimulatorLayout() {
               icon={IconInbox}
               label={t('nav.requestInbox')}
               badge={inboxUnread}
+              onClick={closeMobile}
+            />
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionAdmin')}
+            </p>
+            <NavItem
+              to="/app/members"
+              icon={IconUsers}
+              label={t('nav.members')}
               onClick={closeMobile}
             />
           </>

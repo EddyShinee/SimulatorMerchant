@@ -2,8 +2,15 @@ import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import { createUser, findUserByEmail, initUsersDb } from '../utils/usersDb.js'
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  initUsersDb,
+  updateUserPasswordHash,
+} from '../utils/usersDb.js'
 import { getSupabase, isSupabaseConfigured } from '../utils/supabaseClient.js'
+import { getSupabaseAdmin } from '../utils/merchantStore.js'
 import {
   buildAuthRegisterOptions,
   finishAuthRegister,
@@ -179,6 +186,93 @@ router.post('/login', async (req, res) => {
     return res.json({ token, user: await authUserPayload(user) })
   } catch (err) {
     console.error('login error', err)
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' })
+  }
+})
+
+// PATCH /api/auth/password — logged-in user changes their own password
+router.patch('/password', requireAuth, async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword || '')
+    const newPassword = String(req.body?.newPassword || '')
+
+    if (!currentPassword) {
+      return res.status(400).json({
+        error: 'CURRENT_PASSWORD_REQUIRED',
+        message: 'Current password is required.',
+      })
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'WEAK_PASSWORD',
+        message: 'Password must be at least 6 characters.',
+      })
+    }
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        error: 'PASSWORD_UNCHANGED',
+        message: 'New password must be different from the current password.',
+      })
+    }
+
+    const email = String(req.user.email || '').trim().toLowerCase()
+    const userId = String(req.user.sub || '')
+
+    const supabase = getSupabase()
+    if (supabase) {
+      const { data: sessionData, error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      })
+      if (verifyError || !sessionData?.user) {
+        return res.status(401).json({
+          error: 'INVALID_CREDENTIALS',
+          message: 'Current password is incorrect.',
+        })
+      }
+
+      const admin = getSupabaseAdmin()
+      if (admin) {
+        const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword })
+        if (error) {
+          return res.status(400).json({
+            error: 'UPDATE_FAILED',
+            message: error.message || 'Failed to update password.',
+          })
+        }
+      } else {
+        const { error } = await supabase.auth.updateUser({ password: newPassword })
+        if (error) {
+          return res.status(400).json({
+            error: 'UPDATE_FAILED',
+            message: error.message || 'Failed to update password.',
+          })
+        }
+      }
+
+      return res.json({ ok: true })
+    }
+
+    await initUsersDb()
+    const user = (await findUserById(userId)) || (await findUserByEmail(email))
+    if (!user) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found.' })
+    }
+
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash)
+    if (!ok) {
+      return res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Current password is incorrect.',
+      })
+    }
+
+    const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds)
+    await updateUserPasswordHash(user.id, passwordHash)
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error('change password error', err)
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' })
   }
 })

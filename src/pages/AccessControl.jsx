@@ -1,38 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import api from '../api/client.js'
 import { useAccess } from '../context/AccessContext.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { ROLES, normalizeFeatureEntry } from '../config/accessControl.js'
 
 export default function AccessControl({ embedded = false }) {
   const { t } = useLanguage()
-  const { user } = useAuth()
   const { catalog, features, setFeatures, refresh } = useAccess()
-  const [tab, setTab] = useState('features')
-  const [users, setUsers] = useState([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
   const [savingKey, setSavingKey] = useState('')
-  const [savingUser, setSavingUser] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-
-  const loadUsers = useCallback(async () => {
-    setLoadingUsers(true)
-    setError('')
-    try {
-      const { data } = await api.get('/api/access/users')
-      setUsers(data.users || [])
-    } catch (err) {
-      setError(err.response?.data?.message || t('access.loadUsersError'))
-    } finally {
-      setLoadingUsers(false)
-    }
-  }, [t])
-
-  useEffect(() => {
-    if (tab === 'members') void loadUsers()
-  }, [tab, loadUsers])
 
   const toggleFeature = async (key, role, enabled) => {
     setSavingKey(`${key}:${role}`)
@@ -54,22 +31,6 @@ export default function AccessControl({ embedded = false }) {
     }
   }
 
-  const changeRole = async (userId, nextRole) => {
-    setSavingUser(userId)
-    setError('')
-    setMessage('')
-    try {
-      await api.patch(`/api/access/users/${encodeURIComponent(userId)}/role`, { role: nextRole })
-      setMessage(t('access.roleSaved'))
-      await loadUsers()
-      await refresh()
-    } catch (err) {
-      setError(err.response?.data?.message || t('access.saveError'))
-    } finally {
-      setSavingUser('')
-    }
-  }
-
   return (
     <div className="space-y-6">
       {!embedded && (
@@ -79,37 +40,20 @@ export default function AccessControl({ embedded = false }) {
         </div>
       )}
 
-      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
-        {[
-          ['features', t('access.tabFeatures')],
-          ['members', t('access.tabMembers')],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${
-              tab === id ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
       )}
       {message && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
           {message}
         </div>
       )}
 
-      {tab === 'features' && (
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('access.featuresHint')}</p>
-          {catalog.map((group) => (
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t('access.featuresHint')}</p>
+        {catalog.map((group) => (
             <div key={group.id} className="card overflow-hidden">
               <div className="hidden items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800 md:grid md:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem]">
                 <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t(group.labelKey)}</h2>
@@ -171,53 +115,7 @@ export default function AccessControl({ embedded = false }) {
               </ul>
             </div>
           ))}
-        </div>
-      )}
-
-      {tab === 'members' && (
-        <div className="card overflow-hidden">
-          <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('access.membersTitle')}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">{t('access.membersHint')}</p>
-          </div>
-          {loadingUsers ? (
-            <p className="px-4 py-8 text-sm text-slate-400">{t('common.loading')}</p>
-          ) : (
-            <div className="table-scroll">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/60">
-                  <tr>
-                    <th className="px-4 py-2 font-semibold">{t('common.email')}</th>
-                    <th className="px-4 py-2 font-semibold">{t('access.role')}</th>
-                    <th className="px-4 py-2 font-semibold">{t('access.you')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {users.map((u) => (
-                    <tr key={u.id}>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">{u.email}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          className="input !w-auto !py-1.5 text-xs"
-                          value={u.role}
-                          disabled={savingUser === u.id}
-                          onChange={(e) => void changeRole(u.id, e.target.value)}
-                        >
-                          <option value={ROLES.admin}>{t('access.roleAdmin')}</option>
-                          <option value={ROLES.member}>{t('access.roleMember')}</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">
-                        {u.id === user?.id || u.email === user?.email ? t('access.youBadge') : ''}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   )
 }

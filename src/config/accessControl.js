@@ -92,6 +92,7 @@ export function featureKeyForPath(pathname) {
   const p = String(pathname || '')
   if (p.startsWith('/app/settings')) return null
   if (p.startsWith('/app/access')) return '__admin__'
+  if (p.startsWith('/app/members')) return '__admin__'
   if (p.startsWith('/app/payment-flow')) return 'payment-flow'
   if (p.startsWith('/app/payout/create')) return 'payout-create'
   if (p.startsWith('/app/payout/inquiry')) return 'payout-inquiry'

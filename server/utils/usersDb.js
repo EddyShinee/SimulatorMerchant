@@ -178,6 +178,49 @@ export async function findUserByEmail(email) {
   }
 }
 
+export async function findUserById(id) {
+  await initUsersDb()
+  const uid = String(id || '').trim()
+  if (!uid) return null
+
+  if (mode === 'postgres') {
+    const { rows } = await pool.query(
+      'SELECT id, email, password_hash, created_at FROM users WHERE id = $1 LIMIT 1',
+      [uid]
+    )
+    return mapRow(rows[0])
+  }
+
+  const stmt = sqliteDb.prepare(
+    'SELECT id, email, password_hash, created_at FROM users WHERE id = ? LIMIT 1'
+  )
+  try {
+    stmt.bind([uid])
+    if (!stmt.step()) return null
+    return mapRow(stmt.getAsObject())
+  } finally {
+    stmt.free()
+  }
+}
+
+export async function updateUserPasswordHash(id, passwordHash) {
+  await initUsersDb()
+  const uid = String(id || '').trim()
+  if (!uid) return false
+
+  if (mode === 'postgres') {
+    const { rowCount } = await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      passwordHash,
+      uid,
+    ])
+    return rowCount > 0
+  }
+
+  sqliteDb.run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, uid])
+  persistSqlite()
+  return true
+}
+
 export async function createUser(user) {
   await initUsersDb()
   const row = {
