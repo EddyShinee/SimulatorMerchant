@@ -31,6 +31,7 @@ import {
   templateToFinvietForm,
   finvietFormToBody,
   parseFinvietFormFromJson,
+  parseFinvietImportJson,
   withFreshFinvietIds,
   withFreshFinvietTimestamps,
   ensureFinvietMerchantBillId,
@@ -390,6 +391,27 @@ export default function PosStandalone() {
     setNotificationForm(nextForm)
     if (notificationEditMode === 'form') {
       setBodyJson(JSON.stringify(formToNotificationBody(nextForm), null, 2))
+    }
+  }
+
+  const handleFinvietImport = (jsonText) => {
+    if (!jsonText?.trim()) {
+      setError(t('posStandalone.finvietImportEmpty'))
+      return
+    }
+    try {
+      const imported = parseFinvietImportJson(jsonText.trim())
+      const nextForm = {
+        ...imported,
+        secretKey: finvietForm.secretKey?.trim() || loadStoredFinvietSecret() || FINVIET_DEFAULT_SECRET_KEY,
+        signature: '',
+      }
+      setFinvietForm(nextForm)
+      setBodyJson(JSON.stringify(finvietFormToBody(nextForm, { refreshTimes: false }), null, 2))
+      setError('')
+      void applyFinvietSignature(nextForm)
+    } catch {
+      setError(t('posStandalone.finvietImportInvalid'))
     }
   }
 
@@ -807,6 +829,7 @@ export default function PosStandalone() {
                     form={finvietForm}
                     onChange={handleNotificationFormChange}
                     onRegenerateSignature={() => applyFinvietSignature(finvietForm, { regenerate: true })}
+                    onImportQueryResult={handleFinvietImport}
                     signing={finvietSigning}
                     t={t}
                   />

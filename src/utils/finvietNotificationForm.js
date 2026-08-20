@@ -121,8 +121,46 @@ export function withFreshFinvietIds(form) {
   })
 }
 
+function pickTransaction(source = {}) {
+  if (source.transaction && typeof source.transaction === 'object') return source.transaction
+  if (Array.isArray(source.transactions) && source.transactions[0]) return source.transactions[0]
+  return {}
+}
+
+/** Query-result wrapper or notify body → callback notify object. */
+export function normalizeFinvietNotifySource(raw) {
+  const root = raw?.data && typeof raw.data === 'object' ? raw.data : raw
+  const tx = pickTransaction(root)
+  const timestamp =
+    root.timestamp ??
+    root.updated_at ??
+    tx.updated_at ??
+    tx.success_at ??
+    Date.now()
+
+  return {
+    amount: root.amount,
+    status: root.status,
+    currency: root.currency,
+    timestamp,
+    store_code: root.store_code,
+    retail_app_id: root.retail_app_id ?? '',
+    transaction: tx,
+    customer_info: root.customer_info,
+    merchant_code: root.merchant_code,
+    merchant_bill_id: root.merchant_bill_id,
+    store_code_partner: root.store_code_partner,
+    merchant_code_partner: root.merchant_code_partner,
+    signature: raw?.signature ?? root.signature ?? '',
+  }
+}
+
+export function parseFinvietImportJson(jsonText) {
+  const parsed = JSON.parse(jsonText)
+  return templateToFinvietForm(normalizeFinvietNotifySource(parsed))
+}
 export function templateToFinvietForm(template = {}) {
-  const tx = template.transaction || {}
+  const tx = pickTransaction(template)
   const card = template.customer_info?.card_info || {}
   return {
     amount: template.amount ?? 0,
@@ -131,7 +169,7 @@ export function templateToFinvietForm(template = {}) {
     signature: template.signature ?? '',
     timestamp: template.timestamp ?? Date.now(),
     storeCode: template.store_code ?? '',
-    retailAppId: template.retail_app_id ?? '',
+    retailAppId: template.retail_app_id == null ? '' : String(template.retail_app_id),
     merchantCode: template.merchant_code ?? '',
     merchantBillId: template.merchant_bill_id ?? '',
     storeCodePartner: template.store_code_partner ?? '',
@@ -210,7 +248,7 @@ export function finvietSignFingerprint(form) {
 
 export function parseFinvietFormFromJson(jsonText) {
   const parsed = JSON.parse(jsonText)
-  return templateToFinvietForm(parsed)
+  return templateToFinvietForm(normalizeFinvietNotifySource(parsed))
 }
 
 export function withFreshFinvietTimestampsBody(body) {

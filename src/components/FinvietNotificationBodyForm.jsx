@@ -6,6 +6,7 @@ import {
   FINVIET_CARD_ORIGIN_OPTIONS,
 } from '../config/finvietNotificationConfig.js'
 import { formatFinvietTimestamp, finvietFieldLabel } from '../utils/finvietNotificationForm.js'
+import PasteButton from './PasteButton.jsx'
 
 function Field({ label, children, className = '', hint }) {
   return (
@@ -28,7 +29,14 @@ function AutoTimestampField({ fieldKey, value, hint }) {
   )
 }
 
-export default function FinvietNotificationBodyForm({ form, onChange, onRegenerateSignature, signing, t }) {
+export default function FinvietNotificationBodyForm({
+  form,
+  onChange,
+  onRegenerateSignature,
+  onImportQueryResult,
+  signing,
+  t,
+}) {
   const set = (key, value) => onChange({ ...form, [key]: value })
   const L = finvietFieldLabel
 
@@ -57,6 +65,13 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
               {signing ? t('posStandalone.finvietSigning') : t('posStandalone.finvietRegenerateSignature')}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-sky-200 bg-sky-50/80 p-3 dark:border-sky-900/60 dark:bg-sky-950/30">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-medium text-sky-900 dark:text-sky-100">{t('posStandalone.finvietImportHint')}</p>
+          <PasteButton label={t('posStandalone.finvietImportPaste')} onPaste={onImportQueryResult} />
         </div>
       </div>
 
@@ -90,11 +105,12 @@ export default function FinvietNotificationBodyForm({ form, onChange, onRegenera
           <Field label={L('store_code')}>
             <input className="input font-mono text-xs" value={form.storeCode} onChange={(e) => set('storeCode', e.target.value)} />
           </Field>
-          <Field label={L('retail_app_id')}>
+          <Field label={L('retail_app_id')} hint={t('posStandalone.finvietRetailAppIdHint')}>
             <input
               className="input font-mono text-xs"
               value={form.retailAppId}
               onChange={(e) => set('retailAppId', e.target.value)}
+              placeholder={t('posStandalone.finvietRetailAppIdPlaceholder')}
             />
           </Field>
           <Field label={L('signature')} className="sm:col-span-2">

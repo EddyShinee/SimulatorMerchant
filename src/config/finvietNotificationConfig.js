@@ -13,17 +13,18 @@ function nowMs() {
   return Date.now()
 }
 
-/** INV_DDMMYYYY_NNNNNN — invoice-style merchant bill id */
+/** DFT_DDMMYYYY_NNNNNN — bill id from FinViet query / notify (e.g. DFT_13082026_000020) */
 export function generateFinvietMerchantBillId() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
   const date = `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}`
   const seq = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
-  return `INV_${date}_${seq}`
+  return `DFT_${date}_${seq}`
 }
 
 export function generateFinvietPaymentTransId() {
-  return String(Date.now()).slice(-16) + String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+  const base = String(Date.now()) + String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+  return base.slice(-16)
 }
 
 export function generateFinvietRefCode() {
@@ -40,13 +41,12 @@ export function buildFinvietNotificationTemplate() {
   const created = ts - 50000
   const success = ts - 10000
   return {
-    amount: 27000,
+    amount: 63000,
     status: 'success',
     currency: 'VND',
     signature: '',
     timestamp: ts,
     store_code: '2C2P1',
-    retail_app_id: '2C2P_RETAIL_1',
     transaction: {
       ref_code: generateFinvietRefCode(),
       error_msg: '',
@@ -63,10 +63,10 @@ export function buildFinvietNotificationTemplate() {
     },
     customer_info: {
       card_info: {
-        card_type: 'VISA',
+        card_type: 'OTHER',
         card_holder: null,
-        card_number: '411111****1111',
-        card_origin: 'INTERNATIONAL',
+        card_number: '545909****0362',
+        card_origin: 'OTHER',
       },
       customer_name: null,
     },
