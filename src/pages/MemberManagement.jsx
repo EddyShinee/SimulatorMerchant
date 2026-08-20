@@ -125,7 +125,7 @@ export default function MemberManagement() {
           <button type="button" className="btn-secondary text-sm" disabled={loading} onClick={() => void loadUsers()}>
             {loading ? t('common.loading') : t('members.refresh')}
           </button>
-          <Link to="/app/settings" className="btn-secondary text-sm">
+          <Link to="/app/settings/access" className="btn-secondary text-sm">
             {t('members.manageFeatures')}
           </Link>
         </div>

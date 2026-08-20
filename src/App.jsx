@@ -25,6 +25,10 @@ import PaymentCallbackFrontend from './pages/PaymentCallbackFrontend.jsx'
 import CreatePayout from './pages/CreatePayout.jsx'
 import PayoutInquiry from './pages/PayoutInquiry.jsx'
 import Settings from './pages/Settings.jsx'
+import AccountSettings from './pages/settings/AccountSettings.jsx'
+import PasswordSettings from './pages/settings/PasswordSettings.jsx'
+import BiometricSettings from './pages/settings/BiometricSettings.jsx'
+import AccessSettings from './pages/settings/AccessSettings.jsx'
 import MemberManagement from './pages/MemberManagement.jsx'
 
 function GatedApiConsole() {
@@ -73,7 +77,20 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="settings" element={<Settings />}>
+          <Route index element={<Navigate to="account" replace />} />
+          <Route path="account" element={<AccountSettings />} />
+          <Route path="password" element={<PasswordSettings />} />
+          <Route path="biometric" element={<BiometricSettings />} />
+          <Route
+            path="access"
+            element={
+              <FeatureRoute adminOnly>
+                <AccessSettings />
+              </FeatureRoute>
+            }
+          />
+        </Route>
         <Route
           path="members"
           element={
@@ -82,7 +99,7 @@ export default function App() {
             </FeatureRoute>
           }
         />
-        <Route path="access" element={<Navigate to="/app/settings" replace />} />
+        <Route path="access" element={<Navigate to="/app/settings/access" replace />} />
         <Route
           path="payment-flow"
           element={

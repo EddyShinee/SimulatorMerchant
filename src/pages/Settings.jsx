@@ -1,269 +1,44 @@
-import { useEffect, useState } from 'react'
-import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
-import { useAuth } from '../context/AuthContext.jsx'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAccess } from '../context/AccessContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import AccessControl from './AccessControl.jsx'
 
 export default function Settings() {
-  const { user, enableTouchId, updateTouchId, disableTouchId, getTouchIdStatus, changePassword } = useAuth()
-  const { isAdmin } = useAccess()
   const { t } = useLanguage()
-  const [touchIdAvailable, setTouchIdAvailable] = useState(false)
-  const [touchIdEnabled, setTouchIdEnabled] = useState(null)
-  const [touchIdBusy, setTouchIdBusy] = useState(false)
-  const [touchIdMsg, setTouchIdMsg] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordBusy, setPasswordBusy] = useState(false)
-  const [passwordMsg, setPasswordMsg] = useState('')
-  const [passwordError, setPasswordError] = useState('')
+  const { isAdmin } = useAccess()
 
-  useEffect(() => {
-    let active = true
-    async function checkPlatform() {
-      if (!browserSupportsWebAuthn()) {
-        if (active) setTouchIdAvailable(false)
-        return
-      }
-      try {
-        const ok = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        if (active) setTouchIdAvailable(Boolean(ok))
-      } catch {
-        if (active) setTouchIdAvailable(false)
-      }
-    }
-    checkPlatform()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    let active = true
-    async function loadStatus() {
-      if (!user) {
-        setTouchIdEnabled(null)
-        return
-      }
-      try {
-        const status = await getTouchIdStatus()
-        if (active) setTouchIdEnabled(Boolean(status?.enabled))
-      } catch {
-        if (active) setTouchIdEnabled(false)
-      }
-    }
-    loadStatus()
-    return () => {
-      active = false
-    }
-  }, [user, getTouchIdStatus])
-
-  const runTouchIdAction = async (action, successKey) => {
-    setTouchIdMsg('')
-    setTouchIdBusy(true)
-    try {
-      await action()
-      const status = await getTouchIdStatus()
-      setTouchIdEnabled(Boolean(status?.enabled))
-      setTouchIdMsg(t(successKey))
-    } catch (err) {
-      if (err?.name === 'NotAllowedError') {
-        setTouchIdMsg(t('auth.touchIdCancelled'))
-      } else {
-        setTouchIdMsg(err.response?.data?.message || err.message || t('errors.network'))
-      }
-    } finally {
-      setTouchIdBusy(false)
-    }
-  }
-
-  const handleEnableTouchId = () => void runTouchIdAction(() => enableTouchId(), 'auth.enableTouchIdSuccess')
-
-  const handleUpdateTouchId = () => {
-    if (!window.confirm(t('auth.confirmUpdateTouchId'))) return
-    void runTouchIdAction(() => updateTouchId(), 'auth.updateTouchIdSuccess')
-  }
-
-  const handleDisableTouchId = () => {
-    if (!window.confirm(t('auth.confirmRemoveTouchId'))) return
-    void runTouchIdAction(() => disableTouchId(), 'auth.removeTouchIdSuccess')
-  }
-
-  const handleChangePassword = async (e) => {
-    e.preventDefault()
-    setPasswordMsg('')
-    setPasswordError('')
-
-    if (newPassword.length < 6) {
-      setPasswordError(t('auth.passwordTooShort'))
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError(t('auth.passwordMismatch'))
-      return
-    }
-    if (currentPassword === newPassword) {
-      setPasswordError(t('settings.passwordUnchanged'))
-      return
-    }
-
-    setPasswordBusy(true)
-    try {
-      await changePassword(currentPassword, newPassword)
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-      setPasswordMsg(t('settings.passwordSaved'))
-    } catch (err) {
-      setPasswordError(err.response?.data?.message || err.message || t('errors.network'))
-    } finally {
-      setPasswordBusy(false)
-    }
-  }
+  const tabs = [
+    { to: '/app/settings/account', label: t('settings.account') },
+    { to: '/app/settings/password', label: t('settings.password') },
+    { to: '/app/settings/biometric', label: t('settings.biometric') },
+    ...(isAdmin ? [{ to: '/app/settings/access', label: t('nav.accessControl') }] : []),
+  ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="page-title">{t('settings.title')}</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.subtitle')}</p>
       </div>
 
-      <section className="card space-y-3 p-5">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('settings.account')}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('common.email')}</p>
-            <p className="mt-1 break-all font-mono text-sm text-slate-800 dark:text-slate-100">{user?.email}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('access.role')}</p>
-            <p className="mt-1 text-sm font-semibold text-brand-600 dark:text-brand-400">
-              {isAdmin ? t('access.roleAdmin') : t('access.roleMember')}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="card space-y-4 p-5">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('settings.password')}</h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t('settings.passwordHint')}</p>
-        </div>
-        <form className="grid max-w-md gap-3" onSubmit={handleChangePassword}>
-          <div>
-            <label className="label" htmlFor="current-password">
-              {t('settings.currentPassword')}
-            </label>
-            <input
-              id="current-password"
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="new-password">
-              {t('settings.newPassword')}
-            </label>
-            <input
-              id="new-password"
-              className="input"
-              type="password"
-              autoComplete="new-password"
-              placeholder={t('auth.passwordPlaceholder')}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="confirm-password">
-              {t('common.confirmPassword')}
-            </label>
-            <input
-              id="confirm-password"
-              className="input"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-          {passwordError && (
-            <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
-          )}
-          {passwordMsg && (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">{passwordMsg}</p>
-          )}
-          <div>
-            <button type="submit" className="btn-primary text-sm" disabled={passwordBusy}>
-              {passwordBusy ? t('common.loading') : t('settings.updatePassword')}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section className="card space-y-4 p-5">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('settings.biometric')}</h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t('settings.biometricHint')}</p>
-        </div>
-
-        {!touchIdAvailable ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('settings.biometricUnavailable')}</p>
-        ) : touchIdEnabled ? (
-          <div className="space-y-3">
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">{t('auth.touchIdEnabled')}</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                disabled={touchIdBusy}
-                onClick={handleUpdateTouchId}
-              >
-                {touchIdBusy ? t('common.loading') : t('auth.updateTouchId')}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary text-sm text-red-600 hover:text-red-700 dark:text-red-400"
-                disabled={touchIdBusy}
-                onClick={handleDisableTouchId}
-              >
-                {t('auth.removeTouchId')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="btn-primary text-sm"
-            disabled={touchIdBusy}
-            onClick={handleEnableTouchId}
+      <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0" aria-label={t('settings.title')}>
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            className={({ isActive }) =>
+              `shrink-0 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+                isActive
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`
+            }
           >
-            {touchIdBusy ? t('common.loading') : t('auth.enableTouchId')}
-          </button>
-        )}
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
 
-        {touchIdMsg && <p className="text-sm text-slate-500 dark:text-slate-400">{touchIdMsg}</p>}
-      </section>
-
-      {isAdmin && (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('nav.accessControl')}</h2>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t('access.subtitle')}</p>
-          </div>
-          <AccessControl embedded />
-        </section>
-      )}
+      <Outlet />
     </div>
   )
 }

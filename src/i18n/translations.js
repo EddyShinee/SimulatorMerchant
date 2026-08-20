@@ -129,8 +129,9 @@ export const translations = {
     },
     settings: {
       title: 'Cài đặt',
-      subtitle: 'Quản lý tài khoản, mật khẩu, sinh trắc học và phân quyền.',
+      subtitle: 'Chọn mục bên dưới để quản lý từng phần.',
       account: 'Tài khoản',
+      accountHint: 'Thông tin đăng nhập và quyền hiện tại của bạn.',
       password: 'Đổi mật khẩu',
       passwordHint: 'Nhập mật khẩu hiện tại rồi đặt mật khẩu mới (ít nhất 6 ký tự).',
       currentPassword: 'Mật khẩu hiện tại',
@@ -962,8 +963,9 @@ export const translations = {
     },
     settings: {
       title: 'Settings',
-      subtitle: 'Manage your account, password, biometrics, and access control.',
+      subtitle: 'Choose a section below to manage each part separately.',
       account: 'Account',
+      accountHint: 'Your sign-in email and current role.',
       password: 'Change password',
       passwordHint: 'Enter your current password, then set a new one (at least 6 characters).',
       currentPassword: 'Current password',

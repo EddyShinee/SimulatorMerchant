@@ -79,7 +79,10 @@ function ApiRadioItem({ to, label, onClick }) {
 
 function usePageTitle(pathname, t) {
   if (pathname === '/app' || pathname === '/app/') return t('nav.dashboard')
-  if (pathname.includes('/settings') || pathname.includes('/access')) return t('nav.settings')
+  if (pathname.includes('/settings/password')) return t('settings.password')
+  if (pathname.includes('/settings/biometric')) return t('settings.biometric')
+  if (pathname.includes('/settings/access') || pathname.includes('/access')) return t('nav.accessControl')
+  if (pathname.includes('/settings')) return t('nav.settings')
   if (pathname.includes('/members')) return t('nav.members')
   if (isPaymentFlowRoute(pathname)) return t('nav.paymentFlow')
   if (pathname.includes('/inbox')) return t('nav.requestInbox')
