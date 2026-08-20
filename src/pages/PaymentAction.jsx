@@ -18,6 +18,11 @@ import {
   generateTimestamp,
   buildPaymentActionXml,
 } from '../config/paymentActionConfig.js'
+import {
+  isMaintenanceSuccess,
+  lookupMaintenanceResultCode,
+  lookupMaintenanceStatusCode,
+} from '../config/paymentMaintenanceCodes.js'
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -81,26 +86,68 @@ function DecryptedXmlView({ xml }) {
   const respCode = get(fields, 'respCode')
   const respDesc = get(fields, 'respDesc')
   const status = get(fields, 'status')
-  const success = respCode === '00'
+  const resultDescription = lookupMaintenanceResultCode(respCode)
+  const statusDescription = lookupMaintenanceStatusCode(status)
+  const success = isMaintenanceSuccess(respCode)
+
+  const describeField = (tag, value) => {
+    if (tag === 'respCode') return lookupMaintenanceResultCode(value)
+    if (tag === 'status') return lookupMaintenanceStatusCode(value)
+    return null
+  }
 
   return (
     <div className="space-y-3">
       {/* Highlighted summary */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {respCode != null && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold ${
+                success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {success ? '✓' : '✕'} respCode: {respCode}
+            </span>
+          )}
+          {status && (
+            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              status: {status}
+            </span>
+          )}
+        </div>
+
         {respCode != null && (
-          <span
-            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold ${
-              success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              success
+                ? 'border-green-200 bg-green-50 text-green-900'
+                : 'border-red-200 bg-red-50 text-red-900'
             }`}
           >
-            {success ? '✓' : '✕'} respCode: {respCode}
-            {respDesc ? ` · ${respDesc}` : ''}
-          </span>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+              {t('paymentAction.resultCodeDescription')}
+            </p>
+            <p className="mt-0.5 font-medium">
+              {resultDescription ?? t('paymentAction.codeUnknown')}
+            </p>
+            {respDesc && respDesc !== resultDescription && (
+              <p className="mt-1 text-xs opacity-80">
+                {t('paymentAction.respDescFromGateway')}: {respDesc}
+              </p>
+            )}
+          </div>
         )}
+
         {status && (
-          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-            status: {status}
-          </span>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t('paymentAction.statusCodeDescription')}
+            </p>
+            <p className="mt-0.5 font-medium">
+              {statusDescription ?? t('paymentAction.codeUnknown')}
+            </p>
+          </div>
         )}
       </div>
 
@@ -108,24 +155,34 @@ function DecryptedXmlView({ xml }) {
       <div className="overflow-hidden rounded-lg border border-slate-200">
         <table className="w-full text-sm">
           <tbody>
-            {fields.map((f, i) => (
-              <tr key={f.tag} className={i % 2 ? 'bg-slate-50' : 'bg-white'}>
-                <td className="w-1/2 break-words px-3 py-1.5 font-medium text-slate-500 align-top">
-                  {f.tag}
-                </td>
-                <td className="w-1/2 break-words px-3 py-1.5 font-mono text-slate-800">
-                  {f.isComplex ? (
-                    <pre className="overflow-auto whitespace-pre-wrap text-xs text-slate-600">
-                      {f.complexXml}
-                    </pre>
-                  ) : f.value ? (
-                    f.value
-                  ) : (
-                    <span className="text-slate-300">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {fields.map((f, i) => {
+              const mapped = !f.isComplex && f.value ? describeField(f.tag, f.value) : null
+              return (
+                <tr key={f.tag} className={i % 2 ? 'bg-slate-50' : 'bg-white'}>
+                  <td className="w-1/3 break-words px-3 py-1.5 font-medium text-slate-500 align-top">
+                    {f.tag}
+                  </td>
+                  <td className="w-2/3 break-words px-3 py-1.5 font-mono text-slate-800">
+                    {f.isComplex ? (
+                      <pre className="overflow-auto whitespace-pre-wrap text-xs text-slate-600">
+                        {f.complexXml}
+                      </pre>
+                    ) : f.value ? (
+                      <div>
+                        <div>{f.value}</div>
+                        {mapped && (
+                          <div className="mt-1 font-sans text-xs font-medium text-brand-700">
+                            → {mapped}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

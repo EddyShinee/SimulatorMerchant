@@ -366,6 +366,10 @@ export const translations = {
       processTypeVoid: 'Void',
       notifyUrl: 'Notify URL',
       notifyUrlRefundHint: 'Tự điền callback backend của Request Inbox khi chọn Refund — có thể sửa tay.',
+      resultCodeDescription: 'Result Code (respCode)',
+      statusCodeDescription: 'Status Code',
+      codeUnknown: 'Không có mô tả trong bảng mã 2C2P',
+      respDescFromGateway: 'respDesc từ gateway',
     },
     paymentPos: {
       title: 'Payment POS',
@@ -1159,6 +1163,10 @@ export const translations = {
       processTypeVoid: 'Void',
       notifyUrl: 'Notify URL',
       notifyUrlRefundHint: 'Auto-filled with Request Inbox backend callback when Refund is selected — editable.',
+      resultCodeDescription: 'Result Code (respCode)',
+      statusCodeDescription: 'Status Code',
+      codeUnknown: 'No description in 2C2P code table',
+      respDescFromGateway: 'respDesc from gateway',
     },
     paymentPos: {
       title: 'Payment POS',
