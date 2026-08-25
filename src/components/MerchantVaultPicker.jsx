@@ -49,7 +49,7 @@ export default function MerchantVaultPicker({
   const [form, setForm] = useState(emptyForm())
   const [showForm, setShowForm] = useState(false)
   const [query, setQuery] = useState('')
-  const [envFilter, setEnvFilter] = useState('all') // all | uat | production
+  const [envFilter, setEnvFilter] = useState(() => pageEnvToVaultEnv(currentPageEnv))
   const [copiedKey, setCopiedKey] = useState('')
   const [biometricEnabled, setBiometricEnabled] = useState(false)
   const [platformAuth, setPlatformAuth] = useState(false)
@@ -144,13 +144,16 @@ export default function MerchantVaultPicker({
   const suggestNew =
     unlocked && configured && trimmedMid.length > 0 && !midKnown && !loading
 
+  useEffect(() => {
+    setEnvFilter(pageEnvToVaultEnv(currentPageEnv))
+  }, [currentPageEnv])
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const tabEnv = envFilter === 'production' ? 'production' : 'uat'
     return items.filter((item) => {
-      if (envFilter !== 'all') {
-        const env = item.environment === 'production' ? 'production' : 'uat'
-        if (env !== envFilter) return false
-      }
+      const env = item.environment === 'production' ? 'production' : 'uat'
+      if (env !== tabEnv) return false
       if (!q) return true
       const name = String(item.merchantName || '').toLowerCase()
       const mid = String(item.mid || '').toLowerCase()
@@ -281,7 +284,7 @@ export default function MerchantVaultPicker({
     setShowForm(false)
     setEditingId(null)
     setQuery('')
-    setEnvFilter('all')
+    setEnvFilter(pageEnvToVaultEnv(currentPageEnv))
   }
 
   const startAdd = (prefill = null) => {
@@ -294,7 +297,7 @@ export default function MerchantVaultPicker({
         environment: prefill.environment === 'production' ? 'production' : 'uat',
       })
     } else {
-      setForm(emptyForm())
+      setForm({ ...emptyForm(), environment: envFilter === 'production' ? 'production' : 'uat' })
     }
     setShowForm(true)
     setOpen(true)
@@ -611,16 +614,17 @@ export default function MerchantVaultPicker({
 
                   <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800">
                     {[
-                      { value: 'all', label: t('merchantVault.filterAll') },
                       { value: 'uat', label: t('merchantVault.envUat') },
                       { value: 'production', label: t('merchantVault.envProductionShort') },
                     ].map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
-                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
                           envFilter === opt.value
-                            ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                            ? opt.value === 'production'
+                              ? 'bg-amber-500 text-white shadow-sm'
+                              : 'bg-sky-600 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
                         }`}
                         onClick={() => setEnvFilter(opt.value)}
@@ -759,11 +763,15 @@ export default function MerchantVaultPicker({
                               </button>
                             )}
 
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-200/80 pt-1.5 dark:border-slate-700">
+                            <div
+                              className={`mt-2 grid gap-1.5 border-t border-slate-200/80 pt-2 dark:border-slate-700 ${
+                                fillSecretKey ? 'grid-cols-3' : 'grid-cols-2'
+                              }`}
+                            >
                               {fillSecretKey && (
                                 <button
                                   type="button"
-                                  className="text-[11px] text-slate-500 hover:underline"
+                                  className="rounded-md border border-slate-300 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
                                   onClick={() =>
                                     setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
                                   }
@@ -773,14 +781,14 @@ export default function MerchantVaultPicker({
                               )}
                               <button
                                 type="button"
-                                className="text-[11px] text-slate-500 hover:underline"
+                                className="rounded-md border border-slate-300 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
                                 onClick={() => startEdit(item)}
                               >
                                 {t('merchantVault.edit')}
                               </button>
                               <button
                                 type="button"
-                                className="text-[11px] text-rose-600 hover:underline"
+                                className="rounded-md border border-rose-200 bg-rose-50 px-2 py-2 text-center text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-950"
                                 onClick={() => handleDelete(item.id)}
                               >
                                 {t('merchantVault.delete')}
