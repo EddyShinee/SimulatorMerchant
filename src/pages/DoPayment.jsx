@@ -50,6 +50,8 @@ import {
   countryCodeForCurrency,
   encodeApplePayTokenFor2C2P,
   applePayMerchantValidationUrl,
+  getApplePayPageDomain,
+  isLikelyUnregisteredApplePayDomain,
   paymentTokenSupportsApplePay,
 } from '../utils/applePay.js'
 
@@ -317,6 +319,8 @@ export default function DoPayment() {
   )
   const applePayTokenChannelOk = paymentTokenSupportsApplePay(flow.paymentChannels)
   const applePayChannelKnown = Array.isArray(flow.paymentChannels) && flow.paymentChannels.length > 0
+  const applePayPageDomain = getApplePayPageDomain()
+  const applePayDomainRisk = isLikelyUnregisteredApplePayDomain(applePayPageDomain)
 
   const syncEnvFromPaymentToken = () => {
     const target = inferPaymentTokenEnvFromFlow(flow) || 'sandbox'
@@ -355,9 +359,17 @@ export default function DoPayment() {
 
   const handleApplePayError = useCallback(
     (err) => {
-      const code = err?.applePayCode || (/\b9112\b/.test(String(err?.message)) ? '9112' : '')
-      if (code === '9112') {
-        toast.warning(t('doPayment.applePayError9112'))
+      if (err?.applePayErrorKind === 'domain') {
+        toast.warning(
+          t('doPayment.applePayError9112Domain').replace(
+            '{domain}',
+            err.applePayPageDomain || getApplePayPageDomain() || '—'
+          )
+        )
+        return
+      }
+      if (err?.applePayErrorKind === 'channel') {
+        toast.warning(t('doPayment.applePayError9112Channel'))
         return
       }
       const msg = err?.statusMessage || err?.message || String(err)
@@ -1163,6 +1175,21 @@ export default function DoPayment() {
                 ) : null}
                 {!applePayChannelKnown && paymentToken.trim() ? (
                   <p className="text-xs text-amber-800 dark:text-amber-200">{t('doPayment.applePayUnknownChannel')}</p>
+                ) : null}
+                {applePayPageDomain ? (
+                  <div
+                    className={`rounded-lg border px-3 py-2 text-xs ${
+                      applePayDomainRisk
+                        ? 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100'
+                        : 'border-slate-200 bg-white/70 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300'
+                    }`}
+                  >
+                    <p className="font-semibold">{t('doPayment.applePayPageDomain')}</p>
+                    <p className="mt-1 font-mono text-[11px]">{applePayPageDomain}</p>
+                    {applePayDomainRisk ? (
+                      <p className="mt-2 text-[11px] leading-relaxed">{t('doPayment.applePayDomainRisk')}</p>
+                    ) : null}
+                  </div>
                 ) : null}
                 {hostedPaymentPageUrl ? (
                   <div className="rounded-lg border border-sky-300/80 bg-white/70 px-3 py-2 text-xs dark:border-sky-700 dark:bg-slate-900/50">

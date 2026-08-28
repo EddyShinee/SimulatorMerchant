@@ -111,16 +111,48 @@ export function paymentTokenSupportsApplePay(paymentChannels) {
   return channels.some((c) => String(c || '').trim().toUpperCase() === 'APPLEPAY')
 }
 
+/** Hostname where Apple Pay JS runs (initiativeContext for 2C2P/Apple). */
+export function getApplePayPageDomain() {
+  if (typeof window === 'undefined') return ''
+  return String(window.location.hostname || '').trim()
+}
+
+/** Heuristic: Vercel preview URLs are usually not registered with 2C2P Apple Pay. */
+export function isLikelyUnregisteredApplePayDomain(hostname = getApplePayPageDomain()) {
+  const host = String(hostname || '').toLowerCase()
+  if (!host) return false
+  if (host === 'localhost' || host === '127.0.0.1') return false
+  return (
+    host.includes('vercel.app') ||
+    host.endsWith('.vercel.app') ||
+    host.includes('-git-') ||
+    /\d[a-z0-9]{8,}-/.test(host)
+  )
+}
+
 /** Map 2C2P merchant-validation respCode → actionable simulator message. */
-export function applePayMerchantValidationErrorMessage(respCode, respDesc = '') {
+export function applePayMerchantValidationErrorMessage(
+  respCode,
+  respDesc = '',
+  { hasApplePayChannel = false, pageDomain = '' } = {}
+) {
   const code = String(respCode || '').trim()
   const desc = String(respDesc || '').trim()
+  const domain = pageDomain || getApplePayPageDomain()
 
   if (code === '9112') {
+    if (hasApplePayChannel) {
+      return {
+        code,
+        message: '9112',
+        kind: 'domain',
+        pageDomain: domain,
+      }
+    }
     return {
       code,
-      message:
-        'Payment Token must be created with paymentChannel APPLEPAY (not ALL/CC). Create a new Payment Token, select channel APPLEPAY, then retry Apple Pay.',
+      message: '9112',
+      kind: 'channel',
     }
   }
   if (code === '9040') {
@@ -141,7 +173,7 @@ export function applePayMerchantValidationErrorMessage(respCode, respDesc = '') 
   return { code, message: desc || `Merchant validation failed (${code || 'unknown'})` }
 }
 
-export function parseApplePayMerchantSession(proxyData) {
+export function parseApplePayMerchantSession(proxyData, context = {}) {
   let session = proxyData?.body
   if (typeof session === 'string') {
     try {
@@ -154,9 +186,15 @@ export function parseApplePayMerchantSession(proxyData) {
     session = session.data
   }
   if (session?.respCode && session.respCode !== '0000') {
-    const { code, message } = applePayMerchantValidationErrorMessage(session.respCode, session.respDesc)
+    const { code, message, kind } = applePayMerchantValidationErrorMessage(
+      session.respCode,
+      session.respDesc,
+      context
+    )
     const err = new Error(message)
     err.applePayCode = code
+    err.applePayErrorKind = kind
+    err.applePayPageDomain = context.pageDomain || getApplePayPageDomain()
     throw err
   }
   if (!session?.epochTimestamp && !session?.merchantSessionIdentifier) {

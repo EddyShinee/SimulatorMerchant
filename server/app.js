@@ -41,6 +41,20 @@ app.use(
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// Apple Pay domain verification (optional — set APPLE_PAY_DOMAIN_ASSOCIATION in env)
+app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res) => {
+  const content = process.env.APPLE_PAY_DOMAIN_ASSOCIATION
+  if (!content || !String(content).trim()) {
+    return res
+      .status(404)
+      .type('text/plain')
+      .send(
+        'Not configured. Set APPLE_PAY_DOMAIN_ASSOCIATION with the file content from 2C2P, then register this domain in 2C2P/Apple Pay.'
+      )
+  }
+  res.type('text/plain').send(String(content).trim())
+})
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'simulator-merchant-api', time: new Date().toISOString() })

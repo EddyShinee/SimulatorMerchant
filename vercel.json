@@ -10,6 +10,10 @@
   },
   "routes": [
     { "handle": "filesystem" },
+    {
+      "src": "/.well-known/apple-developer-merchantid-domain-association",
+      "dest": "/api/index"
+    },
     { "src": "/api/(.*)", "dest": "/api/index" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

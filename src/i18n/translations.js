@@ -400,8 +400,13 @@ export const translations = {
       applePayWrongChannelChannels: 'Channel đã lưu: {channels}',
       applePayUnknownChannel:
         'Không xác định channel của token. Nếu gặp 9112, tạo lại Payment Token với channel APPLEPAY.',
-      applePayError9112:
-        '9112: Payment Token phải tạo với paymentChannel APPLEPAY. Tạo token mới (không dùng ALL/CC).',
+      applePayPageDomain: 'Domain trang Direct API (Apple Pay initiativeContext)',
+      applePayDomainRisk:
+        'URL Vercel preview / domain chưa đăng ký thường gây 9112 dù token đúng APPLEPAY. Cần host file apple-developer-merchantid-domain-association tại /.well-known/ trên domain đã đăng ký với 2C2P, hoặc dùng webPaymentUrl (hosted page) bên trên.',
+      applePayError9112Channel:
+        '9112: Payment Token phải tạo với paymentChannel APPLEPAY (không dùng ALL/CC).',
+      applePayError9112Domain:
+        '9112 trên domain {domain}: Direct API cần domain đã verify Apple Pay với 2C2P. Dùng webPaymentUrl (hosted) hoặc đăng ký domain + file /.well-known/apple-developer-merchantid-domain-association.',
     },
     paymentAction: {
       title: 'Payment Action',
@@ -1313,8 +1318,13 @@ export const translations = {
       applePayWrongChannelChannels: 'Saved channels: {channels}',
       applePayUnknownChannel:
         'Token channel unknown. If you see 9112, recreate Payment Token with channel APPLEPAY.',
-      applePayError9112:
-        '9112: Payment Token must be created with paymentChannel APPLEPAY. Create a new token (not ALL/CC).',
+      applePayPageDomain: 'Direct API page domain (Apple Pay initiativeContext)',
+      applePayDomainRisk:
+        'Vercel preview / unregistered domains often cause 9112 even with a valid APPLEPAY token. Host apple-developer-merchantid-domain-association at /.well-known/ on a 2C2P-registered domain, or use webPaymentUrl (hosted page) above.',
+      applePayError9112Channel:
+        '9112: Payment Token must be created with paymentChannel APPLEPAY (not ALL/CC).',
+      applePayError9112Domain:
+        '9112 on domain {domain}: Direct API requires an Apple Pay domain verified with 2C2P. Use webPaymentUrl (hosted) or register the domain and host /.well-known/apple-developer-merchantid-domain-association.',
     },
     paymentAction: {
       title: 'Payment Action',

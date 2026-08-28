@@ -7,6 +7,7 @@ import {
   buildApplePayRequest,
   extractApplePayPaymentDataJson,
   getApplePayAvailability,
+  getApplePayPageDomain,
   parseApplePayMerchantSession,
   paymentTokenSupportsApplePay,
 } from '../utils/applePay.js'
@@ -99,10 +100,14 @@ export default function ApplePayButton({
           clientId,
           locale,
         })
+        const pageOrigin = typeof window !== 'undefined' ? window.location.origin : ''
         const { data } = await api.post('/api/simulator/proxy', {
           method: 'POST',
           url: validationApiUrl,
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(pageOrigin ? { Origin: pageOrigin, Referer: `${pageOrigin}/` } : {}),
+          },
           body: requestBody,
         })
 
@@ -110,7 +115,10 @@ export default function ApplePayButton({
           throw new Error(data?.message || `Merchant validation HTTP ${data?.status}`)
         }
 
-        const merchantSession = parseApplePayMerchantSession(data)
+        const merchantSession = parseApplePayMerchantSession(data, {
+          hasApplePayChannel: paymentTokenSupportsApplePay(paymentChannels),
+          pageDomain: getApplePayPageDomain(),
+        })
         session.completeMerchantValidation(merchantSession)
       } catch (err) {
         onErrorRef.current?.(err)
