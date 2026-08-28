@@ -571,6 +571,10 @@ export default function DoPayment() {
         ? flow.channelCode
         : null
 
+  const hostedPaymentPageUrl =
+    (flow.webPaymentUrl || responseReturnUrl || buildResponseReturnUrl(paymentToken, env)).trim() ||
+    ''
+
   const pasteToken = async () => {
     try {
       const text = await navigator.clipboard.readText()
@@ -1085,6 +1089,23 @@ export default function DoPayment() {
                 {t('doPayment.applePaySection')}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.applePayHint')}</p>
+              {hostedPaymentPageUrl ? (
+                <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
+                  <p className="font-semibold">{t('doPayment.applePayHostedPageTitle')}</p>
+                  <p className="mt-1 text-[11px] opacity-90">{t('doPayment.applePayHostedPageHint')}</p>
+                  <a
+                    href={hostedPaymentPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block font-semibold text-brand-700 underline dark:text-brand-300"
+                  >
+                    {t('doPayment.openHostedPaymentPage')}
+                  </a>
+                </div>
+              ) : null}
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Direct API — {t('doPayment.applePayDirectApiLabel')}
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('doPayment.gpayAmount')}</label>

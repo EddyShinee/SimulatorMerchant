@@ -366,7 +366,12 @@ export const translations = {
       googlePayTokenCaptured: 'Đã lấy Google Pay token.',
       applePaySection: 'Apple Pay',
       applePayHint:
-        'Chỉ Safari trên macOS/iOS + HTTPS/localhost. Merchant validation qua 2C2P API; token từ payment.token.paymentData được base64 khi gửi Do Payment.',
+        'Direct API (bên dưới): cần Safari vì ApplePaySession. Trang hosted 2C2P (webPaymentUrl) vẫn hiện nút Apple Pay trên Chrome — dùng link bên dưới nếu bạn test trên Chrome.',
+      applePayHostedPageTitle: 'Trang thanh toán hosted 2C2P',
+      applePayHostedPageHint:
+        'URL sandbox-pgw-ui… do Payment Token trả về. 2C2P tự render Apple Pay / Google Pay trên nhiều trình duyệt hơn Direct API.',
+      openHostedPaymentPage: 'Mở webPaymentUrl (tab mới)',
+      applePayDirectApiLabel: 'Safari + ApplePaySession (token → Do Payment thủ công)',
       applePayCountryCode: 'countryCode (A2)',
       applePayDisplayName: 'Display name (Apple Pay sheet)',
       applePayLineItem: 'Thanh toán',
@@ -1254,7 +1259,12 @@ export const translations = {
       googlePayTokenCaptured: 'Google Pay token captured.',
       applePaySection: 'Apple Pay',
       applePayHint:
-        'Safari on macOS/iOS + HTTPS/localhost only. Merchant validation via 2C2P API; payment.token.paymentData is base64-encoded on Do Payment send.',
+        'Direct API (below): requires Safari for ApplePaySession. The 2C2P hosted page (webPaymentUrl) may show Apple Pay on Chrome — use the link below for Chrome testing.',
+      applePayHostedPageTitle: '2C2P hosted payment page',
+      applePayHostedPageHint:
+        'sandbox-pgw-ui… URL from Payment Token. 2C2P renders Apple Pay / Google Pay on more browsers than Direct API.',
+      openHostedPaymentPage: 'Open webPaymentUrl (new tab)',
+      applePayDirectApiLabel: 'Safari + ApplePaySession (capture token → send Do Payment manually)',
       applePayCountryCode: 'countryCode (A2)',
       applePayDisplayName: 'Display name (Apple Pay sheet)',
       applePayLineItem: 'Payment',
