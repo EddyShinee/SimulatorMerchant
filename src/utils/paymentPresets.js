@@ -31,6 +31,8 @@ const DEFAULTS = {
   accountNo: '',
   customerTokenOnly: false,
   tokenizeOnly: false,
+  amount: 5000,
+  currencyCode: 'VND',
 }
 
 export function loadPaymentPresets() {

@@ -21,6 +21,7 @@ import {
   MY2C2P_SDK_URL,
   isWalletChannel,
   isCardChannel,
+  isGooglePayChannel,
   buildResponseReturnUrl,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
@@ -31,6 +32,12 @@ import {
   buildChannelGroups,
 } from '../utils/paymentOptionParse.js'
 import PaymentChannelPicker from '../components/PaymentChannelPicker.jsx'
+import GooglePayButton from '../components/GooglePayButton.jsx'
+import { DEFAULT_MERCHANT_ID } from '../config/paymentTokenFields.js'
+import {
+  GOOGLE_PAY_ENV_OPTIONS,
+  googlePayEnvironmentForDoPaymentEnv,
+} from '../utils/googlePay.js'
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -252,11 +259,22 @@ export default function DoPayment() {
   const [sendCardDetails, setSendCardDetails] = useState(true)
   const [sendSecurePayToken, setSendSecurePayToken] = useState(false)
 
+  // Google Pay Direct API (2C2P)
+  const [googlePayToken, setGooglePayToken] = useState('')
+  const [googlePayEnv, setGooglePayEnv] = useState(() => googlePayEnvironmentForDoPaymentEnv('sandbox'))
+  const [gatewayMerchantId, setGatewayMerchantId] = useState(flow.merchantId || DEFAULT_MERCHANT_ID)
+  const [googleMerchantId, setGoogleMerchantId] = useState('')
+  const [googleMerchantName, setGoogleMerchantName] = useState('2C2P Test Merchant')
+  const [gpayAmount, setGpayAmount] = useState(flow.amount ?? 5000)
+  const [gpayCurrency, setGpayCurrency] = useState(flow.currencyCode || 'VND')
+  const [googlePayReady, setGooglePayReady] = useState(false)
+
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
   const isTokenPay = tokenPayMode === 'token'
   const channelUpper = channelCode.trim().toUpperCase()
   const isWalletCh = isWalletChannel(channelUpper)
   const isCardCh = isCardChannel(channelUpper)
+  const isGooglePayCh = isGooglePayChannel(channelUpper)
 
   const applyTokenPayMode = (mode) => {
     setTokenPayMode(mode)
@@ -270,6 +288,16 @@ export default function DoPayment() {
       }
     }
   }
+
+  useEffect(() => {
+    setGooglePayEnv(googlePayEnvironmentForDoPaymentEnv(env))
+  }, [env])
+
+  useEffect(() => {
+    if (flow.merchantId) setGatewayMerchantId(flow.merchantId)
+    if (flow.amount != null) setGpayAmount(flow.amount)
+    if (flow.currencyCode) setGpayCurrency(flow.currencyCode)
+  }, [flow.merchantId, flow.amount, flow.currencyCode])
 
   useEffect(() => {
     const code = channelCode.trim().toUpperCase()
@@ -507,6 +535,14 @@ export default function DoPayment() {
   })
 
   const buildPaymentData = () => {
+    if (isGooglePayCh) {
+      return omitEmptyFields({
+        token: googlePayToken.trim(),
+        name: customerName,
+        email: customerEmail,
+      })
+    }
+
     const optional = {}
     if (isIppChannel && !isTokenPay) {
       optional.isIppChosen = isIppChosen
@@ -611,6 +647,16 @@ export default function DoPayment() {
       toast.warning(t('doPayment.tokenOrSecurePayRequired'))
       return
     }
+    if (isGooglePayCh && !googlePayToken.trim()) {
+      setWarning(t('doPayment.googlePayTokenRequired'))
+      toast.warning(t('doPayment.googlePayTokenRequired'))
+      return
+    }
+    if (isGooglePayCh && googlePayEnv === 'PRODUCTION' && !googleMerchantId.trim()) {
+      setWarning(t('doPayment.googleMerchantIdRequired'))
+      toast.warning(t('doPayment.googleMerchantIdRequired'))
+      return
+    }
 
     const paymentBody = { ...paymentData }
     if (isTokenPay && isCardCh && sendSecurePayToken && securePayToken.trim()) {
@@ -618,7 +664,7 @@ export default function DoPayment() {
     } else if (!isTokenPay && sendSecurePayToken && securePayToken.trim()) {
       paymentBody.securePayToken = securePayToken.trim()
     }
-    if (!isTokenPay && sendCardDetails) {
+    if (!isTokenPay && !isGooglePayCh && sendCardDetails) {
       Object.assign(
         paymentBody,
         omitEmptyFields({
@@ -775,6 +821,7 @@ export default function DoPayment() {
                 <p className="mt-1 text-[11px] text-slate-400">{t('doPayment.responseReturnUrlHint')}</p>
               </div>
             </div>
+            {!isGooglePayCh && (
             <div>
               <label className="label">{t('doPayment.tokenPayMode')}</label>
               <div className="flex flex-wrap items-center gap-3">
@@ -813,6 +860,7 @@ export default function DoPayment() {
                 {isTokenPay ? t('doPayment.tokenPayUnifiedHint') : t('doPayment.tokenPayNoneHint')}
               </p>
             </div>
+            )}
           </div>
 
           {/* Channel code */}
@@ -867,6 +915,110 @@ export default function DoPayment() {
             )}
           </div>
 
+          {isGooglePayCh && (
+            <div className="card space-y-3 p-4">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                {t('doPayment.googlePaySection')}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.googlePayHint')}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('doPayment.googlePayEnvironment')}</label>
+                  <select
+                    className="input font-mono text-xs"
+                    value={googlePayEnv}
+                    onChange={(e) => setGooglePayEnv(e.target.value)}
+                  >
+                    {GOOGLE_PAY_ENV_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {googlePayEnv === 'TEST'
+                      ? t('doPayment.googlePayEnvTestHint')
+                      : t('doPayment.googlePayEnvProductionHint')}
+                  </p>
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.gatewayMerchantId')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    value={gatewayMerchantId}
+                    onChange={(e) => setGatewayMerchantId(e.target.value)}
+                    placeholder={DEFAULT_MERCHANT_ID}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.gpayAmount')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    type="number"
+                    value={gpayAmount}
+                    onChange={(e) => setGpayAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.gpayCurrency')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    value={gpayCurrency}
+                    onChange={(e) => setGpayCurrency(e.target.value.toUpperCase())}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.googleMerchantId')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    value={googleMerchantId}
+                    onChange={(e) => setGoogleMerchantId(e.target.value)}
+                    placeholder={googlePayEnv === 'PRODUCTION' ? t('doPayment.googleMerchantIdRequired') : ''}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.googleMerchantName')}</label>
+                  <input
+                    className="input"
+                    value={googleMerchantName}
+                    onChange={(e) => setGoogleMerchantName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <GooglePayButton
+                environment={googlePayEnv}
+                gatewayMerchantId={gatewayMerchantId}
+                googleMerchantId={googleMerchantId}
+                googleMerchantName={googleMerchantName}
+                amount={gpayAmount}
+                currencyCode={gpayCurrency}
+                disabled={!gatewayMerchantId.trim()}
+                loadingMessage={t('doPayment.googlePayLoading')}
+                notReadyMessage={
+                  googlePayReady ? '' : t('doPayment.googlePayNotReady')
+                }
+                onReadyChange={setGooglePayReady}
+                onToken={(token) => {
+                  setGooglePayToken(token)
+                  toast.success(t('doPayment.googlePayTokenCaptured'))
+                }}
+                onError={(err) => {
+                  const msg = err?.statusMessage || err?.message || String(err)
+                  toast.warning(msg)
+                }}
+              />
+              <div>
+                <label className="label">{t('doPayment.googlePayToken')}</label>
+                <textarea
+                  className="input min-h-[80px] font-mono text-xs"
+                  value={googlePayToken}
+                  onChange={(e) => setGooglePayToken(e.target.value)}
+                  placeholder={t('doPayment.googlePayTokenPlaceholder')}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Payment information */}
           <div className="card space-y-3 p-4">
             <div className="flex items-center justify-between gap-2">
@@ -882,6 +1034,8 @@ export default function DoPayment() {
                 <label className="label">Customer Email</label>
                 <input className="input" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
               </div>
+              {!isGooglePayCh && (
+              <>
               <div>
                 <label className="label">Mobile No</label>
                 <input className="input" value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} />
@@ -908,6 +1062,8 @@ export default function DoPayment() {
                   ))}
                 </select>
               </div>
+              )}
+              </>
               )}
             </div>
             {isIppChannel && !isTokenPay && (
@@ -966,7 +1122,7 @@ export default function DoPayment() {
               </div>
             )}
 
-            {isTokenPay && (
+            {isTokenPay && !isGooglePayCh && (
               <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/20">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -1085,7 +1241,7 @@ export default function DoPayment() {
           </div>
 
           {/* Card details — raw PAN / expiry / CVV */}
-          {!isTokenPay && (
+          {!isTokenPay && !isGooglePayCh && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
@@ -1128,7 +1284,7 @@ export default function DoPayment() {
           )}
 
           {/* 2C2P encryption → securePayToken */}
-          {(!isTokenPay || isCardCh) && (
+          {(!isTokenPay || isCardCh) && !isGooglePayCh && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">

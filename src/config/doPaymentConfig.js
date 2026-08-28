@@ -43,6 +43,11 @@ export function isWalletChannel(code) {
   return WALLET_CHANNEL_CODES.includes(String(code || '').trim().toUpperCase())
 }
 
+/** Google Pay Direct API channel (2C2P docs). */
+export function isGooglePayChannel(code) {
+  return String(code || '').trim().toUpperCase() === 'GOOGLEPAY'
+}
+
 /** Build PGW UI info URL when Payment Token response has no webPaymentUrl. */
 export function buildResponseReturnUrl(paymentToken, env = 'sandbox') {
   const token = String(paymentToken || '').trim()

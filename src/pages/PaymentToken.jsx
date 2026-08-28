@@ -442,6 +442,8 @@ export default function PaymentToken() {
         merchantId,
         secretKey,
         invoiceNo: finalInvoice,
+        amount: Number(amount),
+        currencyCode,
         ...(paymentTokenValue ? { paymentToken: paymentTokenValue } : {}),
         ...(webPaymentUrl ? { webPaymentUrl } : {}),
         paymentChannels: channel,
