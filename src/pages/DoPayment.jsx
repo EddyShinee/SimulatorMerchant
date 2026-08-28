@@ -22,6 +22,8 @@ import {
   isWalletChannel,
   isCardChannel,
   isGooglePayChannel,
+  isApplePayChannel,
+  isDirectWalletChannel,
   buildResponseReturnUrl,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
@@ -33,12 +35,17 @@ import {
 } from '../utils/paymentOptionParse.js'
 import PaymentChannelPicker from '../components/PaymentChannelPicker.jsx'
 import GooglePayButton from '../components/GooglePayButton.jsx'
+import ApplePayButton from '../components/ApplePayButton.jsx'
 import { DEFAULT_MERCHANT_ID } from '../config/paymentTokenFields.js'
 import {
   GOOGLE_PAY_ENV_OPTIONS,
   encodeGooglePayTokenFor2C2P,
   googlePayEnvironmentForDoPaymentEnv,
 } from '../utils/googlePay.js'
+import {
+  countryCodeForCurrency,
+  encodeApplePayTokenFor2C2P,
+} from '../utils/applePay.js'
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -270,12 +277,22 @@ export default function DoPayment() {
   const [gpayCurrency, setGpayCurrency] = useState(flow.currencyCode || 'VND')
   const [googlePayReady, setGooglePayReady] = useState(false)
 
+  // Apple Pay Direct API (2C2P)
+  const [applePayToken, setApplePayToken] = useState('')
+  const [applePayCountryCode, setApplePayCountryCode] = useState(
+    () => countryCodeForCurrency(flow.currencyCode || 'VND')
+  )
+  const [applePayDisplayName, setApplePayDisplayName] = useState('2C2P Test Merchant')
+  const [applePayReady, setApplePayReady] = useState(false)
+
   const isIppChannel = channelCode.trim().toUpperCase() === 'IPP'
   const isTokenPay = tokenPayMode === 'token'
   const channelUpper = channelCode.trim().toUpperCase()
   const isWalletCh = isWalletChannel(channelUpper)
   const isCardCh = isCardChannel(channelUpper)
   const isGooglePayCh = isGooglePayChannel(channelUpper)
+  const isApplePayCh = isApplePayChannel(channelUpper)
+  const isDirectWalletCh = isDirectWalletChannel(channelUpper)
 
   const handleGooglePayToken = useCallback(
     (token) => {
@@ -286,6 +303,22 @@ export default function DoPayment() {
   )
 
   const handleGooglePayError = useCallback(
+    (err) => {
+      const msg = err?.statusMessage || err?.message || String(err)
+      toast.warning(msg)
+    },
+    [toast]
+  )
+
+  const handleApplePayToken = useCallback(
+    (token) => {
+      setApplePayToken(token)
+      toast.success(t('doPayment.applePayTokenCaptured'))
+    },
+    [toast, t]
+  )
+
+  const handleApplePayError = useCallback(
     (err) => {
       const msg = err?.statusMessage || err?.message || String(err)
       toast.warning(msg)
@@ -313,7 +346,10 @@ export default function DoPayment() {
   useEffect(() => {
     if (flow.merchantId) setGatewayMerchantId(flow.merchantId)
     if (flow.amount != null) setGpayAmount(flow.amount)
-    if (flow.currencyCode) setGpayCurrency(flow.currencyCode)
+    if (flow.currencyCode) {
+      setGpayCurrency(flow.currencyCode)
+      setApplePayCountryCode(countryCodeForCurrency(flow.currencyCode))
+    }
   }, [flow.merchantId, flow.amount, flow.currencyCode])
 
   useEffect(() => {
@@ -560,6 +596,14 @@ export default function DoPayment() {
       })
     }
 
+    if (isApplePayCh) {
+      return omitEmptyFields({
+        token: encodeApplePayTokenFor2C2P(applePayToken),
+        name: customerName,
+        email: customerEmail,
+      })
+    }
+
     const optional = {}
     if (isIppChannel && !isTokenPay) {
       optional.isIppChosen = isIppChosen
@@ -674,6 +718,11 @@ export default function DoPayment() {
       toast.warning(t('doPayment.googleMerchantIdRequired'))
       return
     }
+    if (isApplePayCh && !applePayToken.trim()) {
+      setWarning(t('doPayment.applePayTokenRequired'))
+      toast.warning(t('doPayment.applePayTokenRequired'))
+      return
+    }
 
     const paymentBody = { ...paymentData }
     if (isTokenPay && isCardCh && sendSecurePayToken && securePayToken.trim()) {
@@ -681,7 +730,7 @@ export default function DoPayment() {
     } else if (!isTokenPay && sendSecurePayToken && securePayToken.trim()) {
       paymentBody.securePayToken = securePayToken.trim()
     }
-    if (!isTokenPay && !isGooglePayCh && sendCardDetails) {
+    if (!isTokenPay && !isDirectWalletCh && sendCardDetails) {
       Object.assign(
         paymentBody,
         omitEmptyFields({
@@ -838,7 +887,7 @@ export default function DoPayment() {
                 <p className="mt-1 text-[11px] text-slate-400">{t('doPayment.responseReturnUrlHint')}</p>
               </div>
             </div>
-            {!isGooglePayCh && (
+            {!isDirectWalletCh && (
             <div>
               <label className="label">{t('doPayment.tokenPayMode')}</label>
               <div className="flex flex-wrap items-center gap-3">
@@ -1030,6 +1079,81 @@ export default function DoPayment() {
             </div>
           )}
 
+          {isApplePayCh && (
+            <div className="card space-y-3 p-4">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+                {t('doPayment.applePaySection')}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.applePayHint')}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('doPayment.gpayAmount')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    type="number"
+                    value={gpayAmount}
+                    onChange={(e) => setGpayAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.gpayCurrency')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    value={gpayCurrency}
+                    onChange={(e) => {
+                      const next = e.target.value.toUpperCase()
+                      setGpayCurrency(next)
+                      setApplePayCountryCode(countryCodeForCurrency(next))
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.applePayCountryCode')}</label>
+                  <input
+                    className="input font-mono text-xs"
+                    value={applePayCountryCode}
+                    onChange={(e) => setApplePayCountryCode(e.target.value.toUpperCase())}
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('doPayment.applePayDisplayName')}</label>
+                  <input
+                    className="input"
+                    value={applePayDisplayName}
+                    onChange={(e) => setApplePayDisplayName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <ApplePayButton
+                env={env}
+                paymentToken={paymentToken}
+                clientId={clientId}
+                locale={locale}
+                countryCode={applePayCountryCode}
+                currencyCode={gpayCurrency}
+                amount={gpayAmount}
+                displayName={applePayDisplayName}
+                lineItemLabel={t('doPayment.applePayLineItem')}
+                disabled={!paymentToken.trim() || !clientId.trim()}
+                loadingMessage={t('doPayment.applePayLoading')}
+                notReadyMessage={applePayReady ? '' : t('doPayment.applePayNotReady')}
+                onReadyChange={setApplePayReady}
+                onToken={handleApplePayToken}
+                onError={handleApplePayError}
+              />
+              <div>
+                <label className="label">{t('doPayment.applePayToken')}</label>
+                <textarea
+                  className="input min-h-[80px] font-mono text-xs"
+                  value={applePayToken}
+                  onChange={(e) => setApplePayToken(e.target.value)}
+                  placeholder={t('doPayment.applePayTokenPlaceholder')}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Payment information */}
           <div className="card space-y-3 p-4">
             <div className="flex items-center justify-between gap-2">
@@ -1045,7 +1169,7 @@ export default function DoPayment() {
                 <label className="label">Customer Email</label>
                 <input className="input" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
               </div>
-              {!isGooglePayCh && (
+              {!isDirectWalletCh && (
               <>
               <div>
                 <label className="label">Mobile No</label>
@@ -1133,7 +1257,7 @@ export default function DoPayment() {
               </div>
             )}
 
-            {isTokenPay && !isGooglePayCh && (
+            {isTokenPay && !isDirectWalletCh && (
               <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/20">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -1252,7 +1376,7 @@ export default function DoPayment() {
           </div>
 
           {/* Card details — raw PAN / expiry / CVV */}
-          {!isTokenPay && !isGooglePayCh && (
+          {!isTokenPay && !isDirectWalletCh && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">
@@ -1295,7 +1419,7 @@ export default function DoPayment() {
           )}
 
           {/* 2C2P encryption → securePayToken */}
-          {(!isTokenPay || isCardCh) && !isGooglePayCh && (
+          {(!isTokenPay || isCardCh) && !isDirectWalletCh && (
           <div className="card space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">

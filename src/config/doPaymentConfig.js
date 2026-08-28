@@ -48,6 +48,16 @@ export function isGooglePayChannel(code) {
   return String(code || '').trim().toUpperCase() === 'GOOGLEPAY'
 }
 
+/** Apple Pay Direct API channel (2C2P docs). */
+export function isApplePayChannel(code) {
+  return String(code || '').trim().toUpperCase() === 'APPLEPAY'
+}
+
+/** Google Pay or Apple Pay Direct API — hide card PAN / token-pay UI. */
+export function isDirectWalletChannel(code) {
+  return isGooglePayChannel(code) || isApplePayChannel(code)
+}
+
 /** Build PGW UI info URL when Payment Token response has no webPaymentUrl. */
 export function buildResponseReturnUrl(paymentToken, env = 'sandbox') {
   const token = String(paymentToken || '').trim()

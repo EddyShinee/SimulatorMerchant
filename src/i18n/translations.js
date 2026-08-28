@@ -364,6 +364,20 @@ export const translations = {
       googlePayNotReady:
         'Google Pay không khả dụng trên trình duyệt/thiết bị này. Thử Chrome + localhost/HTTPS hoặc kiểm tra gatewayMerchantId.',
       googlePayTokenCaptured: 'Đã lấy Google Pay token.',
+      applePaySection: 'Apple Pay',
+      applePayHint:
+        'Chỉ Safari trên macOS/iOS + HTTPS/localhost. Merchant validation qua 2C2P API; token từ payment.token.paymentData được base64 khi gửi Do Payment.',
+      applePayCountryCode: 'countryCode (A2)',
+      applePayDisplayName: 'Display name (Apple Pay sheet)',
+      applePayLineItem: 'Thanh toán',
+      applePayToken: 'Apple Pay paymentData (JSON)',
+      applePayTokenPlaceholder:
+        'JSON paymentData từ Apple Pay — tự base64 khi gửi Do Payment (2C2P yêu cầu eyJ…)',
+      applePayTokenRequired: 'Apple Pay token là bắt buộc — bấm nút Apple Pay hoặc dán paymentData JSON.',
+      applePayLoading: 'Đang kiểm tra Apple Pay…',
+      applePayNotReady:
+        'Apple Pay không khả dụng — cần Safari trên thiết bị Apple, HTTPS/localhost, và MID 2C2P đã bật Apple Pay.',
+      applePayTokenCaptured: 'Đã lấy Apple Pay paymentData.',
     },
     paymentAction: {
       title: 'Payment Action',
@@ -1238,6 +1252,21 @@ export const translations = {
       googlePayNotReady:
         'Google Pay is not available in this browser/device. Try Chrome + localhost/HTTPS or check gatewayMerchantId.',
       googlePayTokenCaptured: 'Google Pay token captured.',
+      applePaySection: 'Apple Pay',
+      applePayHint:
+        'Safari on macOS/iOS + HTTPS/localhost only. Merchant validation via 2C2P API; payment.token.paymentData is base64-encoded on Do Payment send.',
+      applePayCountryCode: 'countryCode (A2)',
+      applePayDisplayName: 'Display name (Apple Pay sheet)',
+      applePayLineItem: 'Payment',
+      applePayToken: 'Apple Pay paymentData (JSON)',
+      applePayTokenPlaceholder:
+        'paymentData JSON from Apple Pay — auto base64-encoded on Do Payment send (2C2P expects eyJ…)',
+      applePayTokenRequired:
+        'Apple Pay token is required — click Apple Pay or paste paymentData JSON.',
+      applePayLoading: 'Checking Apple Pay…',
+      applePayNotReady:
+        'Apple Pay unavailable — requires Safari on Apple device, HTTPS/localhost, and a 2C2P MID with Apple Pay enabled.',
+      applePayTokenCaptured: 'Apple Pay paymentData captured.',
     },
     paymentAction: {
       title: 'Payment Action',
