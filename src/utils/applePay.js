@@ -46,12 +46,49 @@ export function formatApplePayAmount(amount, currencyCode) {
 }
 
 export function canUseApplePay() {
-  if (typeof window === 'undefined') return false
-  try {
-    return Boolean(window.ApplePaySession?.canMakePayments?.())
-  } catch {
-    return false
+  return getApplePayAvailability().available
+}
+
+/** Detailed Apple Pay availability for UI messaging. */
+export function getApplePayAvailability() {
+  if (typeof window === 'undefined') {
+    return { available: false, reason: 'no_window' }
   }
+  if (!window.isSecureContext) {
+    return { available: false, reason: 'secure_context' }
+  }
+  if (!window.ApplePaySession) {
+    return { available: false, reason: 'no_api' }
+  }
+  try {
+    if (!window.ApplePaySession.canMakePayments()) {
+      return { available: false, reason: 'no_cards' }
+    }
+    return { available: true, reason: '' }
+  } catch (err) {
+    return { available: false, reason: 'unknown', detail: err?.message || String(err) }
+  }
+}
+
+export function parseApplePayMerchantSession(proxyData) {
+  let session = proxyData?.body
+  if (typeof session === 'string') {
+    try {
+      session = JSON.parse(session)
+    } catch {
+      throw new Error('Invalid merchant validation response')
+    }
+  }
+  if (session?.data && typeof session.data === 'object' && !session.epochTimestamp) {
+    session = session.data
+  }
+  if (session?.respCode && session.respCode !== '0000') {
+    throw new Error(session.respDesc || `Merchant validation failed (${session.respCode})`)
+  }
+  if (!session?.epochTimestamp && !session?.merchantSessionIdentifier) {
+    throw new Error(session?.respDesc || 'Invalid merchant session from 2C2P')
+  }
+  return session
 }
 
 /**

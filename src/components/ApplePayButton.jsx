@@ -4,8 +4,9 @@ import {
   APPLE_PAY_SESSION_VERSION,
   applePayMerchantValidationUrl,
   buildApplePayRequest,
-  canUseApplePay,
   extractApplePayPaymentDataJson,
+  getApplePayAvailability,
+  parseApplePayMerchantSession,
 } from '../utils/applePay.js'
 
 export default function ApplePayButton({
@@ -19,6 +20,7 @@ export default function ApplePayButton({
   displayName = '2C2P Test Merchant',
   lineItemLabel = 'Payment',
   disabled = false,
+  disabledMessage = '',
   onToken,
   onError,
   onReadyChange,
@@ -36,22 +38,25 @@ export default function ApplePayButton({
 
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
+  const [unavailableReason, setUnavailableReason] = useState('')
 
   useEffect(() => {
-    const available = canUseApplePay()
+    const { available, reason } = getApplePayAvailability()
     setReady(available)
+    setUnavailableReason(reason)
     onReadyChangeRef.current?.(available)
     setLoading(false)
   }, [])
 
   const handleClick = async () => {
-    if (disabled || !paymentToken.trim() || !clientId.trim()) {
-      onErrorRef.current?.(new Error('Payment Token and Client ID are required for Apple Pay'))
+    if (disabled) {
+      if (disabledMessage) onErrorRef.current?.(new Error(disabledMessage))
       return
     }
 
-    if (!canUseApplePay()) {
-      onErrorRef.current?.(new Error('Apple Pay is not available in this browser'))
+    const availability = getApplePayAvailability()
+    if (!availability.available) {
+      onErrorRef.current?.(new Error(notReadyMessage || 'Apple Pay is not available'))
       return
     }
 
@@ -80,23 +85,11 @@ export default function ApplePayButton({
           },
         })
 
-        let merchantSession = data?.body
-        if (typeof merchantSession === 'string') {
-          try {
-            merchantSession = JSON.parse(merchantSession)
-          } catch {
-            throw new Error('Invalid merchant validation response')
-          }
-        }
-
         if (data?.error || (data?.status && (data.status < 200 || data.status >= 300))) {
           throw new Error(data?.message || `Merchant validation HTTP ${data?.status}`)
         }
 
-        if (merchantSession?.respCode && merchantSession.respCode !== '0000') {
-          throw new Error(merchantSession.respDesc || `Merchant validation failed (${merchantSession.respCode})`)
-        }
-
+        const merchantSession = parseApplePayMerchantSession(data)
         session.completeMerchantValidation(merchantSession)
       } catch (err) {
         onErrorRef.current?.(err)
@@ -115,9 +108,7 @@ export default function ApplePayButton({
       }
     }
 
-    session.oncancel = () => {
-      // user dismissed sheet — no error toast
-    }
+    session.oncancel = () => {}
 
     try {
       session.begin()
@@ -126,7 +117,11 @@ export default function ApplePayButton({
     }
   }
 
-  if (disabled) return null
+  if (disabled && disabledMessage) {
+    return (
+      <p className="text-xs text-amber-700 dark:text-amber-300">{disabledMessage}</p>
+    )
+  }
 
   return (
     <div className="space-y-2">
@@ -134,7 +129,10 @@ export default function ApplePayButton({
         <p className="text-xs text-slate-500 dark:text-slate-400">{loadingMessage}</p>
       ) : null}
       {!loading && !ready && notReadyMessage ? (
-        <p className="text-xs text-amber-700 dark:text-amber-300">{notReadyMessage}</p>
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          {notReadyMessage}
+          {unavailableReason ? ` (${unavailableReason})` : ''}
+        </p>
       ) : null}
       {ready ? (
         <>

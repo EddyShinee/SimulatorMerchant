@@ -24,6 +24,7 @@ import {
   isGooglePayChannel,
   isApplePayChannel,
   isDirectWalletChannel,
+  WALLET_CHANNEL_QUICK_PICKS,
   buildResponseReturnUrl,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
@@ -353,6 +354,15 @@ export default function DoPayment() {
   }, [flow.merchantId, flow.amount, flow.currencyCode])
 
   useEffect(() => {
+    const channels = Array.isArray(flow.paymentChannels) ? flow.paymentChannels : []
+    const direct = channels.find((c) => isDirectWalletChannel(String(c || '')))
+    if (direct) {
+      const upper = String(direct).toUpperCase()
+      setChannelCode(upper)
+    }
+  }, [flow.paymentChannels])
+
+  useEffect(() => {
     const code = channelCode.trim().toUpperCase()
     const isCc = code === 'CC'
     const isIpp = code === 'IPP'
@@ -476,6 +486,12 @@ export default function DoPayment() {
     if (patch.channelCode != null) setChannelCode(patch.channelCode)
     if (patch.agentCode != null) setAgentCode(patch.agentCode)
     if (patch.agentChannelCode != null) setAgentChannelCode(patch.agentChannelCode)
+  }
+
+  const handleChannelCodeChange = (value) => {
+    setChannelCode(value)
+    const upper = String(value || '').trim().toUpperCase()
+    if (upper) updateFlow({ channelCode: upper })
   }
 
   const handleSelectChannel = (channel, context) => {
@@ -957,7 +973,11 @@ export default function DoPayment() {
             <div className="form-grid-3">
               <div>
                 <label className="label">Channel Code</label>
-                <input className="input" value={channelCode} onChange={(e) => setChannelCode(e.target.value)} />
+                <input
+                  className="input font-mono"
+                  value={channelCode}
+                  onChange={(e) => handleChannelCodeChange(e.target.value)}
+                />
               </div>
               <div>
                 <label className="label">Agent Code</label>
@@ -972,7 +992,194 @@ export default function DoPayment() {
                 />
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                {t('doPayment.walletChannelQuickPick')}
+              </span>
+              {WALLET_CHANNEL_QUICK_PICKS.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => handleChannelCodeChange(code)}
+                  className={`rounded-md border px-2.5 py-1 font-mono text-xs font-semibold transition ${
+                    channelUpper === code
+                      ? 'border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-400 dark:bg-brand-950/50 dark:text-brand-200'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+            {isDirectWalletCh && (
+              <div className="rounded-lg border-2 border-brand-400 bg-brand-50/90 px-3 py-2 text-xs font-semibold text-brand-900 dark:border-brand-500 dark:bg-brand-950/40 dark:text-brand-100">
+                {isApplePayCh ? t('doPayment.applePayPanelActive') : t('doPayment.googlePayPanelActive')}
+              </div>
+            )}
             <CodeBlock maxHeight="max-h-60">{JSON.stringify(codeJson, null, 2)}</CodeBlock>
+
+            {isGooglePayCh && (
+              <div className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/30 p-4 dark:border-violet-800 dark:bg-violet-950/20">
+                <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('doPayment.googlePaySection')}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.googlePayHint')}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{t('doPayment.googlePayEnvironment')}</label>
+                    <select
+                      className="input font-mono text-xs"
+                      value={googlePayEnv}
+                      onChange={(e) => setGooglePayEnv(e.target.value)}
+                    >
+                      {GOOGLE_PAY_ENV_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.gatewayMerchantId')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={gatewayMerchantId}
+                      onChange={(e) => setGatewayMerchantId(e.target.value)}
+                      placeholder={DEFAULT_MERCHANT_ID}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.gpayAmount')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      type="number"
+                      value={gpayAmount}
+                      onChange={(e) => setGpayAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.gpayCurrency')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={gpayCurrency}
+                      onChange={(e) => setGpayCurrency(e.target.value.toUpperCase())}
+                    />
+                  </div>
+                </div>
+                <GooglePayButton
+                  environment={googlePayEnv}
+                  gatewayMerchantId={gatewayMerchantId}
+                  googleMerchantId={googleMerchantId}
+                  googleMerchantName={googleMerchantName}
+                  amount={gpayAmount}
+                  currencyCode={gpayCurrency}
+                  disabled={!gatewayMerchantId.trim()}
+                  loadingMessage={t('doPayment.googlePayLoading')}
+                  notReadyMessage={googlePayReady ? '' : t('doPayment.googlePayNotReady')}
+                  onReadyChange={setGooglePayReady}
+                  onToken={handleGooglePayToken}
+                  onError={handleGooglePayError}
+                />
+                <div>
+                  <label className="label">{t('doPayment.googlePayToken')}</label>
+                  <textarea
+                    className="input min-h-[80px] font-mono text-xs"
+                    value={googlePayToken}
+                    onChange={(e) => setGooglePayToken(e.target.value)}
+                    placeholder={t('doPayment.googlePayTokenPlaceholder')}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isApplePayCh && (
+              <div className="space-y-3 rounded-lg border border-sky-200 bg-sky-50/30 p-4 dark:border-sky-800 dark:bg-sky-950/20">
+                <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('doPayment.applePaySection')}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.applePayHint')}</p>
+                {hostedPaymentPageUrl ? (
+                  <div className="rounded-lg border border-sky-300/80 bg-white/70 px-3 py-2 text-xs dark:border-sky-700 dark:bg-slate-900/50">
+                    <p className="font-semibold">{t('doPayment.applePayHostedPageTitle')}</p>
+                    <p className="mt-1 text-[11px] opacity-90">{t('doPayment.applePayHostedPageHint')}</p>
+                    <a
+                      href={hostedPaymentPageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block font-semibold text-brand-700 underline dark:text-brand-300"
+                    >
+                      {t('doPayment.openHostedPaymentPage')}
+                    </a>
+                  </div>
+                ) : null}
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Direct API — {t('doPayment.applePayDirectApiLabel')}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{t('doPayment.gpayAmount')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      type="number"
+                      value={gpayAmount}
+                      onChange={(e) => setGpayAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.gpayCurrency')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={gpayCurrency}
+                      onChange={(e) => {
+                        const next = e.target.value.toUpperCase()
+                        setGpayCurrency(next)
+                        setApplePayCountryCode(countryCodeForCurrency(next))
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.applePayCountryCode')}</label>
+                    <input
+                      className="input font-mono text-xs"
+                      value={applePayCountryCode}
+                      onChange={(e) => setApplePayCountryCode(e.target.value.toUpperCase())}
+                      maxLength={2}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('doPayment.applePayDisplayName')}</label>
+                    <input
+                      className="input"
+                      value={applePayDisplayName}
+                      onChange={(e) => setApplePayDisplayName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <ApplePayButton
+                  env={env}
+                  paymentToken={paymentToken}
+                  clientId={clientId}
+                  locale={locale}
+                  countryCode={applePayCountryCode}
+                  currencyCode={gpayCurrency}
+                  amount={gpayAmount}
+                  displayName={applePayDisplayName}
+                  lineItemLabel={t('doPayment.applePayLineItem')}
+                  disabled={!paymentToken.trim() || !clientId.trim()}
+                  disabledMessage={t('doPayment.applePayNeedPaymentToken')}
+                  loadingMessage={t('doPayment.applePayLoading')}
+                  notReadyMessage={applePayReady ? '' : t('doPayment.applePayNotReady')}
+                  onReadyChange={setApplePayReady}
+                  onToken={handleApplePayToken}
+                  onError={handleApplePayError}
+                />
+                <div>
+                  <label className="label">{t('doPayment.applePayToken')}</label>
+                  <textarea
+                    className="input min-h-[80px] font-mono text-xs"
+                    value={applePayToken}
+                    onChange={(e) => setApplePayToken(e.target.value)}
+                    placeholder={t('doPayment.applePayTokenPlaceholder')}
+                  />
+                </div>
+              </div>
+            )}
 
             {channelGroups.length > 0 && (
               <PaymentChannelPicker
@@ -984,196 +1191,6 @@ export default function DoPayment() {
               />
             )}
           </div>
-
-          {isGooglePayCh && (
-            <div className="card space-y-3 p-4">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
-                {t('doPayment.googlePaySection')}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.googlePayHint')}</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label">{t('doPayment.googlePayEnvironment')}</label>
-                  <select
-                    className="input font-mono text-xs"
-                    value={googlePayEnv}
-                    onChange={(e) => setGooglePayEnv(e.target.value)}
-                  >
-                    {GOOGLE_PAY_ENV_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    {googlePayEnv === 'TEST'
-                      ? t('doPayment.googlePayEnvTestHint')
-                      : t('doPayment.googlePayEnvProductionHint')}
-                  </p>
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.gatewayMerchantId')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    value={gatewayMerchantId}
-                    onChange={(e) => setGatewayMerchantId(e.target.value)}
-                    placeholder={DEFAULT_MERCHANT_ID}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.gpayAmount')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    type="number"
-                    value={gpayAmount}
-                    onChange={(e) => setGpayAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.gpayCurrency')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    value={gpayCurrency}
-                    onChange={(e) => setGpayCurrency(e.target.value.toUpperCase())}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.googleMerchantId')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    value={googleMerchantId}
-                    onChange={(e) => setGoogleMerchantId(e.target.value)}
-                    placeholder={googlePayEnv === 'PRODUCTION' ? t('doPayment.googleMerchantIdRequired') : ''}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.googleMerchantName')}</label>
-                  <input
-                    className="input"
-                    value={googleMerchantName}
-                    onChange={(e) => setGoogleMerchantName(e.target.value)}
-                  />
-                </div>
-              </div>
-              <GooglePayButton
-                environment={googlePayEnv}
-                gatewayMerchantId={gatewayMerchantId}
-                googleMerchantId={googleMerchantId}
-                googleMerchantName={googleMerchantName}
-                amount={gpayAmount}
-                currencyCode={gpayCurrency}
-                disabled={!gatewayMerchantId.trim()}
-                loadingMessage={t('doPayment.googlePayLoading')}
-                notReadyMessage={
-                  googlePayReady ? '' : t('doPayment.googlePayNotReady')
-                }
-                onReadyChange={setGooglePayReady}
-                onToken={handleGooglePayToken}
-                onError={handleGooglePayError}
-              />
-              <div>
-                <label className="label">{t('doPayment.googlePayToken')}</label>
-                <textarea
-                  className="input min-h-[80px] font-mono text-xs"
-                  value={googlePayToken}
-                  onChange={(e) => setGooglePayToken(e.target.value)}
-                  placeholder={t('doPayment.googlePayTokenPlaceholder')}
-                />
-              </div>
-            </div>
-          )}
-
-          {isApplePayCh && (
-            <div className="card space-y-3 p-4">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-100">
-                {t('doPayment.applePaySection')}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.applePayHint')}</p>
-              {hostedPaymentPageUrl ? (
-                <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
-                  <p className="font-semibold">{t('doPayment.applePayHostedPageTitle')}</p>
-                  <p className="mt-1 text-[11px] opacity-90">{t('doPayment.applePayHostedPageHint')}</p>
-                  <a
-                    href={hostedPaymentPageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block font-semibold text-brand-700 underline dark:text-brand-300"
-                  >
-                    {t('doPayment.openHostedPaymentPage')}
-                  </a>
-                </div>
-              ) : null}
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                Direct API — {t('doPayment.applePayDirectApiLabel')}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label">{t('doPayment.gpayAmount')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    type="number"
-                    value={gpayAmount}
-                    onChange={(e) => setGpayAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.gpayCurrency')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    value={gpayCurrency}
-                    onChange={(e) => {
-                      const next = e.target.value.toUpperCase()
-                      setGpayCurrency(next)
-                      setApplePayCountryCode(countryCodeForCurrency(next))
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.applePayCountryCode')}</label>
-                  <input
-                    className="input font-mono text-xs"
-                    value={applePayCountryCode}
-                    onChange={(e) => setApplePayCountryCode(e.target.value.toUpperCase())}
-                    maxLength={2}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('doPayment.applePayDisplayName')}</label>
-                  <input
-                    className="input"
-                    value={applePayDisplayName}
-                    onChange={(e) => setApplePayDisplayName(e.target.value)}
-                  />
-                </div>
-              </div>
-              <ApplePayButton
-                env={env}
-                paymentToken={paymentToken}
-                clientId={clientId}
-                locale={locale}
-                countryCode={applePayCountryCode}
-                currencyCode={gpayCurrency}
-                amount={gpayAmount}
-                displayName={applePayDisplayName}
-                lineItemLabel={t('doPayment.applePayLineItem')}
-                disabled={!paymentToken.trim() || !clientId.trim()}
-                loadingMessage={t('doPayment.applePayLoading')}
-                notReadyMessage={applePayReady ? '' : t('doPayment.applePayNotReady')}
-                onReadyChange={setApplePayReady}
-                onToken={handleApplePayToken}
-                onError={handleApplePayError}
-              />
-              <div>
-                <label className="label">{t('doPayment.applePayToken')}</label>
-                <textarea
-                  className="input min-h-[80px] font-mono text-xs"
-                  value={applePayToken}
-                  onChange={(e) => setApplePayToken(e.target.value)}
-                  placeholder={t('doPayment.applePayTokenPlaceholder')}
-                />
-              </div>
-            </div>
-          )}
 
           {/* Payment information */}
           <div className="card space-y-3 p-4">

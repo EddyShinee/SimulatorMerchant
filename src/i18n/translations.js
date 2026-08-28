@@ -364,6 +364,10 @@ export const translations = {
       googlePayNotReady:
         'Google Pay không khả dụng trên trình duyệt/thiết bị này. Thử Chrome + localhost/HTTPS hoặc kiểm tra gatewayMerchantId.',
       googlePayTokenCaptured: 'Đã lấy Google Pay token.',
+      walletChannelQuickPick: 'Chọn nhanh:',
+      googlePayPanelActive: '✓ Google Pay Direct API — panel bên dưới trong mục Channel Code',
+      applePayPanelActive: '✓ Apple Pay Direct API — panel bên dưới trong mục Channel Code',
+      applePayNeedPaymentToken: 'Cần điền Payment Token và Client ID ở mục Basic Info trước khi bấm Apple Pay.',
       applePaySection: 'Apple Pay',
       applePayHint:
         'Direct API (bên dưới): cần Safari vì ApplePaySession. Trang hosted 2C2P (webPaymentUrl) vẫn hiện nút Apple Pay trên Chrome — dùng link bên dưới nếu bạn test trên Chrome.',
@@ -1257,6 +1261,10 @@ export const translations = {
       googlePayNotReady:
         'Google Pay is not available in this browser/device. Try Chrome + localhost/HTTPS or check gatewayMerchantId.',
       googlePayTokenCaptured: 'Google Pay token captured.',
+      walletChannelQuickPick: 'Quick pick:',
+      googlePayPanelActive: '✓ Google Pay Direct API — panel below in Channel Code section',
+      applePayPanelActive: '✓ Apple Pay Direct API — panel below in Channel Code section',
+      applePayNeedPaymentToken: 'Fill Payment Token and Client ID in Basic Info before using Apple Pay.',
       applePaySection: 'Apple Pay',
       applePayHint:
         'Direct API (below): requires Safari for ApplePaySession. The 2C2P hosted page (webPaymentUrl) may show Apple Pay on Chrome — use the link below for Chrome testing.',

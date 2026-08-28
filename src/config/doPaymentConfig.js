@@ -58,6 +58,8 @@ export function isDirectWalletChannel(code) {
   return isGooglePayChannel(code) || isApplePayChannel(code)
 }
 
+export const WALLET_CHANNEL_QUICK_PICKS = ['CC', 'GOOGLEPAY', 'APPLEPAY']
+
 /** Build PGW UI info URL when Payment Token response has no webPaymentUrl. */
 export function buildResponseReturnUrl(paymentToken, env = 'sandbox') {
   const token = String(paymentToken || '').trim()
