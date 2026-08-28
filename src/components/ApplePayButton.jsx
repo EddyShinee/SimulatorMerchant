@@ -8,12 +8,14 @@ import {
   extractApplePayPaymentDataJson,
   getApplePayAvailability,
   parseApplePayMerchantSession,
+  paymentTokenSupportsApplePay,
 } from '../utils/applePay.js'
 
 export default function ApplePayButton({
   env = 'sandbox',
   apiUrl = '',
   paymentToken = '',
+  paymentChannels = [],
   clientId = '',
   locale = 'en',
   countryCode = 'SG',
@@ -23,6 +25,7 @@ export default function ApplePayButton({
   lineItemLabel = 'Payment',
   disabled = false,
   disabledMessage = '',
+  wrongChannelMessage = '',
   onToken,
   onError,
   onReadyChange,
@@ -53,6 +56,21 @@ export default function ApplePayButton({
   const handleClick = async () => {
     if (disabled) {
       if (disabledMessage) onErrorRef.current?.(new Error(disabledMessage))
+      return
+    }
+
+    if (!paymentToken.trim() || !clientId.trim()) {
+      onErrorRef.current?.(new Error(disabledMessage || 'Payment Token and Client ID are required'))
+      return
+    }
+
+    if (paymentChannels.length > 0 && !paymentTokenSupportsApplePay(paymentChannels)) {
+      onErrorRef.current?.(
+        new Error(
+          wrongChannelMessage ||
+            'Payment Token must be created with paymentChannel APPLEPAY (not ALL/CC).'
+        )
+      )
       return
     }
 

@@ -280,6 +280,8 @@ export const translations = {
       invalidJson: 'JSON không hợp lệ',
       mustBeInt: 'phải là số nguyên',
       mustBeNumber: 'phải là số',
+      applePayChannelHint:
+        'Apple Pay Direct API: bắt buộc chọn channel APPLEPAY (không dùng ALL). Token ALL/CC sẽ gây lỗi 9112 khi merchant validation.',
     },
     doPayment: {
       title: 'Do Payment',
@@ -392,6 +394,14 @@ export const translations = {
       syncPaymentTokenEnv: 'Đồng bộ theo môi trường Payment Token',
       syncPaymentTokenEnvDone: 'Đã đồng bộ môi trường Do Payment với Payment Token.',
       applePayValidationEnv: 'Merchant validation ({env}): {url}',
+      applePayWrongChannelTitle: 'Payment Token sai channel — lỗi 9112',
+      applePayWrongChannelBody:
+        'Token hiện tại không phải APPLEPAY. Ở bước Payment Token, chọn channel APPLEPAY (không dùng ALL/CC), tạo token mới rồi quay lại Do Payment.',
+      applePayWrongChannelChannels: 'Channel đã lưu: {channels}',
+      applePayUnknownChannel:
+        'Không xác định channel của token. Nếu gặp 9112, tạo lại Payment Token với channel APPLEPAY.',
+      applePayError9112:
+        '9112: Payment Token phải tạo với paymentChannel APPLEPAY. Tạo token mới (không dùng ALL/CC).',
     },
     paymentAction: {
       title: 'Payment Action',
@@ -1181,6 +1191,8 @@ export const translations = {
       invalidJson: 'Invalid JSON',
       mustBeInt: 'must be an integer',
       mustBeNumber: 'must be a number',
+      applePayChannelHint:
+        'Apple Pay Direct API requires paymentChannel APPLEPAY (not ALL). ALL/CC tokens cause error 9112 during merchant validation.',
     },
     doPayment: {
       title: 'Do Payment',
@@ -1295,6 +1307,14 @@ export const translations = {
       syncPaymentTokenEnv: 'Sync to Payment Token environment',
       syncPaymentTokenEnvDone: 'Do Payment environment synced with Payment Token.',
       applePayValidationEnv: 'Merchant validation ({env}): {url}',
+      applePayWrongChannelTitle: 'Wrong Payment Token channel — error 9112',
+      applePayWrongChannelBody:
+        'This token was not created with APPLEPAY. On Payment Token, select channel APPLEPAY (not ALL/CC), create a new token, then return to Do Payment.',
+      applePayWrongChannelChannels: 'Saved channels: {channels}',
+      applePayUnknownChannel:
+        'Token channel unknown. If you see 9112, recreate Payment Token with channel APPLEPAY.',
+      applePayError9112:
+        '9112: Payment Token must be created with paymentChannel APPLEPAY. Create a new token (not ALL/CC).',
     },
     paymentAction: {
       title: 'Payment Action',

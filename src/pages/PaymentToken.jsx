@@ -682,6 +682,14 @@ export default function PaymentToken() {
                   placeholder={t('paymentToken.channelCustomPlaceholder')}
                 />
               )}
+              {(channelMode === 'list'
+                ? channelSelected.some((c) => String(c).toUpperCase() === 'APPLEPAY')
+                : channelCustom.toUpperCase().includes('APPLEPAY')) ? (
+                <p className="mt-2 text-xs text-sky-800 dark:text-sky-200">{t('paymentToken.applePayChannelHint')}</p>
+              ) : null}
+              {channelMode === 'list' && channelSelected.includes('ALL') && !channelSelected.includes('APPLEPAY') ? (
+                <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">{t('paymentToken.applePayChannelHint')}</p>
+              ) : null}
             </div>
           </div>
 

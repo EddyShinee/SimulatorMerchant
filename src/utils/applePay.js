@@ -1,5 +1,8 @@
 export const APPLE_PAY_SESSION_VERSION = 3
 
+import { DEFAULT_BROWSER_DETAILS } from '../config/paymentOptionsConfig.js'
+import { effectiveDoPaymentEnv } from '../config/doPaymentConfig.js'
+
 export const APPLE_PAY_SUPPORTED_NETWORKS = ['visa', 'masterCard', 'amex', 'discover', 'jcb']
 
 export const APPLE_PAY_MERCHANT_CAPABILITIES = ['supports3DS', 'supportsCredit', 'supportsDebit']
@@ -29,9 +32,6 @@ const CURRENCY_COUNTRY = {
 export function countryCodeForCurrency(currencyCode) {
   return CURRENCY_COUNTRY[String(currencyCode || '').toUpperCase()] || 'SG'
 }
-
-import { DEFAULT_BROWSER_DETAILS } from '../config/paymentOptionsConfig.js'
-import { effectiveDoPaymentEnv } from '../config/doPaymentConfig.js'
 
 export function applePayMerchantValidationUrl(env = 'sandbox', apiUrl = '') {
   const resolved = effectiveDoPaymentEnv(env, apiUrl)
@@ -106,6 +106,41 @@ export function getApplePayAvailability() {
   }
 }
 
+export function paymentTokenSupportsApplePay(paymentChannels) {
+  const channels = Array.isArray(paymentChannels) ? paymentChannels : []
+  return channels.some((c) => String(c || '').trim().toUpperCase() === 'APPLEPAY')
+}
+
+/** Map 2C2P merchant-validation respCode → actionable simulator message. */
+export function applePayMerchantValidationErrorMessage(respCode, respDesc = '') {
+  const code = String(respCode || '').trim()
+  const desc = String(respDesc || '').trim()
+
+  if (code === '9112') {
+    return {
+      code,
+      message:
+        'Payment Token must be created with paymentChannel APPLEPAY (not ALL/CC). Create a new Payment Token, select channel APPLEPAY, then retry Apple Pay.',
+    }
+  }
+  if (code === '9040') {
+    return {
+      code,
+      message: 'Payment Token is invalid or expired. Create a new Payment Token with channel APPLEPAY.',
+    }
+  }
+  if (code === '9993') {
+    return { code, message: 'Payment Token value is invalid. Check the token copied from Payment Token step.' }
+  }
+  if (code === '9004' && /clientID/i.test(desc)) {
+    return { code, message: 'clientID must be a UUID. Regenerate Client ID on Do Payment and retry.' }
+  }
+
+  if (desc && desc.includes(`(${code})`)) return { code, message: desc }
+  if (desc && code) return { code, message: `${desc} (${code})` }
+  return { code, message: desc || `Merchant validation failed (${code || 'unknown'})` }
+}
+
 export function parseApplePayMerchantSession(proxyData) {
   let session = proxyData?.body
   if (typeof session === 'string') {
@@ -119,8 +154,10 @@ export function parseApplePayMerchantSession(proxyData) {
     session = session.data
   }
   if (session?.respCode && session.respCode !== '0000') {
-    const desc = session.respDesc || 'Request failed'
-    throw new Error(`${desc} (${session.respCode})`)
+    const { code, message } = applePayMerchantValidationErrorMessage(session.respCode, session.respDesc)
+    const err = new Error(message)
+    err.applePayCode = code
+    throw err
   }
   if (!session?.epochTimestamp && !session?.merchantSessionIdentifier) {
     throw new Error(session?.respDesc || 'Invalid merchant session from 2C2P')

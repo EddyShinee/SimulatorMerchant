@@ -50,6 +50,7 @@ import {
   countryCodeForCurrency,
   encodeApplePayTokenFor2C2P,
   applePayMerchantValidationUrl,
+  paymentTokenSupportsApplePay,
 } from '../utils/applePay.js'
 
 function loadScript(src) {
@@ -314,6 +315,8 @@ export default function DoPayment() {
     () => applePayMerchantValidationUrl(env, apiUrl),
     [env, apiUrl]
   )
+  const applePayTokenChannelOk = paymentTokenSupportsApplePay(flow.paymentChannels)
+  const applePayChannelKnown = Array.isArray(flow.paymentChannels) && flow.paymentChannels.length > 0
 
   const syncEnvFromPaymentToken = () => {
     const target = inferPaymentTokenEnvFromFlow(flow) || 'sandbox'
@@ -352,10 +355,15 @@ export default function DoPayment() {
 
   const handleApplePayError = useCallback(
     (err) => {
+      const code = err?.applePayCode || (/\b9112\b/.test(String(err?.message)) ? '9112' : '')
+      if (code === '9112') {
+        toast.warning(t('doPayment.applePayError9112'))
+        return
+      }
       const msg = err?.statusMessage || err?.message || String(err)
       toast.warning(msg)
     },
-    [toast]
+    [toast, t]
   )
 
   const applyTokenPayMode = (mode) => {
@@ -1141,6 +1149,21 @@ export default function DoPayment() {
               <div className="space-y-3 rounded-lg border border-sky-200 bg-sky-50/30 p-4 dark:border-sky-800 dark:bg-sky-950/20">
                 <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('doPayment.applePaySection')}</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t('doPayment.applePayHint')}</p>
+                {applePayChannelKnown && !applePayTokenChannelOk ? (
+                  <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
+                    <p className="font-semibold">{t('doPayment.applePayWrongChannelTitle')}</p>
+                    <p className="mt-1">{t('doPayment.applePayWrongChannelBody')}</p>
+                    <p className="mt-1 font-mono text-[10px] opacity-90">
+                      {t('doPayment.applePayWrongChannelChannels').replace(
+                        '{channels}',
+                        flow.paymentChannels.join(', ')
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+                {!applePayChannelKnown && paymentToken.trim() ? (
+                  <p className="text-xs text-amber-800 dark:text-amber-200">{t('doPayment.applePayUnknownChannel')}</p>
+                ) : null}
                 {hostedPaymentPageUrl ? (
                   <div className="rounded-lg border border-sky-300/80 bg-white/70 px-3 py-2 text-xs dark:border-sky-700 dark:bg-slate-900/50">
                     <p className="font-semibold">{t('doPayment.applePayHostedPageTitle')}</p>
@@ -1207,6 +1230,7 @@ export default function DoPayment() {
                   env={effectiveEnv}
                   apiUrl={apiUrl}
                   paymentToken={paymentToken}
+                  paymentChannels={flow.paymentChannels}
                   clientId={clientId}
                   locale={locale}
                   countryCode={applePayCountryCode}
@@ -1214,8 +1238,13 @@ export default function DoPayment() {
                   amount={gpayAmount}
                   displayName={applePayDisplayName}
                   lineItemLabel={t('doPayment.applePayLineItem')}
-                  disabled={!paymentToken.trim() || !clientId.trim()}
+                  disabled={
+                    !paymentToken.trim() ||
+                    !clientId.trim() ||
+                    (applePayChannelKnown && !applePayTokenChannelOk)
+                  }
                   disabledMessage={t('doPayment.applePayNeedPaymentToken')}
+                  wrongChannelMessage={t('doPayment.applePayWrongChannelBody')}
                   loadingMessage={t('doPayment.applePayLoading')}
                   notReadyMessage={applePayReady ? '' : t('doPayment.applePayNotReady')}
                   onReadyChange={setApplePayReady}
