@@ -101,7 +101,8 @@ export function buildGooglePayConfig({
   const isReadyToPayRequest = {
     ...baseRequest,
     allowedPaymentMethods: [baseCardPaymentMethod],
-    existingPaymentMethodRequired: true,
+    // false so TEST works without a saved Google Pay card on the account
+    existingPaymentMethodRequired: false,
   }
 
   const merchantInfo = {

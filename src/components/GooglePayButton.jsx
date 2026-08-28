@@ -23,6 +23,14 @@ export default function GooglePayButton({
 }) {
   const containerRef = useRef(null)
   const configRef = useRef(null)
+  const onTokenRef = useRef(onToken)
+  const onErrorRef = useRef(onError)
+  const onReadyChangeRef = useRef(onReadyChange)
+
+  onTokenRef.current = onToken
+  onErrorRef.current = onError
+  onReadyChangeRef.current = onReadyChange
+
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
 
@@ -32,12 +40,12 @@ export default function GooglePayButton({
     const init = async () => {
       setLoading(true)
       setReady(false)
-      onReadyChange?.(false)
-      if (containerRef.current) containerRef.current.innerHTML = ''
+      if (containerRef.current) containerRef.current.replaceChildren()
 
       const gatewayMid = String(gatewayMerchantId || '').trim()
       if (!gatewayMid || disabled) {
         setLoading(false)
+        onReadyChangeRef.current?.(false)
         return
       }
 
@@ -57,7 +65,8 @@ export default function GooglePayButton({
         if (cancelled) return
 
         setReady(isReady)
-        onReadyChange?.(isReady)
+        onReadyChangeRef.current?.(isReady)
+
         if (!isReady || !containerRef.current) {
           setLoading(false)
           return
@@ -68,17 +77,22 @@ export default function GooglePayButton({
           onClick: async () => {
             try {
               const token = await requestGooglePayToken(configRef.current)
-              onToken?.(token)
+              onTokenRef.current?.(token)
             } catch (err) {
-              onError?.(err)
+              onErrorRef.current?.(err)
             }
           },
         })
 
-        containerRef.current.innerHTML = ''
-        containerRef.current.appendChild(button)
+        if (cancelled || !containerRef.current) return
+
+        containerRef.current.replaceChildren(button)
       } catch (err) {
-        if (!cancelled) onError?.(err)
+        if (!cancelled) {
+          setReady(false)
+          onReadyChangeRef.current?.(false)
+          onErrorRef.current?.(err)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -96,9 +110,6 @@ export default function GooglePayButton({
     amount,
     currencyCode,
     disabled,
-    onToken,
-    onError,
-    onReadyChange,
   ])
 
   if (disabled || !String(gatewayMerchantId || '').trim()) return null
@@ -111,7 +122,10 @@ export default function GooglePayButton({
       {!loading && !ready && notReadyMessage ? (
         <p className="text-xs text-amber-700 dark:text-amber-300">{notReadyMessage}</p>
       ) : null}
-      <div ref={containerRef} className="inline-flex min-h-[40px] items-center" />
+      <div
+        ref={containerRef}
+        className="relative z-10 inline-flex min-h-[40px] items-center [&_button]:pointer-events-auto"
+      />
     </div>
   )
 }

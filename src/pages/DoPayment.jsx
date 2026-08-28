@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -275,6 +275,22 @@ export default function DoPayment() {
   const isWalletCh = isWalletChannel(channelUpper)
   const isCardCh = isCardChannel(channelUpper)
   const isGooglePayCh = isGooglePayChannel(channelUpper)
+
+  const handleGooglePayToken = useCallback(
+    (token) => {
+      setGooglePayToken(token)
+      toast.success(t('doPayment.googlePayTokenCaptured'))
+    },
+    [toast, t]
+  )
+
+  const handleGooglePayError = useCallback(
+    (err) => {
+      const msg = err?.statusMessage || err?.message || String(err)
+      toast.warning(msg)
+    },
+    [toast]
+  )
 
   const applyTokenPayMode = (mode) => {
     setTokenPayMode(mode)
@@ -998,14 +1014,8 @@ export default function DoPayment() {
                   googlePayReady ? '' : t('doPayment.googlePayNotReady')
                 }
                 onReadyChange={setGooglePayReady}
-                onToken={(token) => {
-                  setGooglePayToken(token)
-                  toast.success(t('doPayment.googlePayTokenCaptured'))
-                }}
-                onError={(err) => {
-                  const msg = err?.statusMessage || err?.message || String(err)
-                  toast.warning(msg)
-                }}
+                onToken={handleGooglePayToken}
+                onError={handleGooglePayError}
               />
               <div>
                 <label className="label">{t('doPayment.googlePayToken')}</label>
