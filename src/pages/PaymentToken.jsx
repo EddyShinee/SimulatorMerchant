@@ -25,6 +25,7 @@ import {
   generateIdempotencyId,
   omitEmptyFields,
 } from '../config/paymentTokenFields.js'
+import { effectiveDoPaymentEnv } from '../config/doPaymentConfig.js'
 
 // Build the initial raw-value map for every advanced field.
 function initialAdvancedValues(userId) {
@@ -444,6 +445,8 @@ export default function PaymentToken() {
         invoiceNo: finalInvoice,
         amount: Number(amount),
         currencyCode,
+        paymentTokenEnv: effectiveDoPaymentEnv(env, apiUrl),
+        paymentTokenApiUrl: apiUrl,
         ...(paymentTokenValue ? { paymentToken: paymentTokenValue } : {}),
         ...(webPaymentUrl ? { webPaymentUrl } : {}),
         paymentChannels: channel,

@@ -61,6 +61,36 @@ export function isDirectWalletChannel(code) {
 export const WALLET_CHANNEL_QUICK_PICKS = ['CC', 'GOOGLEPAY', 'APPLEPAY']
 
 /** Build PGW UI info URL when Payment Token response has no webPaymentUrl. */
+/** Infer sandbox | production | mpay from a PGW API URL (custom env). */
+export function inferEnvFromPgwUrl(url = '') {
+  const u = String(url || '').toLowerCase()
+  if (u.includes('sandbox-pgw.2c2p.com')) return 'sandbox'
+  if (u.includes('pgw.m-pay.vn')) return 'mpay'
+  if (u.includes('pgw.2c2p.com')) return 'production'
+  return null
+}
+
+/** Resolve dropdown env; custom falls back to URL inference or sandbox. */
+export function effectiveDoPaymentEnv(env = 'sandbox', apiUrl = '') {
+  if (env && env !== 'custom') return env
+  return inferEnvFromPgwUrl(apiUrl) || 'sandbox'
+}
+
+export function doPaymentEnvLabel(env = 'sandbox') {
+  const opt = DO_PAYMENT_ENV_OPTIONS.find((o) => o.value === env)
+  return opt?.label || env
+}
+
+/** Infer Payment Token origin env from persisted flow (webPaymentUrl fallback). */
+export function inferPaymentTokenEnvFromFlow(flow = {}) {
+  if (flow.paymentTokenEnv) return flow.paymentTokenEnv
+  const url = String(flow.webPaymentUrl || '').toLowerCase()
+  if (url.includes('sandbox-pgw-ui')) return 'sandbox'
+  if (url.includes('pgw-ui.m-pay')) return 'mpay'
+  if (url.includes('pgw-ui.2c2p.com')) return 'production'
+  return ''
+}
+
 export function buildResponseReturnUrl(paymentToken, env = 'sandbox') {
   const token = String(paymentToken || '').trim()
   if (!token) return ''

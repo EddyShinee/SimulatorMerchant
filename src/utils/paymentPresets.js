@@ -33,6 +33,9 @@ const DEFAULTS = {
   tokenizeOnly: false,
   amount: 5000,
   currencyCode: 'VND',
+  /** sandbox | production | mpay — env used when Payment Token was created */
+  paymentTokenEnv: '',
+  paymentTokenApiUrl: '',
 }
 
 export function loadPaymentPresets() {

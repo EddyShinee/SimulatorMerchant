@@ -387,6 +387,11 @@ export const translations = {
       applePayNotReady:
         'Apple Pay không khả dụng — cần Safari trên thiết bị Apple, HTTPS/localhost, và MID 2C2P đã bật Apple Pay.',
       applePayTokenCaptured: 'Đã lấy Apple Pay paymentData.',
+      envMismatchWarning:
+        'Lệch môi trường: Payment Token tạo ở {tokenEnv}, nhưng Do Payment đang dùng {currentEnv}. Apple Pay có thể trả 9112 Invalid Request.',
+      syncPaymentTokenEnv: 'Đồng bộ theo môi trường Payment Token',
+      syncPaymentTokenEnvDone: 'Đã đồng bộ môi trường Do Payment với Payment Token.',
+      applePayValidationEnv: 'Merchant validation ({env}): {url}',
     },
     paymentAction: {
       title: 'Payment Action',
@@ -1285,6 +1290,11 @@ export const translations = {
       applePayNotReady:
         'Apple Pay unavailable — requires Safari on Apple device, HTTPS/localhost, and a 2C2P MID with Apple Pay enabled.',
       applePayTokenCaptured: 'Apple Pay paymentData captured.',
+      envMismatchWarning:
+        'Environment mismatch: Payment Token was created in {tokenEnv}, but Do Payment uses {currentEnv}. Apple Pay may return 9112 Invalid Request.',
+      syncPaymentTokenEnv: 'Sync to Payment Token environment',
+      syncPaymentTokenEnvDone: 'Do Payment environment synced with Payment Token.',
+      applePayValidationEnv: 'Merchant validation ({env}): {url}',
     },
     paymentAction: {
       title: 'Payment Action',

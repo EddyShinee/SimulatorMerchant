@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -26,6 +26,9 @@ import {
   isDirectWalletChannel,
   WALLET_CHANNEL_QUICK_PICKS,
   buildResponseReturnUrl,
+  effectiveDoPaymentEnv,
+  doPaymentEnvLabel,
+  inferPaymentTokenEnvFromFlow,
 } from '../config/doPaymentConfig.js'
 import { PAYMENT_OPTIONS_ENVIRONMENTS } from '../config/paymentOptionsConfig.js'
 import { fetchPaymentOptions, fetchAllPaymentOptionDetails, resolveDetailsUrl } from '../utils/paymentChannelApi.js'
@@ -46,6 +49,7 @@ import {
 import {
   countryCodeForCurrency,
   encodeApplePayTokenFor2C2P,
+  applePayMerchantValidationUrl,
 } from '../utils/applePay.js'
 
 function loadScript(src) {
@@ -212,9 +216,16 @@ export default function DoPayment() {
   const { flow, updateFlow, recordStep } = usePaymentFlow()
   const { loading, start, cancel, stop, isAbortError } = useAbortableLoading()
 
-  // Environment
-  const [env, setEnv] = useState('sandbox')
-  const [apiUrl, setApiUrl] = useState(DO_PAYMENT_ENVIRONMENTS.sandbox)
+  // Environment — default to Payment Token env so Apple/Google validation matches token origin
+  const [env, setEnv] = useState(() => inferPaymentTokenEnvFromFlow(flow) || 'sandbox')
+  const [apiUrl, setApiUrl] = useState(() => {
+    const initialEnv = inferPaymentTokenEnvFromFlow(flow) || 'sandbox'
+    if (initialEnv !== 'custom' && DO_PAYMENT_ENVIRONMENTS[initialEnv]) {
+      return DO_PAYMENT_ENVIRONMENTS[initialEnv]
+    }
+    if (flow.paymentTokenApiUrl) return flow.paymentTokenApiUrl
+    return DO_PAYMENT_ENVIRONMENTS.sandbox
+  })
 
   // Basic info
   const [paymentToken, setPaymentToken] = useState(flow.paymentToken || '')
@@ -294,6 +305,26 @@ export default function DoPayment() {
   const isGooglePayCh = isGooglePayChannel(channelUpper)
   const isApplePayCh = isApplePayChannel(channelUpper)
   const isDirectWalletCh = isDirectWalletChannel(channelUpper)
+
+  const effectiveEnv = effectiveDoPaymentEnv(env, apiUrl)
+  const tokenOriginEnv = inferPaymentTokenEnvFromFlow(flow)
+  const envMismatch =
+    Boolean(tokenOriginEnv && paymentToken.trim() && effectiveEnv !== tokenOriginEnv)
+  const appleValidationUrl = useMemo(
+    () => applePayMerchantValidationUrl(env, apiUrl),
+    [env, apiUrl]
+  )
+
+  const syncEnvFromPaymentToken = () => {
+    const target = inferPaymentTokenEnvFromFlow(flow) || 'sandbox'
+    setEnv(target)
+    if (target !== 'custom') {
+      setApiUrl(DO_PAYMENT_ENVIRONMENTS[target] || DO_PAYMENT_ENVIRONMENTS.sandbox)
+    } else if (flow.paymentTokenApiUrl) {
+      setApiUrl(flow.paymentTokenApiUrl)
+    }
+    toast.success(t('doPayment.syncPaymentTokenEnvDone'))
+  }
 
   const handleGooglePayToken = useCallback(
     (token) => {
@@ -854,6 +885,22 @@ export default function DoPayment() {
 
           {/* Environment */}
           <div className="card p-4">
+            {envMismatch ? (
+              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+                <p>
+                  {t('doPayment.envMismatchWarning')
+                    .replace('{tokenEnv}', doPaymentEnvLabel(tokenOriginEnv))
+                    .replace('{currentEnv}', doPaymentEnvLabel(effectiveEnv))}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 font-semibold text-brand-700 underline dark:text-brand-300"
+                  onClick={syncEnvFromPaymentToken}
+                >
+                  {t('doPayment.syncPaymentTokenEnv')}
+                </button>
+              </div>
+            ) : null}
             <div className="form-grid-3">
               <div>
                 <label className="label">{t('paymentToken.environment')}</label>
@@ -1111,6 +1158,11 @@ export default function DoPayment() {
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                   Direct API — {t('doPayment.applePayDirectApiLabel')}
                 </p>
+                <div className="rounded border border-slate-200 bg-white/80 px-2 py-1.5 font-mono text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                  {t('doPayment.applePayValidationEnv')
+                    .replace('{env}', doPaymentEnvLabel(effectiveEnv))
+                    .replace('{url}', appleValidationUrl)}
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="label">{t('doPayment.gpayAmount')}</label>
@@ -1152,7 +1204,8 @@ export default function DoPayment() {
                   </div>
                 </div>
                 <ApplePayButton
-                  env={env}
+                  env={effectiveEnv}
+                  apiUrl={apiUrl}
                   paymentToken={paymentToken}
                   clientId={clientId}
                   locale={locale}

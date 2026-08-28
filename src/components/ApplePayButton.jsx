@@ -3,6 +3,7 @@ import api from '../api/client.js'
 import {
   APPLE_PAY_SESSION_VERSION,
   applePayMerchantValidationUrl,
+  buildApplePayMerchantValidationBody,
   buildApplePayRequest,
   extractApplePayPaymentDataJson,
   getApplePayAvailability,
@@ -11,6 +12,7 @@ import {
 
 export default function ApplePayButton({
   env = 'sandbox',
+  apiUrl = '',
   paymentToken = '',
   clientId = '',
   locale = 'en',
@@ -72,17 +74,18 @@ export default function ApplePayButton({
 
     session.onvalidatemerchant = async (event) => {
       try {
-        const validationApiUrl = applePayMerchantValidationUrl(env)
+        const validationApiUrl = applePayMerchantValidationUrl(env, apiUrl)
+        const requestBody = buildApplePayMerchantValidationBody({
+          validationUrl: event.validationURL,
+          paymentToken,
+          clientId,
+          locale,
+        })
         const { data } = await api.post('/api/simulator/proxy', {
           method: 'POST',
           url: validationApiUrl,
           headers: { 'Content-Type': 'application/json' },
-          body: {
-            validationUrl: event.validationURL,
-            paymentToken: paymentToken.trim(),
-            clientID: clientId.trim(),
-            locale,
-          },
+          body: requestBody,
         })
 
         if (data?.error || (data?.status && (data.status < 200 || data.status >= 300))) {

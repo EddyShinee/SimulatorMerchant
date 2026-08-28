@@ -30,10 +30,46 @@ export function countryCodeForCurrency(currencyCode) {
   return CURRENCY_COUNTRY[String(currencyCode || '').toUpperCase()] || 'SG'
 }
 
-export function applePayMerchantValidationUrl(env = 'sandbox') {
-  if (env === 'production') return APPLE_PAY_MERCHANT_VALIDATION_URLS.production
-  if (env === 'mpay') return APPLE_PAY_MERCHANT_VALIDATION_URLS.mpay
+import { DEFAULT_BROWSER_DETAILS } from '../config/paymentOptionsConfig.js'
+import { effectiveDoPaymentEnv } from '../config/doPaymentConfig.js'
+
+export function applePayMerchantValidationUrl(env = 'sandbox', apiUrl = '') {
+  const resolved = effectiveDoPaymentEnv(env, apiUrl)
+  if (resolved === 'production') return APPLE_PAY_MERCHANT_VALIDATION_URLS.production
+  if (resolved === 'mpay') return APPLE_PAY_MERCHANT_VALIDATION_URLS.mpay
   return APPLE_PAY_MERCHANT_VALIDATION_URLS.sandbox
+}
+
+/** browserDetails for 2C2P merchant validation (Safari when applicable). */
+export function buildApplePayBrowserDetails() {
+  if (typeof navigator === 'undefined') return { ...DEFAULT_BROWSER_DETAILS }
+
+  const ua = navigator.userAgent || ''
+  const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg/i.test(ua)
+  const isMobile = /iPhone|iPad|iPod|Mobile/i.test(ua)
+
+  return {
+    deviceType: isMobile ? 'mobile' : 'desktop',
+    name: isSafari ? 'Safari' : DEFAULT_BROWSER_DETAILS.name,
+    os: /Mac/i.test(ua) ? 'macOS' : /Win/i.test(ua) ? 'Windows' : isMobile ? 'iOS' : DEFAULT_BROWSER_DETAILS.os,
+    version: isSafari ? '17.0.0' : DEFAULT_BROWSER_DETAILS.version,
+  }
+}
+
+export function buildApplePayMerchantValidationBody({
+  validationUrl,
+  paymentToken,
+  clientId,
+  locale = 'en',
+  browserDetails = buildApplePayBrowserDetails(),
+}) {
+  return {
+    validationUrl: String(validationUrl || '').trim(),
+    paymentToken: String(paymentToken || '').trim(),
+    clientID: String(clientId || '').trim(),
+    locale: String(locale || 'en').trim() || 'en',
+    browserDetails,
+  }
 }
 
 /** Apple Pay expects amount strings; zero-decimal currencies omit fractions. */
@@ -83,7 +119,8 @@ export function parseApplePayMerchantSession(proxyData) {
     session = session.data
   }
   if (session?.respCode && session.respCode !== '0000') {
-    throw new Error(session.respDesc || `Merchant validation failed (${session.respCode})`)
+    const desc = session.respDesc || 'Request failed'
+    throw new Error(`${desc} (${session.respCode})`)
   }
   if (!session?.epochTimestamp && !session?.merchantSessionIdentifier) {
     throw new Error(session?.respDesc || 'Invalid merchant session from 2C2P')
