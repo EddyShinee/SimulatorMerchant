@@ -155,3 +155,32 @@ export async function requestGooglePayToken(config) {
   if (!token) throw new Error('No token in Google Pay response')
   return token
 }
+
+/**
+ * 2C2P Do Payment expects payment.data.token as base64.
+ * Google Pay returns tokenizationData.token as a JSON string — normalize and encode.
+ * @see https://developer.2c2p.com/docs/google-pay
+ */
+export function encodeGooglePayTokenFor2C2P(rawToken) {
+  const trimmed = String(rawToken || '').trim()
+  if (!trimmed) return ''
+
+  // Already base64 (2C2P samples start with eyJ…, not {)
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    if (/^[A-Za-z0-9+/=]+$/.test(trimmed)) return trimmed
+  }
+
+  let normalized = trimmed
+  try {
+    normalized = JSON.stringify(JSON.parse(trimmed))
+  } catch {
+    // keep raw string if not JSON
+  }
+
+  const bytes = new TextEncoder().encode(normalized)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}

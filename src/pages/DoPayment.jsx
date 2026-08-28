@@ -36,6 +36,7 @@ import GooglePayButton from '../components/GooglePayButton.jsx'
 import { DEFAULT_MERCHANT_ID } from '../config/paymentTokenFields.js'
 import {
   GOOGLE_PAY_ENV_OPTIONS,
+  encodeGooglePayTokenFor2C2P,
   googlePayEnvironmentForDoPaymentEnv,
 } from '../utils/googlePay.js'
 
@@ -553,7 +554,7 @@ export default function DoPayment() {
   const buildPaymentData = () => {
     if (isGooglePayCh) {
       return omitEmptyFields({
-        token: googlePayToken.trim(),
+        token: encodeGooglePayTokenFor2C2P(googlePayToken),
         name: customerName,
         email: customerEmail,
       })

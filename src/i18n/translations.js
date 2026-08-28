@@ -357,7 +357,7 @@ export const translations = {
       googleMerchantId: 'Google Merchant ID',
       googleMerchantName: 'Google Merchant Name',
       googlePayToken: 'Google Pay token',
-      googlePayTokenPlaceholder: 'Tự điền sau khi bấm nút Google Pay, hoặc dán thủ công để debug',
+      googlePayTokenPlaceholder: 'JSON từ Google Pay — tự base64 khi gửi Do Payment (2C2P yêu cầu eyJ…)',
       googlePayTokenRequired: 'Google Pay token là bắt buộc — bấm nút Google Pay hoặc dán token.',
       googleMerchantIdRequired: 'Google Merchant ID là bắt buộc khi environment = PRODUCTION.',
       googlePayLoading: 'Đang tải Google Pay…',
@@ -1230,7 +1230,8 @@ export const translations = {
       googleMerchantId: 'Google Merchant ID',
       googleMerchantName: 'Google Merchant Name',
       googlePayToken: 'Google Pay token',
-      googlePayTokenPlaceholder: 'Auto-filled after clicking Google Pay, or paste manually for debugging',
+      googlePayTokenPlaceholder:
+        'JSON from Google Pay — auto base64-encoded on Do Payment send (2C2P expects eyJ…)',
       googlePayTokenRequired: 'Google Pay token is required — click Google Pay or paste a token.',
       googleMerchantIdRequired: 'Google Merchant ID is required when environment = PRODUCTION.',
       googlePayLoading: 'Loading Google Pay…',
