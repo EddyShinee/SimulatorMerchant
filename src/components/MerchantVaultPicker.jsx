@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { startAuthentication, startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -53,6 +53,16 @@ export default function MerchantVaultPicker({
   const [copiedKey, setCopiedKey] = useState('')
   const [biometricEnabled, setBiometricEnabled] = useState(false)
   const [platformAuth, setPlatformAuth] = useState(false)
+  const searchInputRef = useRef(null)
+
+  // Spotlight-style: focus search as soon as the unlocked vault list is shown
+  useEffect(() => {
+    if (!open || !unlocked || showForm) return undefined
+    const id = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [open, unlocked, showForm])
 
   useEffect(() => {
     let active = true
@@ -602,10 +612,13 @@ export default function MerchantVaultPicker({
 
                   <div className="flex gap-2">
                     <input
+                      ref={searchInputRef}
+                      type="search"
                       className="input min-w-0 flex-1 text-sm"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder={t('merchantVault.searchPlaceholder')}
+                      autoFocus
                     />
                     <button type="button" className="btn-primary shrink-0 px-3 text-sm" onClick={() => startAdd()}>
                       {t('merchantVault.add')}
