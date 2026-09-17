@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 import forge from 'node-forge'
 
+const DEFAULT_KEY_PASSWORD = '123'
+
 function isDecoderUnsupported(err) {
   const msg = String(err?.message || err)
   return (
@@ -11,13 +13,30 @@ function isDecoderUnsupported(err) {
   )
 }
 
+function isInterruptedOrCancelled(err) {
+  const msg = String(err?.message || err)
+  return (
+    msg.includes('07880109') ||
+    msg.includes('interrupted or cancelled') ||
+    err?.code === 'ERR_OSSL_CRYPTO_INTERRUPTED_OR_CANCELLED'
+  )
+}
+
 function friendlyKeyError(err, context) {
   const msg = String(err?.message || err)
   if (msg.includes('PKCS#12 MAC') || msg.includes('Invalid password') || msg.includes('mac verify')) {
     return 'Invalid PFX/P12 password. Default key 123.pfx uses password "123".'
   }
-  if (msg.includes('bad decrypt') || err?.code === 'ERR_OSSL_EVP_BAD_DECRYPT') {
-    return 'Private key is encrypted. Enter the correct key password.'
+  if (isInterruptedOrCancelled(err) || msg.includes('unable to get passphrase')) {
+    return 'Private key is encrypted. Enter the key password (default 123.pfx uses "123").'
+  }
+  if (
+    msg.includes('bad decrypt') ||
+    msg.includes('bad password') ||
+    err?.code === 'ERR_OSSL_EVP_BAD_DECRYPT' ||
+    err?.code === 'ERR_OSSL_BAD_DECRYPT'
+  ) {
+    return 'Wrong private-key password. Default key 123.pfx uses "123".'
   }
   if (isDecoderUnsupported(err)) {
     return (
@@ -27,6 +46,59 @@ function friendlyKeyError(err, context) {
     )
   }
   return msg
+}
+
+function extractPrivateKeyPem(text) {
+  const normalized = String(text).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
+  const types = [
+    'ENCRYPTED PRIVATE KEY',
+    'RSA PRIVATE KEY',
+    'EC PRIVATE KEY',
+    'PRIVATE KEY',
+    'OPENSSH PRIVATE KEY',
+  ]
+  for (const type of types) {
+    const match = normalized.match(
+      new RegExp(`-----BEGIN ${type}-----[\\s\\S]+?-----END ${type}-----`)
+    )
+    if (match) return match[0]
+  }
+  return normalized.trim()
+}
+
+function isEncryptedPem(pem) {
+  return pem.includes('BEGIN ENCRYPTED PRIVATE KEY') || /Proc-Type:\s*4,ENCRYPTED/i.test(pem)
+}
+
+function intToB64u(n) {
+  let hex = n.toString(16)
+  if (hex.length % 2) hex = `0${hex}`
+  return Buffer.from(hex, 'hex').toString('base64url')
+}
+
+/** Convert forge RSA key to a Node KeyObject via JWK (avoids OpenSSL PEM decoder issues). */
+function forgeKeyToKeyObject(forgeKey) {
+  if (forgeKey?.n && forgeKey?.d && forgeKey?.p && forgeKey?.q) {
+    try {
+      return crypto.createPrivateKey({
+        format: 'jwk',
+        key: {
+          kty: 'RSA',
+          n: intToB64u(forgeKey.n),
+          e: intToB64u(forgeKey.e),
+          d: intToB64u(forgeKey.d),
+          p: intToB64u(forgeKey.p),
+          q: intToB64u(forgeKey.q),
+          dp: intToB64u(forgeKey.dP),
+          dq: intToB64u(forgeKey.dQ),
+          qi: intToB64u(forgeKey.qInv),
+        },
+      })
+    } catch {
+      /* fall through to PEM */
+    }
+  }
+  return createPrivateKeyFromPem(forgeKeyToPem(forgeKey))
 }
 
 /** Convert forge RSA key to PKCS#8 PEM (more reliable on OpenSSL 3). */
@@ -40,12 +112,12 @@ function forgeKeyToPem(forgeKey) {
   }
 }
 
-function createPrivateKeyFromPem(pem, password) {
-  const options = password ? { key: pem, passphrase: password } : { key: pem }
+function tryCreatePrivateKeyFromPem(pem, password) {
+  const options =
+    password != null && password !== '' ? { key: pem, passphrase: password } : { key: pem }
   try {
     return crypto.createPrivateKey(options)
   } catch (err) {
-    // Retry PKCS#1 → let Node infer; some builds prefer explicit type.
     if (pem.includes('BEGIN RSA PRIVATE KEY')) {
       try {
         return crypto.createPrivateKey({
@@ -61,19 +133,83 @@ function createPrivateKeyFromPem(pem, password) {
   }
 }
 
+function passphraseCandidates(password, encrypted) {
+  const pass = typeof password === 'string' ? password : ''
+  const candidates = []
+  const add = (value) => {
+    if (value == null) return
+    if (!candidates.includes(value)) candidates.push(value)
+  }
+
+  if (encrypted) {
+    if (pass) add(pass)
+    else add(DEFAULT_KEY_PASSWORD)
+  } else {
+    add('')
+    if (pass) add(pass)
+  }
+  return candidates
+}
+
+function createPrivateKeyFromPem(pem, password) {
+  const keyPem = extractPrivateKeyPem(pem)
+  if (!keyPem.includes('BEGIN')) {
+    throw new Error('No private key PEM block found.')
+  }
+  if (keyPem.includes('BEGIN OPENSSH PRIVATE KEY')) {
+    throw new Error(
+      'OpenSSH private keys are not supported. Convert to PKCS#8 PEM (BEGIN PRIVATE KEY).'
+    )
+  }
+  if (!/BEGIN [A-Z ]*PRIVATE KEY/.test(keyPem)) {
+    if (pem.includes('BEGIN PUBLIC KEY') || pem.includes('BEGIN CERTIFICATE')) {
+      throw new Error('This is a public certificate/key. Upload it in the Public Certificate field.')
+    }
+  }
+
+  const encrypted = isEncryptedPem(keyPem)
+  const candidates = passphraseCandidates(password, encrypted)
+  let lastErr
+  for (const pass of candidates) {
+    try {
+      return tryCreatePrivateKeyFromPem(keyPem, pass)
+    } catch (err) {
+      lastErr = err
+    }
+  }
+
+  if (encrypted && !(typeof password === 'string' && password)) {
+    throw new Error('Private key is encrypted. Enter the key password (default 123.pfx uses "123").')
+  }
+  throw lastErr
+}
+
 function loadPfxPrivateKey(buffer, password) {
   let p12Asn1
   try {
-    p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(buffer.toString('binary')))
+    p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(buffer.toString('binary')), {
+      parseAllBytes: false,
+      strict: false,
+    })
   } catch (err) {
     throw new Error(`Invalid PFX/P12 file: ${err.message}`)
   }
 
+  const pass = typeof password === 'string' ? password : ''
+  const attempts = pass ? [pass] : [DEFAULT_KEY_PASSWORD, '']
+  let lastErr
   let p12
-  try {
-    p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password || '')
-  } catch (err) {
-    throw new Error(friendlyKeyError(err, 'PFX'))
+  for (const candidate of attempts) {
+    try {
+      p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, candidate)
+      lastErr = null
+      break
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  if (!p12) {
+    throw new Error(friendlyKeyError(lastErr, 'PFX'))
   }
 
   let bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
@@ -86,9 +222,8 @@ function loadPfxPrivateKey(buffer, password) {
     throw new Error('No private key found in PFX/P12 (wrong password?).')
   }
 
-  const pem = forgeKeyToPem(bag.key)
   try {
-    return createPrivateKeyFromPem(pem)
+    return forgeKeyToKeyObject(bag.key)
   } catch (err) {
     throw new Error(friendlyKeyError(err, 'PFX→PEM'))
   }
@@ -99,27 +234,31 @@ function loadPfxPrivateKey(buffer, password) {
 export function loadPrivateKey(base64, filename, password) {
   const lower = (filename || '').toLowerCase()
   const buffer = Buffer.from(base64, 'base64')
+  const asText = buffer.toString('utf8')
 
-  if (lower.endsWith('.pfx') || lower.endsWith('.p12')) {
-    return loadPfxPrivateKey(buffer, password)
+  // PEM regardless of extension (openssl pkcs12 -out often keeps a .pfx name).
+  if (asText.includes('BEGIN')) {
+    try {
+      return createPrivateKeyFromPem(asText, password)
+    } catch (err) {
+      throw new Error(friendlyKeyError(err, filename || 'PEM'))
+    }
   }
 
-  // Sniff PKCS#12 even if the extension is wrong (common upload mistake).
-  if (buffer.length > 4 && buffer[0] === 0x30 && !buffer.toString('utf8', 0, 32).includes('BEGIN')) {
+  const looksPfx = lower.endsWith('.pfx') || lower.endsWith('.p12')
+  const looksDerSeq = buffer.length > 4 && buffer[0] === 0x30
+
+  if (looksPfx || looksDerSeq) {
     try {
       return loadPfxPrivateKey(buffer, password)
     } catch (pfxErr) {
-      // Not a PFX — continue with PEM/DER attempts below unless clearly PFX.
-      if (String(pfxErr.message).includes('Invalid PFX') === false && lower.endsWith('.pfx')) {
-        throw pfxErr
-      }
+      if (looksPfx) throw pfxErr
     }
   }
 
   if (lower.endsWith('.pem') || lower.endsWith('.key') || lower.endsWith('.txt')) {
-    const pem = buffer.toString('utf8')
     try {
-      return createPrivateKeyFromPem(pem, password)
+      return createPrivateKeyFromPem(asText, password)
     } catch (err) {
       throw new Error(friendlyKeyError(err, filename || 'PEM'))
     }
@@ -143,15 +282,6 @@ export function loadPrivateKey(base64, filename, password) {
       } catch {
         throw new Error(friendlyKeyError(err, 'DER'))
       }
-    }
-  }
-
-  const asText = buffer.toString('utf8')
-  if (asText.includes('BEGIN')) {
-    try {
-      return createPrivateKeyFromPem(asText, password)
-    } catch (err) {
-      throw new Error(friendlyKeyError(err, filename || 'key'))
     }
   }
 

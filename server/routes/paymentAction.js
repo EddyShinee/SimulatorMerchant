@@ -1,5 +1,4 @@
 import express from 'express'
-import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -7,6 +6,7 @@ import * as jose from 'jose'
 import { requireAuth } from '../middleware/auth.js'
 import { attachAccess, requireFeature } from '../middleware/access.js'
 import { loadPrivateKey } from '../utils/privateKey.js'
+import { loadPublicKey } from '../utils/publicKey.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(__dirname, '../..')
@@ -36,35 +36,6 @@ router.get('/payment-action/default-keys', (req, res) => {
   })
 })
 
-// Load a public key (KeyObject) from a certificate or public key file (base64).
-// Accepts: PEM public key (SPKI), PEM/DER X.509 certificate, or DER SPKI key.
-function loadPublicKey(base64, filename) {
-  const buffer = Buffer.from(base64, 'base64')
-  const text = buffer.toString('utf8')
-
-  try {
-    if (text.includes('BEGIN PUBLIC KEY')) {
-      return crypto.createPublicKey(text)
-    }
-    if (text.includes('BEGIN CERTIFICATE')) {
-      return new crypto.X509Certificate(text).publicKey
-    }
-    // Binary (DER): try certificate first, then a raw SPKI public key.
-    try {
-      return new crypto.X509Certificate(buffer).publicKey
-    } catch {
-      return crypto.createPublicKey({ key: buffer, format: 'der', type: 'spki' })
-    }
-  } catch (err) {
-    const msg = String(err?.message || err)
-    throw new Error(
-      msg.includes('DECODER') || msg.includes('unsupported')
-        ? `Unsupported public certificate format (${filename || 'cert'}). Upload a PEM/DER .cer/.crt.`
-        : `Public certificate error: ${msg}`
-    )
-  }
-}
-
 function jweCompactParts(text) {
   return text.trim().split('.').filter(Boolean).length
 }
@@ -73,8 +44,9 @@ function jweCompactParts(text) {
 router.post('/payment-action', async (req, res) => {
   const started = Date.now()
   try {
-    const { apiUrl, xml, password, useDefaultKeys } = req.body || {}
-    let { privateKey, publicCert } = req.body || {}
+    const { apiUrl, xml, useDefaultKeys } = req.body || {}
+    let { privateKey, publicCert, password } = req.body || {}
+    if (useDefaultKeys && !password) password = '123'
 
     if (!apiUrl || typeof apiUrl !== 'string') {
       return res.status(400).json({ error: 'INVALID_URL', message: 'API URL is required.' })

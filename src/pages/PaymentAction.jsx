@@ -18,6 +18,7 @@ import {
   generateTimestamp,
   buildPaymentActionXml,
 } from '../config/paymentActionConfig.js'
+import { inspectKeyFile, KEY_FILE_ACCEPT } from '../utils/keyFileDetect.js'
 import {
   isMaintenanceSuccess,
   lookupMaintenanceResultCode,
@@ -31,6 +32,21 @@ function fileToBase64(file) {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+function DetectedFile({ file, meta, t }) {
+  if (!file) return null
+  return (
+    <p className="mt-1 text-xs text-slate-500">
+      {file.name}
+      {meta?.labelKey && (
+        <span className="ml-1 text-slate-400">
+          · {t(`paymentAction.${meta.labelKey}`)}
+          {meta.needsPassword ? ` · ${t('paymentAction.needsPasswordBadge')}` : ''}
+        </span>
+      )}
+    </p>
+  )
 }
 
 // Recursively serialize a DOM node into indented XML.
@@ -304,6 +320,8 @@ export default function PaymentAction() {
   const [useDefaultKeys, setUseDefaultKeys] = useState(true)
   const [privateKeyFile, setPrivateKeyFile] = useState(null)
   const [publicCertFile, setPublicCertFile] = useState(null)
+  const [privateMeta, setPrivateMeta] = useState(null)
+  const [publicMeta, setPublicMeta] = useState(null)
   const [password, setPassword] = useState('123')
 
   // Request params
@@ -360,6 +378,52 @@ export default function PaymentAction() {
     }
   }
 
+  const applyKeyFiles = async (fileList, preferSlot) => {
+    const files = Array.from(fileList || []).filter(Boolean)
+    if (!files.length) return
+
+    setUseDefaultKeys(false)
+    const notes = []
+    for (const file of files) {
+      let info
+      try {
+        info = await inspectKeyFile(file)
+      } catch {
+        info = {
+          kind: 'unknown',
+          labelKey: 'typeUnknown',
+          needsPassword: preferSlot === 'private',
+          name: file.name,
+        }
+      }
+
+      const slot = info.kind === 'unknown' ? preferSlot : info.kind
+      if (slot === 'private') {
+        setPrivateKeyFile(file)
+        setPrivateMeta(info)
+        if (info.needsPassword) setPassword((prev) => prev || '123')
+        notes.push(
+          t('paymentAction.autoFilledPrivate', {
+            name: file.name,
+            label: t(`paymentAction.${info.labelKey}`),
+          })
+        )
+      } else if (slot === 'public') {
+        setPublicCertFile(file)
+        setPublicMeta(info)
+        notes.push(
+          t('paymentAction.autoFilledPublic', {
+            name: file.name,
+            label: t(`paymentAction.${info.labelKey}`),
+          })
+        )
+      } else {
+        notes.push(t('paymentAction.fileUnrecognized', { name: file.name }))
+      }
+    }
+    if (notes.length) toast.success(notes.join(' · '))
+  }
+
   const fields = useMemo(
     () => ({
       version,
@@ -398,7 +462,12 @@ export default function PaymentAction() {
 
     const signal = start()
     try {
-      const payloadBody = { apiUrl, xml: xmlPreview, password, useDefaultKeys }
+      const payloadBody = {
+        apiUrl,
+        xml: xmlPreview,
+        password: useDefaultKeys ? password || '123' : password,
+        useDefaultKeys,
+      }
       if (!useDefaultKeys) {
         const [privBase64, pubBase64] = await Promise.all([
           fileToBase64(privateKeyFile),
@@ -486,30 +555,56 @@ export default function PaymentAction() {
               <span className="text-xs font-normal text-slate-400">(123.pfx, abc.cer)</span>
             </label>
 
-            {!useDefaultKeys && (
-              <>
-                <div>
-                  <label className="label">🔐 {t('paymentAction.privateKey')}</label>
-                  <input
-                    type="file"
-                    accept=".pfx,.p12,.pem,.key,.der"
-                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
-                    onChange={(e) => setPrivateKeyFile(e.target.files?.[0] || null)}
-                  />
-                  {privateKeyFile && <p className="mt-1 text-xs text-slate-500">{privateKeyFile.name}</p>}
-                </div>
-                <div>
-                  <label className="label">📄 {t('paymentAction.publicCert')}</label>
-                  <input
-                    type="file"
-                    accept=".cer,.crt,.pem"
-                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
-                    onChange={(e) => setPublicCertFile(e.target.files?.[0] || null)}
-                  />
-                  {publicCertFile && <p className="mt-1 text-xs text-slate-500">{publicCertFile.name}</p>}
-                </div>
-              </>
-            )}
+            <div>
+              <label className="label">{t('paymentAction.filePickAny')}</label>
+              <input
+                type="file"
+                multiple
+                accept={KEY_FILE_ACCEPT}
+                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+                onChange={(e) => {
+                  applyKeyFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <p className="mt-1 text-[11px] text-slate-400">{t('paymentAction.fileTypesHint')}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label">🔐 {t('paymentAction.privateKey')}</label>
+                <input
+                  type="file"
+                  accept={KEY_FILE_ACCEPT}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+                  onChange={(e) => {
+                    applyKeyFiles(e.target.files, 'private')
+                    e.target.value = ''
+                  }}
+                />
+                {useDefaultKeys && !privateKeyFile ? (
+                  <p className="mt-1 text-xs text-slate-400">123.pfx · PKCS#12</p>
+                ) : (
+                  <DetectedFile file={privateKeyFile} meta={privateMeta} t={t} />
+                )}
+              </div>
+              <div>
+                <label className="label">📄 {t('paymentAction.publicCert')}</label>
+                <input
+                  type="file"
+                  accept={KEY_FILE_ACCEPT}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+                  onChange={(e) => {
+                    applyKeyFiles(e.target.files, 'public')
+                    e.target.value = ''
+                  }}
+                />
+                {useDefaultKeys && !publicCertFile ? (
+                  <p className="mt-1 text-xs text-slate-400">abc.cer · X.509</p>
+                ) : (
+                  <DetectedFile file={publicCertFile} meta={publicMeta} t={t} />
+                )}
+              </div>
+            </div>
 
             <div>
               <label className="label">🔑 {t('paymentAction.privateKeyPassword')}</label>
@@ -518,9 +613,15 @@ export default function PaymentAction() {
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={useDefaultKeys ? '123' : ''}
+                placeholder={useDefaultKeys || privateMeta?.needsPassword ? '123' : ''}
               />
-              <p className="mt-1 text-[11px] text-slate-400">{t('paymentAction.privateKeyPasswordHint')}</p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {privateMeta?.needsPassword
+                  ? t('paymentAction.privateKeyPasswordHint')
+                  : useDefaultKeys
+                    ? t('paymentAction.privateKeyPasswordHint')
+                    : t('paymentAction.passwordOptional')}
+              </p>
             </div>
           </div>
 
