@@ -401,7 +401,7 @@ export default function PaymentAction() {
       if (slot === 'private') {
         setPrivateKeyFile(file)
         setPrivateMeta(info)
-        if (info.needsPassword) setPassword((prev) => prev || '123')
+        setPassword('')
         notes.push(
           t('paymentAction.autoFilledPrivate', {
             name: file.name,
@@ -613,14 +613,12 @@ export default function PaymentAction() {
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={useDefaultKeys || privateMeta?.needsPassword ? '123' : ''}
+                placeholder={useDefaultKeys ? '123' : ''}
               />
               <p className="mt-1 text-[11px] text-slate-400">
-                {privateMeta?.needsPassword
+                {useDefaultKeys
                   ? t('paymentAction.privateKeyPasswordHint')
-                  : useDefaultKeys
-                    ? t('paymentAction.privateKeyPasswordHint')
-                    : t('paymentAction.passwordOptional')}
+                  : t('paymentAction.passwordOptional')}
               </p>
             </div>
           </div>

@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import forge from 'node-forge'
 
 const DEFAULT_KEY_PASSWORD = '123'
+const DEMO_KEY_PASSWORDS = ['2c2p', DEFAULT_KEY_PASSWORD, '']
 
 function isDecoderUnsupported(err) {
   const msg = String(err?.message || err)
@@ -25,10 +26,10 @@ function isInterruptedOrCancelled(err) {
 function friendlyKeyError(err, context) {
   const msg = String(err?.message || err)
   if (msg.includes('PKCS#12 MAC') || msg.includes('Invalid password') || msg.includes('mac verify')) {
-    return 'Invalid PFX/P12 password. Default key 123.pfx uses password "123".'
+    return 'Invalid PFX/P12 password. Try 2c2p (demo2) or 123 (123.pfx), or leave blank to auto-try.'
   }
   if (isInterruptedOrCancelled(err) || msg.includes('unable to get passphrase')) {
-    return 'Private key is encrypted. Enter the key password (default 123.pfx uses "123").'
+    return 'Private key is encrypted. Leave blank to auto-try 2c2p / 123, or enter your key password.'
   }
   if (
     msg.includes('bad decrypt') ||
@@ -36,7 +37,7 @@ function friendlyKeyError(err, context) {
     err?.code === 'ERR_OSSL_EVP_BAD_DECRYPT' ||
     err?.code === 'ERR_OSSL_BAD_DECRYPT'
   ) {
-    return 'Wrong private-key password. Default key 123.pfx uses "123".'
+    return 'Could not decrypt the private key. Leave blank to auto-try 2c2p / 123, or enter the correct password.'
   }
   if (isDecoderUnsupported(err)) {
     return (
@@ -128,6 +129,14 @@ function tryCreatePrivateKeyFromPem(pem, password) {
       } catch {
         /* fall through */
       }
+      if (isEncryptedPem(pem)) {
+        try {
+          const forgeKey = forge.pki.decryptRsaPrivateKey(pem, password || '')
+          if (forgeKey) return forgeKeyToKeyObject(forgeKey)
+        } catch {
+          /* fall through */
+        }
+      }
     }
     throw err
   }
@@ -140,13 +149,11 @@ function passphraseCandidates(password, encrypted) {
     if (value == null) return
     if (!candidates.includes(value)) candidates.push(value)
   }
-
+  if (pass) add(pass)
   if (encrypted) {
-    if (pass) add(pass)
-    else add(DEFAULT_KEY_PASSWORD)
+    for (const demo of DEMO_KEY_PASSWORDS) add(demo)
   } else {
     add('')
-    if (pass) add(pass)
   }
   return candidates
 }
@@ -179,7 +186,7 @@ function createPrivateKeyFromPem(pem, password) {
   }
 
   if (encrypted && !(typeof password === 'string' && password)) {
-    throw new Error('Private key is encrypted. Enter the key password (default 123.pfx uses "123").')
+    throw new Error(friendlyKeyError(lastErr || new Error('encrypted'), 'PEM'))
   }
   throw lastErr
 }
@@ -196,7 +203,11 @@ function loadPfxPrivateKey(buffer, password) {
   }
 
   const pass = typeof password === 'string' ? password : ''
-  const attempts = pass ? [pass] : [DEFAULT_KEY_PASSWORD, '']
+  const attempts = []
+  if (pass) attempts.push(pass)
+  for (const demo of DEMO_KEY_PASSWORDS) {
+    if (!attempts.includes(demo)) attempts.push(demo)
+  }
   let lastErr
   let p12
   for (const candidate of attempts) {
