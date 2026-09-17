@@ -42,17 +42,26 @@ function loadPublicKey(base64, filename) {
   const buffer = Buffer.from(base64, 'base64')
   const text = buffer.toString('utf8')
 
-  if (text.includes('BEGIN PUBLIC KEY')) {
-    return crypto.createPublicKey(text)
-  }
-  if (text.includes('BEGIN CERTIFICATE')) {
-    return new crypto.X509Certificate(text).publicKey
-  }
-  // Binary (DER): try certificate first, then a raw SPKI public key.
   try {
-    return new crypto.X509Certificate(buffer).publicKey
-  } catch {
-    return crypto.createPublicKey({ key: buffer, format: 'der', type: 'spki' })
+    if (text.includes('BEGIN PUBLIC KEY')) {
+      return crypto.createPublicKey(text)
+    }
+    if (text.includes('BEGIN CERTIFICATE')) {
+      return new crypto.X509Certificate(text).publicKey
+    }
+    // Binary (DER): try certificate first, then a raw SPKI public key.
+    try {
+      return new crypto.X509Certificate(buffer).publicKey
+    } catch {
+      return crypto.createPublicKey({ key: buffer, format: 'der', type: 'spki' })
+    }
+  } catch (err) {
+    const msg = String(err?.message || err)
+    throw new Error(
+      msg.includes('DECODER') || msg.includes('unsupported')
+        ? `Unsupported public certificate format (${filename || 'cert'}). Upload a PEM/DER .cer/.crt.`
+        : `Public certificate error: ${msg}`
+    )
   }
 }
 

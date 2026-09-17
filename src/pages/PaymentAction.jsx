@@ -304,7 +304,7 @@ export default function PaymentAction() {
   const [useDefaultKeys, setUseDefaultKeys] = useState(true)
   const [privateKeyFile, setPrivateKeyFile] = useState(null)
   const [publicCertFile, setPublicCertFile] = useState(null)
-  const [password, setPassword] = useState('')
+  const [password, setPassword] = useState('123')
 
   // Request params
   const [version, setVersion] = useState('4.3')
@@ -476,7 +476,11 @@ export default function PaymentAction() {
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                 checked={useDefaultKeys}
-                onChange={(e) => setUseDefaultKeys(e.target.checked)}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setUseDefaultKeys(on)
+                  if (on && !password) setPassword('123')
+                }}
               />
               {t('paymentAction.useDefaultKeys')}
               <span className="text-xs font-normal text-slate-400">(123.pfx, abc.cer)</span>
@@ -514,7 +518,9 @@ export default function PaymentAction() {
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder={useDefaultKeys ? '123' : ''}
               />
+              <p className="mt-1 text-[11px] text-slate-400">{t('paymentAction.privateKeyPasswordHint')}</p>
             </div>
           </div>
 
