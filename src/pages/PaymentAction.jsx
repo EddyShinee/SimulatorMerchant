@@ -34,19 +34,34 @@ function fileToBase64(file) {
   })
 }
 
-function DetectedFile({ file, meta, t }) {
-  if (!file) return null
+function FilePickButton({ accept, onFiles, fileName, t }) {
   return (
-    <p className="mt-1 text-xs text-slate-500">
-      {file.name}
-      {meta?.labelKey && (
-        <span className="ml-1 text-slate-400">
-          · {t(`paymentAction.${meta.labelKey}`)}
-          {meta.needsPassword ? ` · ${t('paymentAction.needsPasswordBadge')}` : ''}
-        </span>
-      )}
-    </p>
+    <label className="flex cursor-pointer items-center gap-3">
+      <input
+        type="file"
+        className="sr-only"
+        accept={accept}
+        onChange={(e) => {
+          onFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+      <span className="shrink-0 rounded-lg bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-300 dark:hover:bg-brand-900">
+        {t('paymentAction.chooseFile')}
+      </span>
+      <span className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300" title={fileName || ''}>
+        {fileName || t('paymentAction.noFileChosen')}
+      </span>
+    </label>
   )
+}
+
+function detectedLabel(file, meta, t) {
+  if (!file) return ''
+  const parts = [file.name]
+  if (meta?.labelKey) parts.push(t(`paymentAction.${meta.labelKey}`))
+  if (meta?.needsPassword) parts.push(t('paymentAction.needsPasswordBadge'))
+  return parts.join(' · ')
 }
 
 // Recursively serialize a DOM node into indented XML.
@@ -555,54 +570,32 @@ export default function PaymentAction() {
               <span className="text-xs font-normal text-slate-400">(123.pfx, abc.cer)</span>
             </label>
 
-            <div>
-              <label className="label">{t('paymentAction.filePickAny')}</label>
-              <input
-                type="file"
-                multiple
-                accept={KEY_FILE_ACCEPT}
-                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
-                onChange={(e) => {
-                  applyKeyFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <p className="mt-1 text-[11px] text-slate-400">{t('paymentAction.fileTypesHint')}</p>
-            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="label">🔐 {t('paymentAction.privateKey')}</label>
-                <input
-                  type="file"
+                <FilePickButton
                   accept={KEY_FILE_ACCEPT}
-                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
-                  onChange={(e) => {
-                    applyKeyFiles(e.target.files, 'private')
-                    e.target.value = ''
-                  }}
+                  t={t}
+                  onFiles={(files) => applyKeyFiles(files, 'private')}
+                  fileName={
+                    useDefaultKeys && !privateKeyFile
+                      ? '123.pfx · PKCS#12'
+                      : detectedLabel(privateKeyFile, privateMeta, t)
+                  }
                 />
-                {useDefaultKeys && !privateKeyFile ? (
-                  <p className="mt-1 text-xs text-slate-400">123.pfx · PKCS#12</p>
-                ) : (
-                  <DetectedFile file={privateKeyFile} meta={privateMeta} t={t} />
-                )}
               </div>
               <div>
                 <label className="label">📄 {t('paymentAction.publicCert')}</label>
-                <input
-                  type="file"
+                <FilePickButton
                   accept={KEY_FILE_ACCEPT}
-                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
-                  onChange={(e) => {
-                    applyKeyFiles(e.target.files, 'public')
-                    e.target.value = ''
-                  }}
+                  t={t}
+                  onFiles={(files) => applyKeyFiles(files, 'public')}
+                  fileName={
+                    useDefaultKeys && !publicCertFile
+                      ? 'abc.cer · X.509'
+                      : detectedLabel(publicCertFile, publicMeta, t)
+                  }
                 />
-                {useDefaultKeys && !publicCertFile ? (
-                  <p className="mt-1 text-xs text-slate-400">abc.cer · X.509</p>
-                ) : (
-                  <DetectedFile file={publicCertFile} meta={publicMeta} t={t} />
-                )}
               </div>
             </div>
 

@@ -417,9 +417,8 @@ export const translations = {
       privateKeyPassword: 'Mật khẩu Private Key',
       privateKeyPasswordHint: 'Key mặc định 123.pfx: 123. Để trống sẽ tự thử.',
       passwordOptional: 'Để trống — hệ thống tự thử 2c2p (demo2) và 123. Chỉ nhập nếu key của bạn khác.',
-      filePickAny: 'Chọn file (1 hoặc nhiều) — tự nhận loại',
-      fileTypesHint:
-        'Private: .pfx .p12 .pem .key · Public: .cer .crt .pem (BEGIN PUBLIC KEY / CERTIFICATE). Có thể chọn cả 2 file một lúc.',
+      chooseFile: 'Chọn file',
+      noFileChosen: 'Chưa chọn file',
       typePkcs12: 'PKCS#12 (.pfx/.p12)',
       typeEncryptedPem: 'PEM private key đã mã hóa',
       typePrivatePem: 'PEM private key',
@@ -1352,9 +1351,8 @@ export const translations = {
       privateKeyPassword: 'Private Key Password',
       privateKeyPasswordHint: 'Default 123.pfx: 123. Leave blank to auto-try.',
       passwordOptional: 'Leave blank — auto-tries 2c2p (demo2) and 123. Enter only if your key uses another password.',
-      filePickAny: 'Choose files (one or more) — type is detected automatically',
-      fileTypesHint:
-        'Private: .pfx .p12 .pem .key · Public: .cer .crt .pem (BEGIN PUBLIC KEY / CERTIFICATE). You can select both files at once.',
+      chooseFile: 'Choose file',
+      noFileChosen: 'No file chosen',
       typePkcs12: 'PKCS#12 (.pfx/.p12)',
       typeEncryptedPem: 'Encrypted PEM private key',
       typePrivatePem: 'PEM private key',
