@@ -18,7 +18,7 @@ import {
   generateTimestamp,
   buildPaymentActionXml,
 } from '../config/paymentActionConfig.js'
-import { inspectKeyFile, KEY_FILE_ACCEPT } from '../utils/keyFileDetect.js'
+import { inspectKeyFile, KEY_FILE_ACCEPT, resolveKeySlot } from '../utils/keyFileDetect.js'
 import {
   isMaintenanceSuccess,
   lookupMaintenanceResultCode,
@@ -412,7 +412,7 @@ export default function PaymentAction() {
         }
       }
 
-      const slot = info.kind === 'unknown' ? preferSlot : info.kind
+      const slot = resolveKeySlot(info, preferSlot)
       if (slot === 'private') {
         setPrivateKeyFile(file)
         setPrivateMeta(info)

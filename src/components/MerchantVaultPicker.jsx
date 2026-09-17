@@ -26,7 +26,8 @@ function emptyForm() {
  * Props:
  * - onSelect({ merchantName, mid, secretKey, environment })
  * - currentMid / currentSecretKey / currentPageEnv — dùng để đề xuất lưu MID mới
- * - fillSecretKey — false trên Payment Action (không có SHA key)
+ * - fillSecretKey — false trên trang không có ô SHA (Payment Action): chọn merchant
+ *   chỉ điền MID, form thêm/sửa vẫn luôn có Key (SHA).
  */
 export default function MerchantVaultPicker({
   onSelect,
@@ -675,6 +676,15 @@ export default function MerchantVaultPicker({
                         />
                       </div>
                       <div>
+                        <label className="label">{t('merchantVault.secretKey')}</label>
+                        <input
+                          className="input font-mono text-xs"
+                          value={form.secretKey}
+                          onChange={(e) => setForm((f) => ({ ...f, secretKey: e.target.value }))}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
                         <label className="label">{t('merchantVault.environment')}</label>
                         <select
                           className="input"
@@ -685,16 +695,6 @@ export default function MerchantVaultPicker({
                           <option value="production">{t('merchantVault.envProduction')}</option>
                         </select>
                       </div>
-                      {fillSecretKey && (
-                        <div>
-                          <label className="label">{t('merchantVault.secretKey')}</label>
-                          <input
-                            className="input font-mono text-xs"
-                            value={form.secretKey}
-                            onChange={(e) => setForm((f) => ({ ...f, secretKey: e.target.value }))}
-                          />
-                        </div>
-                      )}
                       <div className="flex gap-2">
                         <button type="submit" className="btn-primary flex-1 text-sm" disabled={loading}>
                           {t('common.save')}
@@ -755,43 +755,35 @@ export default function MerchantVaultPicker({
                               {copiedKey === midCopyId ? t('common.copied') : item.mid}
                             </button>
 
-                            {fillSecretKey && (
+                            <button
+                              type="button"
+                              className="mt-0.5 block w-full min-w-0 overflow-hidden text-left font-mono text-[11px] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300"
+                              title={t('merchantVault.clickToCopy')}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyText(item.secretKey, keyCopyId)
+                              }}
+                            >
+                              <span className="text-slate-400">Key: </span>
+                              {copiedKey === keyCopyId ? (
+                                t('common.copied')
+                              ) : keyVisible ? (
+                                <span className="inline-block max-w-full break-all">{item.secretKey || '—'}</span>
+                              ) : (
+                                maskKey(item.secretKey)
+                              )}
+                            </button>
+
+                            <div className="mt-2 grid grid-cols-3 gap-1.5 border-t border-slate-200/80 pt-2 dark:border-slate-700">
                               <button
                                 type="button"
-                                className="mt-0.5 block w-full min-w-0 overflow-hidden text-left font-mono text-[11px] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300"
-                                title={t('merchantVault.clickToCopy')}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  copyText(item.secretKey, keyCopyId)
-                                }}
+                                className="rounded-md border border-slate-300 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
+                                onClick={() =>
+                                  setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
+                                }
                               >
-                                <span className="text-slate-400">Key: </span>
-                                {copiedKey === keyCopyId ? (
-                                  t('common.copied')
-                                ) : keyVisible ? (
-                                  <span className="inline-block max-w-full break-all">{item.secretKey || '—'}</span>
-                                ) : (
-                                  maskKey(item.secretKey)
-                                )}
+                                {keyVisible ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
                               </button>
-                            )}
-
-                            <div
-                              className={`mt-2 grid gap-1.5 border-t border-slate-200/80 pt-2 dark:border-slate-700 ${
-                                fillSecretKey ? 'grid-cols-3' : 'grid-cols-2'
-                              }`}
-                            >
-                              {fillSecretKey && (
-                                <button
-                                  type="button"
-                                  className="rounded-md border border-slate-300 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
-                                  onClick={() =>
-                                    setShowKeys((s) => ({ ...s, [item.id]: !s[item.id] }))
-                                  }
-                                >
-                                  {keyVisible ? t('merchantVault.hideKey') : t('merchantVault.showKey')}
-                                </button>
-                              )}
                               <button
                                 type="button"
                                 className="rounded-md border border-slate-300 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
