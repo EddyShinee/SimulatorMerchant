@@ -16,6 +16,7 @@ export const PAYMENT_ACTION_ENV_OPTIONS = [
 export const PROCESS_TYPE_OPTIONS = [
   { value: 'I', labelKey: 'paymentAction.processTypeInquiry' },
   { value: 'R', labelKey: 'paymentAction.processTypeRefund' },
+  { value: 'RS', labelKey: 'paymentAction.processTypeInquiryRefundStatus' },
   { value: 'V', labelKey: 'paymentAction.processTypeVoid' },
 ]
 
