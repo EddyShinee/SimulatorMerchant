@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import CopyButton from '../components/CopyButton.jsx'
 import CodeBlock from '../components/CodeBlock.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import NotificationBodyForm from '../components/NotificationBodyForm.jsx'
 import FinvietNotificationBodyForm from '../components/FinvietNotificationBodyForm.jsx'
 import {
@@ -514,6 +516,8 @@ export default function PosStandalone() {
     }
 
     setLoading(true)
+    const exchangeStarted = new Date()
+    const sendMethod = isNotification ? 'POST' : opMeta.method
     try {
       const { data } = await api.post('/api/simulator/pos-standalone/send', {
         method: isNotification ? 'POST' : opMeta.method,
@@ -528,15 +532,23 @@ export default function PosStandalone() {
         finvietSecretKey: isFinviet ? finvietSecret(finvietForm) : undefined,
       })
 
-      setResult(data)
+      setResult({ ...data, ...stampExchange(exchangeStarted, sendMethod) })
       if (!data.ok && data.error) setError(data.message || data.error)
     } catch (err) {
       const d = err.response?.data
-      if (err.response?.status === 404) {
-        setError(t('posStandalone.endpointNotFound'))
-      } else {
-        setError(d?.message || err.message || t('errors.network'))
-      }
+      const message =
+        err.response?.status === 404
+          ? t('posStandalone.endpointNotFound')
+          : d?.message || err.message || t('errors.network')
+      setError(message)
+      setResult({
+        status: err.response?.status ?? d?.status,
+        statusText: d?.statusText,
+        durationMs: d?.durationMs,
+        body: d?.body,
+        error: message,
+        ...stampExchange(exchangeStarted, sendMethod),
+      })
     } finally {
       setLoading(false)
     }
@@ -901,24 +913,7 @@ export default function PosStandalone() {
             <div className="card p-8 text-center text-sm text-slate-400">{t('paymentToken.noResult')}</div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {result.status != null && (
-                  <span
-                    className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                      result.status >= 200 && result.status < 300
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {result.status} {result.statusText || ''}
-                  </span>
-                )}
-                {result.durationMs != null && (
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                    {result.durationMs} ms
-                  </span>
-                )}
-              </div>
+              <ExchangeSummary result={result} method={result.method || 'POST'} />
 
               {result.webhookJwt && !isFinviet && (
                 <>

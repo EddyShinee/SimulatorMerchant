@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import api, { getInboxUrls } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -492,6 +494,7 @@ export default function PaymentAction() {
       }
     }
 
+    const exchangeStarted = new Date()
     const signal = start()
     try {
       const payloadBody = {
@@ -511,19 +514,19 @@ export default function PaymentAction() {
       }
       const { data } = await api.post('/api/simulator/payment-action', payloadBody, { signal })
       updateFlow({ invoiceNo: invoiceNo.trim() })
-      setResult(data)
+      setResult({ ...data, ...stampExchange(exchangeStarted) })
       if (data?.success !== false) toast.success(t('common.requestSuccess'))
       else toast.warning(data?.message || t('errors.network'))
     } catch (err) {
       if (isAbortError(err)) {
         toast.warning(t('common.requestCancelled'))
-        setResult({ error: t('common.requestCancelled'), xml: xmlPreview })
+        setResult({ error: t('common.requestCancelled'), xml: xmlPreview, ...stampExchange(exchangeStarted) })
         return
       }
       const message = proxyErrorMessage(err, t('errors.network'))
       setError(message)
       toast.error(message)
-      setResult({ error: message, xml: xmlPreview })
+      setResult({ error: message, xml: xmlPreview, ...stampExchange(exchangeStarted) })
     } finally {
       stop()
     }
@@ -851,26 +854,7 @@ export default function PaymentAction() {
             <div className="card p-8 text-center text-sm text-slate-400">{t('paymentToken.noResult')}</div>
           ) : (
             <div className="space-y-4">
-              {(result.status != null || result.error) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {result.status != null && (
-                    <span
-                      className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                        result.status >= 200 && result.status < 300
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {result.status} {result.statusText || ''}
-                    </span>
-                  )}
-                  {result.durationMs != null && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                      {result.durationMs} ms
-                    </span>
-                  )}
-                </div>
-              )}
+              <ExchangeSummary result={result} method="POST" />
 
               {result.requestHeaders && (
                 <div className="card p-4">

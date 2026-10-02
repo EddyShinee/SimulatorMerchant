@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -105,6 +107,7 @@ export default function PaymentPos() {
       userDefined1,
     }
 
+    const exchangeStarted = new Date()
     const signal = start()
 
     let jwtToken = null
@@ -164,6 +167,7 @@ export default function PaymentPos() {
           status: data?.status,
           statusText: data?.statusText,
           durationMs: data?.durationMs,
+          ...stampExchange(exchangeStarted),
           response: respBody,
           decodedResponse,
           error: data?.error ? data?.message : null,
@@ -178,7 +182,7 @@ export default function PaymentPos() {
     } catch (err) {
       if (isAbortError(err)) {
         toast.warning(t('common.requestCancelled'))
-        setResult(partialResult({ error: t('common.requestCancelled') }))
+        setResult(partialResult({ error: t('common.requestCancelled'), ...stampExchange(exchangeStarted) }))
         return
       }
       const message = proxyErrorMessage(err, t('errors.network'))
@@ -189,6 +193,7 @@ export default function PaymentPos() {
         partialResult({
           status: err.response?.status,
           durationMs: d?.durationMs,
+          ...stampExchange(exchangeStarted),
           error: message,
         })
       )
@@ -377,31 +382,7 @@ export default function PaymentPos() {
             <div className="card p-8 text-center text-sm text-slate-400">{t('paymentToken.noResult')}</div>
           ) : (
             <div className="space-y-4">
-              {(result.status != null || result.error) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {result.status != null && (
-                    <span
-                      className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                        result.status >= 200 && result.status < 300
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {result.status} {result.statusText || ''}
-                    </span>
-                  )}
-                  {result.durationMs != null && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                      {result.durationMs} ms
-                    </span>
-                  )}
-                  {result.error && (
-                    <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
-                      {result.error}
-                    </span>
-                  )}
-                </div>
-              )}
+              <ExchangeSummary result={result} method="POST" />
 
               <ResultCard
                 title={`📤 ${t('paymentPos.unencryptedPayload')}`}

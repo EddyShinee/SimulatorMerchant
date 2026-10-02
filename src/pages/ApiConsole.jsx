@@ -3,16 +3,11 @@ import { useParams } from 'react-router-dom'
 import api, { getApiOrigin } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import { getApiById } from '../config/apis.js'
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
-
-function statusColor(status) {
-  if (status >= 200 && status < 300) return 'bg-green-100 text-green-700'
-  if (status >= 300 && status < 400) return 'bg-amber-100 text-amber-700'
-  if (status >= 400) return 'bg-red-100 text-red-700'
-  return 'bg-slate-100 text-slate-700'
-}
 
 export default function ApiConsole() {
   const { apiId } = useParams()
@@ -79,13 +74,22 @@ export default function ApiConsole() {
     }
 
     setLoading(true)
+    const exchangeStarted = new Date()
     try {
       const { data } = await api.post('/api/simulator/proxy', { method, url, headers, body })
-      setResult(data)
+      setResult({ ...data, ...stampExchange(exchangeStarted, method) })
     } catch (err) {
       const data = err.response?.data
-      if (data) setResult(data)
-      else setError(t('errors.network'))
+      if (data) {
+        setResult({
+          ...data,
+          error: data.message || data.error || null,
+          ...stampExchange(exchangeStarted, method),
+        })
+      } else {
+        setError(t('errors.network'))
+        setResult({ error: t('errors.network'), ...stampExchange(exchangeStarted, method) })
+      }
     } finally {
       setLoading(false)
     }
@@ -164,18 +168,9 @@ export default function ApiConsole() {
       </form>
 
       <div className="card p-5">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="mb-3 space-y-3">
           <h2 className="font-semibold text-slate-900">{t('apiCaller.response')}</h2>
-          {result && result.status != null && (
-            <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${statusColor(result.status)}`}>
-              {t('apiCaller.status')}: {result.status} {result.statusText || ''}
-            </span>
-          )}
-          {result && result.durationMs != null && (
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              {t('apiCaller.duration')}: {result.durationMs} ms
-            </span>
-          )}
+          <ExchangeSummary result={result} method={method} />
         </div>
 
         {!result ? (

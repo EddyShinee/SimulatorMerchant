@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import api, { getInboxUrls } from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -413,6 +415,7 @@ export default function PaymentToken() {
     setInvoiceNo('')
     setIdempotencyId(generateIdempotencyId())
 
+    const exchangeStarted = new Date()
     const signal = start()
     let jwtToken = null
     try {
@@ -465,6 +468,7 @@ export default function PaymentToken() {
         status: data?.status,
         statusText: data?.statusText,
         durationMs: data?.durationMs,
+        ...stampExchange(exchangeStarted),
         response: respBody,
         decodedResponse,
         ok: data?.ok,
@@ -485,6 +489,7 @@ export default function PaymentToken() {
           invoiceNo: finalInvoice,
           jwtToken,
           error: t('common.requestCancelled'),
+          ...stampExchange(exchangeStarted),
         })
         return
       }
@@ -495,6 +500,7 @@ export default function PaymentToken() {
         invoiceNo: finalInvoice,
         jwtToken,
         error: message,
+        ...stampExchange(exchangeStarted),
       })
     } finally {
       stop()
@@ -789,31 +795,7 @@ export default function PaymentToken() {
             <div className="result-panel space-y-4">
               <InvoiceCopyBar invoiceNo={resultInvoiceNo} />
 
-              {(result.status != null || result.error) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {result.status != null && (
-                    <span
-                      className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                        result.status >= 200 && result.status < 300
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {result.status} {result.statusText || ''}
-                    </span>
-                  )}
-                  {result.durationMs != null && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                      {result.durationMs} ms
-                    </span>
-                  )}
-                  {result.error && (
-                    <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
-                      {result.error}
-                    </span>
-                  )}
-                </div>
-              )}
+              <ExchangeSummary result={result} method="POST" />
 
               <div className="card min-w-0 overflow-hidden p-4">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

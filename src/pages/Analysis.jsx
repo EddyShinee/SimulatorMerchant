@@ -6,6 +6,8 @@ import { usePaymentFlow } from '../context/PaymentFlowContext.jsx'
 import LoadingOverlay from '../components/LoadingOverlay.jsx'
 import PasteButton from '../components/PasteButton.jsx'
 import AnalysisDashboard from '../components/AnalysisDashboard.jsx'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import { useAbortableLoading } from '../hooks/useAbortableLoading.js'
 import { proxyErrorMessage } from '../utils/proxyResponse.js'
 import { ANALYSIS_API_SELECT } from '../config/analysisConfig.js'
@@ -56,6 +58,7 @@ export default function Analysis() {
       analysisFullCookie: fullCookie.trim(),
     })
 
+    const exchangeStarted = new Date()
     const signal = start()
     try {
       const { data } = await api.post(
@@ -72,6 +75,7 @@ export default function Analysis() {
         status: data.status,
         durationMs: data.durationMs,
         finalUrl: data.finalUrl,
+        ...stampExchange(exchangeStarted, 'GET'),
       })
       setRawHtml(typeof data.body === 'string' ? data.body : '')
 
@@ -117,11 +121,19 @@ export default function Analysis() {
     } catch (err) {
       if (isAbortError(err)) {
         toast.warning(t('common.requestCancelled'))
+        setMeta({ error: t('common.requestCancelled'), ...stampExchange(exchangeStarted, 'GET') })
         return
       }
       const message = proxyErrorMessage(err, t('errors.network'))
       setError(message)
       toast.error(message)
+      const d = err.response?.data
+      setMeta({
+        status: err.response?.status ?? d?.status,
+        durationMs: d?.durationMs,
+        error: message,
+        ...stampExchange(exchangeStarted, 'GET'),
+      })
     } finally {
       stop()
     }
@@ -209,6 +221,8 @@ export default function Analysis() {
           ⚠️ {parseError}
         </div>
       )}
+
+      {meta && <ExchangeSummary result={meta} method="GET" />}
 
       {rows && meta && <AnalysisDashboard rows={rows} meta={meta} />}
 

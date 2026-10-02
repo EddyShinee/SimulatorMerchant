@@ -931,6 +931,15 @@ export const translations = {
       addAccountSuccess: 'Đã tạo tài khoản {email}.',
       addAccountError: 'Không tạo được tài khoản.',
     },
+    exchange: {
+      method: 'Method',
+      requestedAt: 'Requested at',
+      respondedAt: 'Responded at',
+      duration: 'Response time',
+      httpStatus: 'HTTP status',
+      respCode: 'respCode',
+      none: '—',
+    },
     errors: {
       generic: 'Đã xảy ra lỗi. Vui lòng thử lại.',
       network: 'Không thể kết nối tới máy chủ.',
@@ -1870,6 +1879,15 @@ export const translations = {
       addAccountHide: 'Close form',
       addAccountSuccess: 'Created account {email}.',
       addAccountError: 'Could not create the account.',
+    },
+    exchange: {
+      method: 'Method',
+      requestedAt: 'Requested at',
+      respondedAt: 'Responded at',
+      duration: 'Response time',
+      httpStatus: 'HTTP status',
+      respCode: 'respCode',
+      none: '—',
     },
     errors: {
       generic: 'Something went wrong. Please try again.',

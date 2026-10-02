@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import ExchangeSummary from '../components/ExchangeSummary.jsx'
+import { stampExchange } from '../utils/exchangeMeta.js'
 import api from '../api/client.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -118,6 +120,7 @@ export default function PayoutInquiry() {
       UTR: utr.trim(),
     }
 
+    const exchangeStarted = new Date()
     const signal = start()
     let jwtToken = null
     let finalPayload = null
@@ -146,6 +149,7 @@ export default function PayoutInquiry() {
         status: data?.status,
         statusText: data?.statusText,
         durationMs: data?.durationMs,
+        ...stampExchange(exchangeStarted),
         response: respBody,
         decodedResponse,
         error: data?.error ? data?.message : null,
@@ -162,6 +166,7 @@ export default function PayoutInquiry() {
           finalPayload,
           jwtToken,
           error: t('common.requestCancelled'),
+          ...stampExchange(exchangeStarted),
         })
         return
       }
@@ -173,6 +178,7 @@ export default function PayoutInquiry() {
         finalPayload,
         jwtToken,
         error: message,
+        ...stampExchange(exchangeStarted),
       })
     } finally {
       stop()
@@ -281,31 +287,7 @@ export default function PayoutInquiry() {
             <div className="card p-8 text-center text-sm text-slate-400">{t('paymentToken.noResult')}</div>
           ) : (
             <div className="space-y-4">
-              {(result.status != null || result.error) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {result.status != null && (
-                    <span
-                      className={`rounded-md px-2 py-0.5 text-xs font-bold ${
-                        result.status >= 200 && result.status < 300
-                          ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-                          : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-                      }`}
-                    >
-                      {result.status} {result.statusText || ''}
-                    </span>
-                  )}
-                  {result.durationMs != null && (
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {result.durationMs} ms
-                    </span>
-                  )}
-                  {result.error && (
-                    <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
-                      {result.error}
-                    </span>
-                  )}
-                </div>
-              )}
+              <ExchangeSummary result={result} method="POST" />
 
               <JsonResultCard
                 title={`📤 ${t('payoutInquiry.rawPayload')}`}
