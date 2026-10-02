@@ -361,6 +361,7 @@ export default function PaymentAction() {
   const [topLoyalty, setTopLoyalty] = useState(emptyLoyalty)
 
   // Result
+  const [headersText, setHeadersText] = useState('{\n  "Content-Type": "text/plain"\n}')
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
@@ -475,6 +476,22 @@ export default function PaymentAction() {
       return
     }
 
+    let requestHeaders = {}
+    if (headersText.trim()) {
+      try {
+        requestHeaders = JSON.parse(headersText)
+      } catch {
+        setError(t('paymentAction.invalidHeaders'))
+        toast.warning(t('paymentAction.invalidHeaders'))
+        return
+      }
+      if (!requestHeaders || typeof requestHeaders !== 'object' || Array.isArray(requestHeaders)) {
+        setError(t('paymentAction.invalidHeaders'))
+        toast.warning(t('paymentAction.invalidHeaders'))
+        return
+      }
+    }
+
     const signal = start()
     try {
       const payloadBody = {
@@ -482,6 +499,7 @@ export default function PaymentAction() {
         xml: xmlPreview,
         password: useDefaultKeys ? password || '123' : password,
         useDefaultKeys,
+        headers: requestHeaders,
       }
       if (!useDefaultKeys) {
         const [privBase64, pubBase64] = await Promise.all([
@@ -549,6 +567,17 @@ export default function PaymentAction() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="card space-y-2 p-4">
+            <label className="label">📤 {t('paymentAction.requestHeaders')}</label>
+            <textarea
+              className="input min-h-[96px] font-mono text-xs"
+              value={headersText}
+              onChange={(e) => setHeadersText(e.target.value)}
+              spellCheck={false}
+            />
+            <p className="text-[11px] text-slate-400">{t('paymentAction.requestHeadersHint')}</p>
           </div>
 
           {/* Key management */}
@@ -840,6 +869,18 @@ export default function PaymentAction() {
                       {result.durationMs} ms
                     </span>
                   )}
+                </div>
+              )}
+
+              {result.requestHeaders && (
+                <div className="card p-4">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-700">📤 {t('paymentAction.requestHeaders')}</p>
+                    <CopyButton text={JSON.stringify(result.requestHeaders, null, 2)} />
+                  </div>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                    {JSON.stringify(result.requestHeaders, null, 2)}
+                  </pre>
                 </div>
               )}
 

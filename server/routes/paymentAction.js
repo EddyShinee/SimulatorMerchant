@@ -40,12 +40,52 @@ function jweCompactParts(text) {
   return text.trim().split('.').filter(Boolean).length
 }
 
+const BLOCKED_HEADERS = new Set([
+  'host',
+  'content-length',
+  'connection',
+  'transfer-encoding',
+  'keep-alive',
+  'upgrade',
+])
+
+function buildOutboundHeaders(input) {
+  if (input != null && (typeof input !== 'object' || Array.isArray(input))) {
+    const err = new Error('Request headers must be a JSON object.')
+    err.code = 'INVALID_HEADERS'
+    throw err
+  }
+
+  const headers = {}
+  if (input && typeof input === 'object') {
+    for (const [rawKey, rawValue] of Object.entries(input)) {
+      const key = String(rawKey).trim()
+      if (!key || /[\r\n:]/.test(key)) continue
+      if (BLOCKED_HEADERS.has(key.toLowerCase())) continue
+      if (rawValue == null) continue
+      const value = String(rawValue)
+      if (/[\r\n]/.test(value)) continue
+      headers[key] = value
+    }
+  }
+
+  const hasContentType = Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')
+  if (!hasContentType) headers['Content-Type'] = 'text/plain'
+  return headers
+}
+
 // POST /api/simulator/payment-action
 router.post('/payment-action', async (req, res) => {
   const started = Date.now()
   try {
-    const { apiUrl, xml, useDefaultKeys } = req.body || {}
+    const { apiUrl, xml, useDefaultKeys, headers: requestHeadersInput } = req.body || {}
     let { privateKey, publicCert, password } = req.body || {}
+    let outboundHeaders
+    try {
+      outboundHeaders = buildOutboundHeaders(requestHeadersInput)
+    } catch (e) {
+      return res.status(400).json({ error: e.code || 'INVALID_HEADERS', message: e.message })
+    }
     if (useDefaultKeys && !password) password = '123'
 
     if (!apiUrl || typeof apiUrl !== 'string') {
@@ -95,7 +135,7 @@ router.post('/payment-action', async (req, res) => {
     try {
       const resp = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'content-type': 'text/plain' },
+        headers: outboundHeaders,
         body: finalToken,
         signal: controller.signal,
       })
@@ -133,6 +173,7 @@ router.post('/payment-action', async (req, res) => {
       durationMs: Date.now() - started,
       jwe: jweToken,
       jws: finalToken,
+      requestHeaders: outboundHeaders,
       rawResponse,
       decryptedXml,
       decryptError,
