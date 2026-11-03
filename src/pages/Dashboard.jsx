@@ -256,6 +256,9 @@ export default function Dashboard() {
             {canAccess('payment-flow') && canAccess('payment-inquiry') && (
               <QuickAction to={inquiryTo}>{t('apis.paymentInquiry')}</QuickAction>
             )}
+            {canAccess('payment-v3') && (
+              <QuickAction to="/app/api/payment-v3">{t('apis.paymentV3')}</QuickAction>
+            )}
             {canAccess('analysis') && <QuickAction to="/app/api/analysis">{t('apis.analysis')}</QuickAction>}
             {canAccess('pos-standalone') && (
               <QuickAction to="/app/pos-standalone">{t('nav.posStandalone')}</QuickAction>

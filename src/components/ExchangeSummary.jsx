@@ -19,17 +19,25 @@ function formatStamp(value, lang) {
   return `${datePart}.${String(date.getMilliseconds()).padStart(3, '0')}`
 }
 
-function toneFor(status, resp) {
+function httpTone(status, hasError) {
   const http = Number(status)
-  const code = String(resp?.respCode || '')
-  const kind = code ? paymentResponseStatus({ respCode: code }) : null
-  if (code === '00' || kind === 'success' || kind === 'completed') return 'ok'
+  if (Number.isFinite(http)) {
+    if (http >= 200 && http < 300) return 'ok'
+    if (http >= 300 && http < 400) return 'warn'
+    if (http >= 400) return 'bad'
+  }
+  return hasError ? 'bad' : 'muted'
+}
+
+function respTone(code) {
+  const value = String(code ?? '').trim()
+  if (!value) return 'muted'
+  if (['00', '000', '0000', '2000'].includes(value)) return 'ok'
+  if (['001', '42', '2001', '2002', '2003'].includes(value)) return 'warn'
+  const kind = paymentResponseStatus({ respCode: value })
+  if (kind === 'success' || kind === 'completed') return 'ok'
   if (kind === 'pending') return 'warn'
-  if (kind === 'failed') return 'bad'
-  if (Number.isFinite(http) && http >= 200 && http < 300) return 'ok'
-  if (Number.isFinite(http) && http >= 400) return 'bad'
-  if (Number.isFinite(http) && http >= 300) return 'warn'
-  return 'muted'
+  return 'bad'
 }
 
 const TONE = {
@@ -81,9 +89,8 @@ export default function ExchangeSummary({ result, method = 'POST' }) {
 
   const http = result.status
   const resp = extractRespInfo(result)
-  let toneKey = toneFor(http, resp)
-  if (toneKey === 'muted' && result.error) toneKey = 'bad'
-  const tone = TONE[toneKey]
+  const tone = TONE[httpTone(http, Boolean(result.error))]
+  const codeTone = TONE[respTone(resp?.respCode)]
   const requested = formatStamp(result.requestedAt, lang)
   const responded = formatStamp(result.respondedAt, lang)
   const duration = result.clientDurationMs ?? result.durationMs
@@ -105,7 +112,7 @@ export default function ExchangeSummary({ result, method = 'POST' }) {
         </span>
         <span className={`text-sm font-bold ${tone.value}`}>HTTP {httpLabel}</span>
         {resp?.respCode && (
-          <span className={`text-sm font-bold ${tone.value}`}>respCode {resp.respCode}</span>
+          <span className={`text-sm font-bold ${codeTone.value}`}>respCode {resp.respCode}</span>
         )}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -114,7 +121,7 @@ export default function ExchangeSummary({ result, method = 'POST' }) {
           <span className={tone.value}>{httpLabel}</span>
         </Cell>
         <Cell label={t('exchange.respCode')} emphasize>
-          <span className={tone.value}>{codeLabel}</span>
+          <span className={codeTone.value}>{codeLabel}</span>
         </Cell>
         <Cell label={t('exchange.requestedAt')}>{requested || t('exchange.none')}</Cell>
         <Cell label={t('exchange.respondedAt')}>{responded || t('exchange.none')}</Cell>

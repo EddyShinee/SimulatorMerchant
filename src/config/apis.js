@@ -49,6 +49,18 @@ export const API_CATALOG = [
     },
   },
   {
+    id: 'payment-v3',
+    nameKey: 'apis.paymentV3',
+    method: 'POST',
+    path: '/api/simulator/hook/payment-v3',
+    sampleBody: {
+      merchantID: '344344000069000',
+      paymentChannel: 'VNQR',
+      amt: '000000000030',
+      currencyCode: '704',
+    },
+  },
+  {
     id: 'transaction-status-inquiry',
     nameKey: 'apis.transactionStatusInquiry',
     method: 'GET',

@@ -1,7 +1,8 @@
 import CopyButton from './CopyButton.jsx'
 import CodeBlock from './CodeBlock.jsx'
+import { formatStructuredText } from '../utils/formatStructuredText.js'
 
-/** Result card with optional JSON syntax highlighting. */
+/** Result card. JSON and XML are pretty-printed unless language is "text". */
 export default function JsonResultCard({
   title,
   text,
@@ -9,7 +10,8 @@ export default function JsonResultCard({
   language = 'auto',
   copyLabel,
 }) {
-  const body = text == null ? '' : typeof text === 'string' ? text : JSON.stringify(text, null, 2)
+  const raw = text == null ? '' : typeof text === 'string' ? text : JSON.stringify(text, null, 2)
+  const body = language === 'text' ? raw : formatStructuredText(raw)
 
   return (
     <div className="card min-w-0 overflow-hidden p-4">

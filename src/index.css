@@ -64,7 +64,8 @@ body {
   .code-block-plain {
     @apply text-slate-100;
   }
-  .json-view {
+  .json-view,
+  .xml-view {
     @apply font-mono text-xs leading-relaxed;
     white-space: pre;
   }

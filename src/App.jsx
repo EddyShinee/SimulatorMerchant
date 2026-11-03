@@ -12,6 +12,7 @@ import ApiConsole from './pages/ApiConsole.jsx'
 import PaymentToken from './pages/PaymentToken.jsx'
 import DoPayment from './pages/DoPayment.jsx'
 import PaymentAction from './pages/PaymentAction.jsx'
+import PaymentV3 from './pages/PaymentV3.jsx'
 import PaymentPos from './pages/PaymentPos.jsx'
 import PaymentInquiry from './pages/PaymentInquiry.jsx'
 import TransactionStatusInquiry from './pages/TransactionStatusInquiry.jsx'
@@ -156,6 +157,14 @@ export default function App() {
           element={
             <FeatureRoute feature="payment-action">
               <PaymentAction />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="api/payment-v3"
+          element={
+            <FeatureRoute feature="payment-v3">
+              <PaymentV3 />
             </FeatureRoute>
           }
         />
