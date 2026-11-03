@@ -31,12 +31,16 @@ export const FEATURE_GROUPS = [
       { key: 'payment-option-details', labelKey: 'apis.paymentOptionDetails' },
       { key: 'do-payment', labelKey: 'apis.doPayment' },
       { key: 'payment-action', labelKey: 'apis.paymentAction' },
-      { key: 'payment-v3', labelKey: 'apis.paymentV3' },
       { key: 'transaction-status-inquiry', labelKey: 'apis.transactionStatusInquiry' },
       { key: 'payment-inquiry', labelKey: 'apis.paymentInquiry' },
       { key: 'payment-pos', labelKey: 'apis.paymentPos' },
       { key: 'analysis', labelKey: 'apis.analysis' },
     ],
+  },
+  {
+    id: 'payment-v3',
+    labelKey: 'access.groupPaymentV3',
+    features: [{ key: 'payment-v3', labelKey: 'apis.paymentV3' }],
   },
   {
     id: 'payout',

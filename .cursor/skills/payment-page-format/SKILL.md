@@ -101,11 +101,21 @@ Use one id everywhere, for example `payment-v3`.
 
 1. `src/config/<name>Config.js` — `ENVIRONMENTS` and `ENV_OPTIONS`.
 2. `src/pages/<Page>.jsx` — the shell above.
-3. `src/config/apis.js` — `API_CATALOG` entry. The sidebar reads this list.
-4. `src/config/accessControl.js` — same id in the `api` feature group.
+3. `src/config/apis.js` — `API_CATALOG` entry for Payment 4.x pages only. The "Choose API" sidebar reads this list.
+4. `src/config/accessControl.js` — same id in the `api` feature group for Payment 4.x. Payment V3 stays in its own `payment-v3` group and its own sidebar section (`nav.sectionPaymentV3`), not in Choose API, so it is not mixed with Payment V4.
 5. `src/App.jsx` — static route `api/<id>` wrapped in `<FeatureRoute feature="<id>">`, next to the other API routes.
 6. `src/i18n/translations.js` — `apis.<key>` plus the page's own strings in **both** `vi` and `en`. Reuse `paymentToken.configuration`, `basicInfo`, `environment`, `apiUrl`, `secretKey`, `results`, `noResult`, and `rawResponse`.
 
 `SimulatorLayout` titles the page from `API_CATALOG`. Add a Dashboard quick action only when the user asks for one.
 
 Read `src/pages/PaymentToken.jsx` before editing a page so class names and section order stay aligned with that file.
+
+## Version
+
+A user-facing change bumps the patch version before the work is finished. `APP_VERSION` in `src/config/appVersion.js` reads `version` from `package.json`, and the sidebar brand shows that value.
+
+```bash
+npm version patch --no-git-tag-version
+```
+
+That updates `package.json` and `package-lock.json` only. Do not create a git tag. Skip the bump for comment-only edits.

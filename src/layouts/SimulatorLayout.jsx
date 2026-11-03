@@ -89,6 +89,7 @@ function usePageTitle(pathname, t) {
   if (pathname.includes('/pos-standalone')) return t('nav.posStandalone')
   if (pathname.includes('/payout/inquiry')) return t('nav.payoutInquiry')
   if (pathname.includes('/payout/create')) return t('nav.payoutCreate')
+  if (pathname.includes('/api/payment-v3')) return t('nav.paymentV3')
   const apiMatch = pathname.match(/\/app\/api\/([^/]+)/)
   if (apiMatch) {
     const api = API_CATALOG.find((a) => a.id === apiMatch[1])
@@ -156,6 +157,20 @@ export default function SimulatorLayout() {
                 />
               ))}
             </div>
+          </>
+        )}
+
+        {canAccess('payment-v3') && (
+          <>
+            <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              {t('nav.sectionPaymentV3')}
+            </p>
+            <NavItem
+              to="/app/api/payment-v3"
+              icon={IconApi}
+              label={t('nav.paymentV3')}
+              onClick={closeMobile}
+            />
           </>
         )}
 
